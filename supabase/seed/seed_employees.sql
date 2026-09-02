@@ -1,0 +1,16 @@
+insert into employees (name, employee_type, joining_date, team, status) values
+('Aarav Sharma', 'apprentice_nontech', '2026-06-01', 'Operations', 'active'),
+('Priya Verma', 'apprentice_tech', '2026-05-15', 'Engineering', 'active'),
+('Rohan Gupta', 'intern', '2026-04-01', 'Engineering', 'active'),
+('Sneha Iyer', 'intern', '2026-03-10', 'Design', 'active'),
+('Vikram Singh', 'fte', '2025-08-01', 'Engineering', 'active'),
+('Anjali Nair', 'fte', '2025-09-15', 'Operations', 'active'),
+('Karan Mehta', 'ftc', '2026-01-10', 'Finance', 'active'),
+('Divya Reddy', 'ftc', '2026-02-01', 'Engineering', 'active'),
+('Arjun Kumar', 'contractor', '2026-07-01', 'Design', 'active'),
+('Meera Joshi', 'contractor', '2026-06-15', 'Operations', 'active'),
+('Rahul Desai', 'apprentice_tech', '2026-07-10', 'Engineering', 'active'),
+('Pooja Nair', 'apprentice_nontech', '2026-07-05', 'Operations', 'active'),
+('Aditya Rao', 'intern', '2026-02-20', 'Engineering', 'active'),
+('Kavya Pillai', 'fte', '2025-10-01', 'Design', 'active'),
+('Sanjay Patel', 'ftc', '2026-03-01', 'Operations', 'active');
