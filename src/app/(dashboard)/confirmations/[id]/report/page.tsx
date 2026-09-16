@@ -1,5 +1,5 @@
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
-
+import { ApproveButton } from './ApproveButton'
 export default async function CompiledReportPage({
   params,
 }: {
@@ -60,8 +60,10 @@ export default async function CompiledReportPage({
               <p className="text-gray-700 text-sm">{entry.feedbackText}</p>
             )}
           </div>
-        ))}
-      </div>
-    </div>
-  )
+               ))}
+      </div>
+
+      <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
+    </div>
+  )
 }

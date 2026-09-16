@@ -1,9 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type CompiledFeedback = {
-  confirmationId: string
-  employeeName: string
-  employeeType: string
+  confirmationId: string
+  employeeId: string
+  employeeName: string
+  employeeType: string
   totalNominated: number
   totalSubmitted: number
   totalPending: number
@@ -69,9 +70,10 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
     }
   }
 
-  return {
-    confirmationId,
-    employeeName: confirmation.employees?.name || 'Unknown',
+   return {
+    confirmationId,
+    employeeId: confirmation.employee_id,
+    employeeName: confirmation.employees?.name || 'Unknown',
     employeeType: confirmation.employees?.employee_type || 'Unknown',
     totalNominated,
     totalSubmitted,
