@@ -8,9 +8,10 @@ export async function nominatePeers(
   peers: { name: string; employeeId?: string; email?: string }[]
 ) {
   const supabase = createServerSupabaseClient()
-  const rows = peers.map((peer) => ({
+   const rows = peers.map((peer) => ({
     confirmation_id: confirmationId,
     peer_name: peer.name,
+    peer_email: peer.email || null,
     peer_employee_id: peer.employeeId || null,
     response_status: 'pending',
   }))
