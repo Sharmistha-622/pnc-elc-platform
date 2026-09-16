@@ -19,7 +19,7 @@ export default async function ManagerDecisionPage({
       <p className="text-gray-600 mb-6">
         Employee: {confirmation.employees?.name} ({confirmation.employees?.employee_type})
       </p>
-      <ManagerDecisionForm confirmationId={id} />
+     <ManagerDecisionForm confirmationId={id} employeeName={confirmation.employees?.name || 'this employee'} />
     </div>
   )
 }
