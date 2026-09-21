@@ -61,11 +61,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/employees",
       icon: Users,
     },
-    {
-      title: "Appraisals",
-      url: "/appraisals",
-      icon: TrendingUp,
-    },
+   {
+      title: "Appraisals",
+      url: "/appraisals",
+      icon: TrendingUp,
+    },
+    {
+      title: "Appraisal Report",
+      url: "/appraisals/report",
+      icon: ClipboardCheck,
+    },
     {
       title: "Components Showcase",
       url: "/components",
