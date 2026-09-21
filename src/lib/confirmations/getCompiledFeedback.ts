@@ -27,7 +27,7 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
 
   const { data: confirmation, error: confirmationError } = await supabase
     .from('confirmations')
-    .select('*, employees(name, employee_type)')
+       .select('*, employees(name, employee_types(name))')
     .eq('id', confirmationId)
     .single()
 
@@ -74,7 +74,7 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
     confirmationId,
     employeeId: confirmation.employee_id,
     employeeName: confirmation.employees?.name || 'Unknown',
-    employeeType: confirmation.employees?.employee_type || 'Unknown',
+       employeeType: confirmation.employees?.employee_types?.name || 'Unknown',
     totalNominated,
     totalSubmitted,
     totalPending,
