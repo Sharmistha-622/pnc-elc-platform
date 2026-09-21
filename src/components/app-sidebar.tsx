@@ -7,6 +7,10 @@ import {
   Send,
   LayoutDashboard,
   Settings,
+  Users,
+  ClipboardCheck,
+  TrendingUp,
+  Fingerprint,
 } from "lucide-react"
 
 import { NavMain, NavItem } from "@/components/nav-main"
@@ -20,7 +24,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { Fingerprint } from "lucide-react"
 import Link from "next/link"
 
 const data = {
@@ -54,6 +57,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       isActive: true,
     },
     {
+      title: "Employees",
+      url: "/employees",
+      icon: Users,
+    },
+    {
+      title: "Appraisals",
+      url: "/appraisals",
+      icon: TrendingUp,
+    },
+    {
       title: "Components Showcase",
       url: "/components",
       icon: BookOpen,
@@ -74,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link 
+              <Link
                 href="/"
                 onClick={() => {
                   if (isMobile) setOpenMobile(false)
