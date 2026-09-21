@@ -5,11 +5,13 @@ import { updateManagerDecision } from '@/lib/confirmations/updateManagerDecision
 import { generateCalendarLink } from '@/lib/calendar/generateCalendarLink'
 
 export function ManagerDecisionForm({
-  confirmationId,
-  employeeName,
+  confirmationId,
+  employeeName,
+  employeeEmail,
 }: {
-  confirmationId: string
-  employeeName: string
+  confirmationId: string
+  employeeName: string
+  employeeEmail?: string
 }) {
   const [decision, setDecision] = useState<'yes' | 'no' | ''>('')
   const [rescheduleDate, setRescheduleDate] = useState('')
@@ -31,11 +33,12 @@ export function ManagerDecisionForm({
       suggestedDate.setDate(suggestedDate.getDate() + 3)
       suggestedDate.setHours(10, 0, 0, 0)
 
-      const calendarLink = generateCalendarLink({
-        title: `Confirmation Review Meeting — ${employeeName}`,
-        description: `Review meeting for ${employeeName}'s confirmation process.`,
-        startDateTime: suggestedDate,
-      })
+           const calendarLink = generateCalendarLink({
+        title: `Confirmation Review Meeting — ${employeeName}`,
+        description: `Review meeting for ${employeeName}'s confirmation process.`,
+        startDateTime: suggestedDate,
+        guestEmail: employeeEmail,
+      })
 
       return (
         <div>
