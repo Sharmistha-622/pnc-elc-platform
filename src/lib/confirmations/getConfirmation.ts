@@ -4,7 +4,7 @@ export async function getConfirmation(confirmationId: string) {
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('confirmations')
-    .select('*, employees(name, employee_type, joining_date)')
+    .select('*, employees(name, employee_type, joining_date, email)')
     .eq('id', confirmationId)
     .single()
 
