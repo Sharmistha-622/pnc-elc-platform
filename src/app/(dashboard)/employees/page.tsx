@@ -1,4 +1,5 @@
 import { getEmployees } from '@/lib/employees/getEmployees'
+import Link from 'next/link'
 
 export default async function EmployeesPage() {
   const employees = await getEmployees()
@@ -14,6 +15,7 @@ export default async function EmployeesPage() {
             <th className="text-left p-2">Team</th>
             <th className="text-left p-2">Joining Date</th>
             <th className="text-left p-2">Status</th>
+            <th className="text-left p-2">Profile</th>
           </tr>
         </thead>
         <tbody>
@@ -24,6 +26,14 @@ export default async function EmployeesPage() {
               <td className="p-2">{emp.team || '-'}</td>
               <td className="p-2">{emp.joining_date}</td>
               <td className="p-2">{emp.status}</td>
+              <td className="p-2">
+                <Link
+                  href={`/employees/${emp.id}/profile`}
+                  className="text-blue-600 hover:underline"
+                >
+                  View Profile
+                </Link>
+              </td>
             </tr>
           ))}
         </tbody>
