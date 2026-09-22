@@ -20,6 +20,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageBanner } from "@/components/shared/page-banner";
 
 const SAMPLE_BATCHES = [
   {
@@ -78,24 +79,23 @@ export default function RollbackCenterPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-200">
-      {/* Header */}
-      <div className="flex items-center gap-3.5 border-b border-border/60 pb-5">
-        <Link
-          href="/data-management"
-          className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <RotateCcw className="h-6 w-6 text-rose-600 dark:text-rose-400" />
-            Rollback Center
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Safely restore single employee records to historical points in time or undo bulk import batches.
-          </p>
-        </div>
-      </div>
+      {/* Banner */}
+      <PageBanner
+        title="Rollback Center"
+        description="Safely restore single employee records to historical points in time or undo bulk import batches."
+        icon={<RotateCcw className="h-8 w-8 text-teal-500" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/data-management"
+              className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-foreground text-xs font-semibold flex items-center gap-1.5 bg-background"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Hub</span>
+            </Link>
+          </div>
+        }
+      />
 
       {/* Safety Notice */}
       <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs">

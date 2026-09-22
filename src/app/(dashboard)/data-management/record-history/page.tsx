@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageBanner } from "@/components/shared/page-banner";
 
 const SAMPLE_TIMELINE = [
   {
@@ -58,24 +59,23 @@ export default function RecordHistoryPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-200">
-      {/* Header */}
-      <div className="flex items-center gap-3.5 border-b border-border/60 pb-5">
-        <Link
-          href="/data-management"
-          className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <UserRoundCog className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            Record History
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track granular field-level updates and timeline changes for individual employee records.
-          </p>
-        </div>
-      </div>
+      {/* Banner */}
+      <PageBanner
+        title="Record History"
+        description="Track granular field-level updates and timeline changes for individual employee records."
+        icon={<UserRoundCog className="h-8 w-8 text-teal-500" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/data-management"
+              className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-foreground text-xs font-semibold flex items-center gap-1.5 bg-background"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Hub</span>
+            </Link>
+          </div>
+        }
+      />
 
       {/* Search Filter Card */}
       <Card className="rounded-lg bg-card/60 backdrop-blur-md border border-border shadow-xs p-4">

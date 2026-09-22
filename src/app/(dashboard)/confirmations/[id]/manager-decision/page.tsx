@@ -1,5 +1,7 @@
 import { getConfirmation } from '@/lib/confirmations/getConfirmation'
 import { ManagerDecisionForm } from './ManagerDecisionForm'
+import { PageBanner } from '@/components/shared/page-banner'
+import { ShieldCheck, UserCheck } from 'lucide-react'
 
 export default async function ManagerDecisionPage({
   params,
@@ -10,20 +12,34 @@ export default async function ManagerDecisionPage({
   const confirmation = await getConfirmation(id)
 
   if (!confirmation) {
-    return <div className="p-6">Confirmation not found.</div>
+    return (
+      <div className="space-y-6">
+        <PageBanner
+          badge="Error"
+          title="Confirmation Not Found"
+          description="The requested confirmation decision record could not be found."
+          icon={ShieldCheck}
+        />
+      </div>
+    )
   }
 
   return (
-    <div className="p-6 max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">Manager Decision</h1>
-      <p className="text-gray-600 mb-6">
-        Employee: {confirmation.employees?.name} ({confirmation.employees?.employee_type})
-      </p>
-    <ManagerDecisionForm
-  confirmationId={id}
-  employeeName={confirmation.employees?.name || 'this employee'}
-  employeeEmail={confirmation.employees?.email}
-/>
+    <div className="space-y-6 max-w-2xl">
+      <PageBanner
+        badge="Manager Review"
+        title={`Manager Decision — ${confirmation.employees?.name || 'Employee'}`}
+        description={`Record final manager evaluation and decision for ${confirmation.employees?.name} (${confirmation.employees?.employee_type || 'Probation'}).`}
+        icon={UserCheck}
+      />
+
+      <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+        <ManagerDecisionForm
+          confirmationId={id}
+          employeeName={confirmation.employees?.name || 'this employee'}
+          employeeEmail={confirmation.employees?.email}
+        />
+      </div>
     </div>
   )
 }

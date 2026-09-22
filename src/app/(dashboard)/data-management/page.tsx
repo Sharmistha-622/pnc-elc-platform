@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PageBanner } from "@/components/shared/page-banner";
 
 const DATA_MANAGEMENT_CATEGORIES = [
   {
@@ -81,22 +82,12 @@ export default function DataManagementPage() {
       <div className="absolute top-0 right-1/4 w-80 h-80 bg-primary/5 rounded-full filter blur-[80px] pointer-events-none -z-10" />
       <div className="absolute bottom-20 left-1/3 w-96 h-96 bg-indigo-500/5 rounded-full filter blur-[100px] pointer-events-none -z-10" />
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-6">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary rounded-lg border border-primary/20 shadow-inner">
-            <Database className="w-6 h-6 animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground/80">
-              Data Management
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              System administration utilities for imports, records lifecycle, audit tracking, and database integrity.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Banner */}
+      <PageBanner
+        title="Data Management"
+        description="System administration utilities for imports, records lifecycle, audit tracking, and database integrity."
+        icon={<Database className="h-8 w-8 text-teal-500" />}
+      />
 
       {/* Category Sections */}
       <div className="space-y-12">

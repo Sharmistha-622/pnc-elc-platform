@@ -20,6 +20,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageBanner } from "@/components/shared/page-banner";
 
 const SAMPLE_LOGS = [
   {
@@ -147,40 +148,36 @@ export default function AuditLogsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/60 pb-5">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/data-management"
-            className="p-2 border border-border/80 rounded-xl hover:bg-muted transition-all text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-              <FileSpreadsheet className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              Audit Logs
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Append-only change log and system security audit trail
-            </p>
+      {/* Banner */}
+      <PageBanner
+        title="Audit Logs"
+        description="Append-only change log and system security audit trail across all user records."
+        icon={<FileSpreadsheet className="h-8 w-8 text-teal-500" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/data-management"
+              className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-foreground text-xs font-semibold flex items-center gap-1.5 bg-background"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Hub</span>
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchLogs}
+              disabled={loading}
+              className="rounded-lg h-9 text-xs gap-1.5 font-semibold bg-background"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
           </div>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchLogs}
-          disabled={loading}
-          className="rounded-xl h-9 text-xs gap-1.5 font-semibold"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
+        }
+      />
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-card/60 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-card/60 backdrop-blur-md p-4 rounded-lg border border-slate-200 dark:border-zinc-800 shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -219,7 +216,7 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Audit Logs Table */}
-      <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-card/60 backdrop-blur-md shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-card/60 backdrop-blur-md shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-slate-50/75 dark:bg-zinc-900/50">
             <TableRow>

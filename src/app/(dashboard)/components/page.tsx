@@ -89,19 +89,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { PageBanner } from "@/components/shared/page-banner";
+import { Component, Layers } from "lucide-react";
+
 export default function ComponentsShowcasePage() {
   const [progress, setProgress] = useState(60);
 
   return (
-    <div className="flex flex-1 flex-col gap-10 p-4 md:p-8 max-w-7xl mx-auto w-full pb-20">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Components Showcase</h1>
-        <p className="text-muted-foreground text-lg">
-          A comprehensive style guide of all pre-installed shadcn/ui components and their variations.
-        </p>
-      </div>
-
-      <Separator />
+    <div className="flex flex-1 flex-col gap-8 max-w-7xl mx-auto w-full pb-20">
+      <PageBanner
+        badge="Design System"
+        title="Components Showcase"
+        description="A comprehensive style guide and interactive catalog of all pre-installed shadcn/ui components and design tokens."
+        icon={Layers}
+      />
 
       {/* 1. Typography, Buttons & Badges */}
       <section className="space-y-6">
@@ -110,7 +111,7 @@ export default function ComponentsShowcasePage() {
         <div className="space-y-8">
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Typography</h3>
-            <div className="space-y-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="space-y-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
               <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Heading 1</h1>
               <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">Heading 2</h2>
               <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">Heading 3</h3>
@@ -122,7 +123,7 @@ export default function ComponentsShowcasePage() {
 
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Buttons</h3>
-            <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
               <Button>Default</Button>
               <Button variant="secondary">Secondary</Button>
               <Button variant="destructive">Destructive</Button>
@@ -135,7 +136,7 @@ export default function ComponentsShowcasePage() {
 
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Badges</h3>
-            <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
               <Badge>Default</Badge>
               <Badge variant="secondary">Secondary</Badge>
               <Badge variant="destructive">Destructive</Badge>
@@ -149,7 +150,7 @@ export default function ComponentsShowcasePage() {
       <section className="space-y-6 mt-10">
         <h2 className="text-2xl font-semibold tracking-tight border-b pb-2">Forms & Inputs</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
@@ -213,7 +214,7 @@ export default function ComponentsShowcasePage() {
       <section className="space-y-6 mt-10">
         <h2 className="text-2xl font-semibold tracking-tight border-b pb-2">Overlays & Modals</h2>
         
-        <div className="flex flex-wrap gap-6 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="flex flex-wrap gap-6 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">Open Dialog</Button>
@@ -282,7 +283,7 @@ export default function ComponentsShowcasePage() {
       <section className="space-y-6 mt-10">
         <h2 className="text-2xl font-semibold tracking-tight border-b pb-2">Data Display & Feedback</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
           <Card>
             <CardHeader>
               <CardTitle>Card Title</CardTitle>
@@ -357,7 +358,7 @@ export default function ComponentsShowcasePage() {
       <section className="space-y-6 mt-10">
         <h2 className="text-2xl font-semibold tracking-tight border-b pb-2">Layout & Navigation</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-lg border border-slate-200 dark:border-slate-800">
           <Tabs defaultValue="account" className="w-[400px] max-w-full">
             <TabsList>
               <TabsTrigger value="account">Account</TabsTrigger>
