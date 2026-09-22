@@ -51,3 +51,4 @@ OnboardingContent/
 supabase/seed-*.ts
 supabase/extract-onboarding-content.ts
 tmp/
+graphify-out/
