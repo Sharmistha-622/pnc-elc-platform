@@ -2,13 +2,6 @@
 
 import React, { useMemo } from "react";
 import { Users, CheckCircle2, Layers, Shield } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 interface UsersStatsProps {
   users: any[];
@@ -172,14 +165,14 @@ export function UsersStatsCharts({ users }: UsersStatsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
       {/* Role Distribution */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs overflow-hidden">
-        <CardHeader className="py-3 px-4 border-b border-border/60">
-          <CardTitle className="text-sm font-bold tracking-tight">Role Distribution</CardTitle>
-          <CardDescription className="text-xs">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs overflow-hidden flex flex-col">
+        <div className="py-3 px-4 border-b border-border/60">
+          <h3 className="text-sm font-bold tracking-tight text-foreground">Role Distribution</h3>
+          <p className="text-xs text-muted-foreground">
             Team members mapped by assigned application role
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 space-y-2.5">
+          </p>
+        </div>
+        <div className="p-4 space-y-2.5">
           {roleDistribution.length > 0 ? (
             roleDistribution.map(({ role, value }) => {
               const pct = Math.round((value / totalUsers) * 100);
@@ -204,18 +197,18 @@ export function UsersStatsCharts({ users }: UsersStatsProps) {
           ) : (
             <div className="py-4 text-center text-muted-foreground text-xs">No roles to display</div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Team Distribution */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs overflow-hidden">
-        <CardHeader className="py-3 px-4 border-b border-border/60">
-          <CardTitle className="text-sm font-bold tracking-tight">Team Allocations</CardTitle>
-          <CardDescription className="text-xs">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs overflow-hidden flex flex-col">
+        <div className="py-3 px-4 border-b border-border/60">
+          <h3 className="text-sm font-bold tracking-tight text-foreground">Team Allocations</h3>
+          <p className="text-xs text-muted-foreground">
             Team members mapped by functional team assignments
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 space-y-2.5">
+          </p>
+        </div>
+        <div className="p-4 space-y-2.5">
           {teamDistribution.length > 0 ? (
             teamDistribution.map(({ team, value }) => {
               const pct = Math.round((value / totalUsers) * 100);
@@ -240,8 +233,8 @@ export function UsersStatsCharts({ users }: UsersStatsProps) {
           ) : (
             <div className="py-4 text-center text-muted-foreground text-xs">No teams to display</div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
