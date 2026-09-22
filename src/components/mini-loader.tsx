@@ -25,29 +25,29 @@ export function MiniLoader() {
 
       case 1:
         return (
-          <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white animate-in duration-500">
-            <span className="font-black text-xl">NG</span>
+          <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white animate-in duration-500 px-1">
+            <span className="font-black text-xs tracking-tight whitespace-nowrap">NG ELC</span>
           </div>
         );
 
       case 2:
         return (
           <div className="w-full h-full flex items-center justify-center bg-sky-500 text-white animate-in slide-in-from-right duration-500">
-            <i className="fa-solid fa-user-group text-xl"></i>
+            <i className="fa-solid fa-file-signature text-xl"></i>
           </div>
         );
 
       case 3:
         return (
           <div className="w-full h-full flex items-center justify-center bg-emerald-500 text-white animate-in slide-in-from-right duration-500">
-            <i className="fa-solid fa-chalkboard-user text-xl"></i>
+            <i className="fa-solid fa-clipboard-check text-xl"></i>
           </div>
         );
 
       case 4:
         return (
           <div className="w-full h-full flex items-center justify-center bg-amber-500 text-white animate-in slide-in-from-right duration-500">
-            <i className="fa-solid fa-seedling text-xl"></i>
+            <i className="fa-solid fa-award text-xl"></i>
           </div>
         );
 
