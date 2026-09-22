@@ -7,7 +7,6 @@ import {
   Database,
   UserCheck,
   Layers,
-  ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -90,10 +89,6 @@ export default function DashboardPage() {
               <Link key={item.href} href={item.href} className="group block">
                 <div className="h-full border border-border/80 bg-card/60 backdrop-blur-sm transition-all duration-300 relative overflow-hidden group-hover:-translate-y-0.5 group-hover:shadow-md rounded-lg p-4 flex flex-col gap-2.5">
                   <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
-                  
-                  <div className="absolute right-3.5 top-3.5 opacity-0 group-hover:opacity-100 transition-all duration-300 text-muted-foreground">
-                    <ArrowRight className="w-4 h-4 translate-x-[-4px] group-hover:translate-x-0 transition-transform" />
-                  </div>
 
                   <div className="relative z-10 flex items-center justify-between">
                     <div className={`p-2 rounded-lg transition-all duration-300 ${item.iconBg} shadow-xs group-hover:scale-105 shrink-0 flex items-center justify-center`}>

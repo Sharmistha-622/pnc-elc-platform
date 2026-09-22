@@ -7,7 +7,6 @@ import {
   UserRoundCog,
   RotateCcw,
   Database,
-  ArrowRight,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageBanner } from "@/components/shared/page-banner";
@@ -103,9 +102,6 @@ export default function DataManagementPage() {
                   <Link key={link.href} href={link.href} className="group block">
                     <Card className={`h-full border border-border/80 bg-card/60 backdrop-blur-sm transition-all duration-300 relative overflow-hidden group-hover:-translate-y-1 group-hover:shadow-lg rounded-lg ${link.border}`}>
                       <div className={`absolute inset-0 bg-gradient-to-br ${link.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-                      <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-all duration-300 text-muted-foreground">
-                        <ArrowRight className="w-4 h-4 translate-x-[-8px] group-hover:translate-x-0 transition-transform" />
-                      </div>
                       <CardHeader className="flex flex-col items-start gap-4 space-y-0 relative z-10">
                         <div className="flex flex-row items-center gap-4 pr-6 w-full">
                           <div className={`p-3 rounded-lg transition-all duration-300 ${link.iconBg} shadow-sm group-hover:scale-105 group-hover:rotate-3 shrink-0 flex items-center justify-center`}>
