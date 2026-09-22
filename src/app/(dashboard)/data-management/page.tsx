@@ -105,7 +105,7 @@ export default function DataManagementPage() {
             <h2 className="text-xl font-bold tracking-tight text-foreground/90 border-b border-border/40 pb-2">
               {category.title}
             </h2>
-            <div className={`grid grid-cols-1 ${category.links.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"} gap-6`}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {category.links.map((link) => {
                 const Icon = link.icon;
                 return (
