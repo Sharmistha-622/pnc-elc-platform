@@ -7,125 +7,134 @@ import {
   UserRoundCog,
   RotateCcw,
   Database,
+  ArrowRight,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-const DATA_MANAGEMENT_SECTIONS = [
+const DATA_MANAGEMENT_CATEGORIES = [
   {
     title: "Employee Data",
-    cards: [
+    links: [
       {
         href: "/data-management/import",
-        title: "Import Employee Data",
-        badge: "SUPER ADMIN",
+        label: "Import Employee Data",
         description: "Upload CSV or XLSX exports, and configure schema mappings.",
         icon: FileUp,
-        iconStyle: "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400",
+        badge: "Super Admin",
+        gradient: "from-indigo-500/10 via-purple-500/5 to-transparent",
+        border: "hover:border-indigo-500/30 dark:hover:border-indigo-500/50",
+        iconBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white",
       },
       {
         href: "/data-management/import-history",
-        title: "Import History",
-        badge: "INTERNAL USERS",
+        label: "Import History",
         description: "Review details and statistics of all previous system data imports.",
         icon: History,
-        iconStyle: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400",
+        badge: "Internal Users",
+        gradient: "from-emerald-500/10 via-teal-500/5 to-transparent",
+        border: "hover:border-emerald-500/30 dark:hover:border-emerald-500/50",
+        iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white",
       },
     ],
   },
   {
     title: "Audits and Rollbacks",
-    cards: [
+    links: [
       {
         href: "/data-management/audit-logs",
-        title: "Audit Logs",
-        badge: "INTERNAL USERS",
+        label: "Audit Logs",
         description: "Full append-only change logs and activity audits across all profiles.",
         icon: FileSpreadsheet,
-        iconStyle: "bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400",
+        badge: "Internal Users",
+        gradient: "from-blue-500/10 via-sky-500/5 to-transparent",
+        border: "hover:border-blue-500/30 dark:hover:border-blue-500/50",
+        iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white",
       },
       {
         href: "/data-management/record-history",
-        title: "Record History",
-        badge: "SUPER ADMIN",
+        label: "Record History",
         description: "Track granular field-level updates and timeline changes for individuals.",
         icon: UserRoundCog,
-        iconStyle: "bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400",
+        badge: "Super Admin",
+        gradient: "from-violet-500/10 via-fuchsia-500/5 to-transparent",
+        border: "hover:border-violet-500/30 dark:hover:border-violet-500/50",
+        iconBg: "bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-600 group-hover:text-white",
       },
       {
         href: "/data-management/rollback",
-        title: "Rollback Center",
-        badge: "SUPER ADMIN",
+        label: "Rollback Center",
         description: "Perform safety restores on single accounts or undo entire import batches.",
         icon: RotateCcw,
-        iconStyle: "bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400",
+        badge: "Super Admin",
+        gradient: "from-rose-500/10 via-red-500/5 to-transparent",
+        border: "hover:border-rose-500/30 dark:hover:border-rose-500/50",
+        iconBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400 group-hover:bg-rose-600 group-hover:text-white",
       },
     ],
   },
 ];
 
-export default function DataManagementHubPage() {
+export default function DataManagementPage() {
   return (
-    <div className="flex flex-col gap-8 p-6 md:p-8 w-full max-w-7xl mx-auto pb-20 animate-in fade-in duration-200">
-      {/* Clean Compact Header (matching reference) */}
-      <div className="flex items-center gap-3.5">
-        <div className="w-11 h-11 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-center shrink-0">
-          <Database className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Data Management
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            System administration utilities for imports, records lifecycle, audit tracking, and database integrity.
-          </p>
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in slide-in-from-bottom-3 duration-500 relative">
+      {/* Decorative background ambient glows */}
+      <div className="absolute top-0 right-1/4 w-80 h-80 bg-primary/5 rounded-full filter blur-[80px] pointer-events-none -z-10" />
+      <div className="absolute bottom-20 left-1/3 w-96 h-96 bg-indigo-500/5 rounded-full filter blur-[100px] pointer-events-none -z-10" />
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary rounded-lg border border-primary/20 shadow-inner">
+            <Database className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground/80">
+              Data Management
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              System administration utilities for imports, records lifecycle, audit tracking, and database integrity.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Sections */}
-      <div className="space-y-8">
-        {DATA_MANAGEMENT_SECTIONS.map((section) => (
-          <div key={section.title} className="space-y-3.5">
-            <h2 className="text-base font-bold tracking-tight text-foreground">
-              {section.title}
+      {/* Category Sections */}
+      <div className="space-y-12">
+        {DATA_MANAGEMENT_CATEGORIES.map((category) => (
+          <div key={category.title} className="space-y-4">
+            <h2 className="text-xl font-bold tracking-tight text-foreground/90 border-b border-border/40 pb-2">
+              {category.title}
             </h2>
-
-            <div
-              className={`grid grid-cols-1 ${
-                section.cards.length === 2
-                  ? "md:grid-cols-2"
-                  : "md:grid-cols-3"
-              } gap-4`}
-            >
-              {section.cards.map((card) => {
-                const Icon = card.icon;
+            <div className={`grid grid-cols-1 ${category.links.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"} gap-6`}>
+              {category.links.map((link) => {
+                const Icon = link.icon;
                 return (
-                  <Link key={card.href} href={card.href} className="group block">
-                    <Card className="rounded-lg bg-card border border-border/80 shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-zinc-700 transition-all p-5 h-full flex flex-col justify-between">
-                      {/* Top: Icon + Title & Badge */}
-                      <div className="flex items-start gap-3.5">
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${card.iconStyle}`}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="text-base font-bold text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                            {card.title}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md bg-muted text-muted-foreground border-none"
-                          >
-                            {card.badge}
-                          </Badge>
-                        </div>
+                  <Link key={link.href} href={link.href} className="group block">
+                    <Card className={`h-full border border-border/80 bg-card/60 backdrop-blur-sm transition-all duration-300 relative overflow-hidden group-hover:-translate-y-1 group-hover:shadow-lg rounded-lg ${link.border}`}>
+                      <div className={`absolute inset-0 bg-gradient-to-br ${link.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                      <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-all duration-300 text-muted-foreground">
+                        <ArrowRight className="w-4 h-4 translate-x-[-8px] group-hover:translate-x-0 transition-transform" />
                       </div>
-
-                      {/* Bottom: Description */}
-                      <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mt-4 font-normal">
-                        {card.description}
-                      </p>
+                      <CardHeader className="flex flex-col items-start gap-4 space-y-0 relative z-10">
+                        <div className="flex flex-row items-center gap-4 pr-6 w-full">
+                          <div className={`p-3 rounded-lg transition-all duration-300 ${link.iconBg} shadow-sm group-hover:scale-105 group-hover:rotate-3 shrink-0 flex items-center justify-center`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div className="flex flex-col justify-center gap-2">
+                            <CardTitle className="text-lg font-bold tracking-tight text-foreground group-hover:text-primary dark:group-hover:text-white transition-colors duration-300 leading-none">
+                              {link.label}
+                            </CardTitle>
+                            <div className="flex items-center">
+                              <span className="text-[10px] px-2 py-0.5 font-bold rounded-lg bg-secondary/80 border border-border/80 text-muted-foreground uppercase tracking-widest inline-block leading-none">
+                                {link.badge}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <CardDescription className="text-sm leading-relaxed text-muted-foreground group-hover:text-foreground/95 transition-colors duration-300 w-full">
+                          {link.description}
+                        </CardDescription>
+                      </CardHeader>
                     </Card>
                   </Link>
                 );
