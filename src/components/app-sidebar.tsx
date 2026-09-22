@@ -10,7 +10,7 @@ import {
   Users,
   ClipboardCheck,
   TrendingUp,
-  Fingerprint,
+  DatabaseBackup,
 } from "lucide-react"
 
 import { NavMain, NavItem } from "@/components/nav-main"
@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 const data = {
   navSecondary: [
@@ -48,40 +49,54 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { setOpenMobile, isMobile } = useSidebar()
+  const pathname = usePathname()
 
-  const navGeneral: NavItem[] = [
+  const navItems: NavItem[] = [
     {
       title: "Dashboard",
       url: "/",
       icon: LayoutDashboard,
-      isActive: true,
+      isActive: pathname === "/",
     },
     {
       title: "Employees",
       url: "/employees",
       icon: Users,
+      isActive: pathname.startsWith("/employees"),
     },
-   {
+    {
       title: "Appraisals",
       url: "/appraisals",
       icon: TrendingUp,
+      isActive: pathname === "/appraisals",
     },
     {
       title: "Appraisal Report",
       url: "/appraisals/report",
       icon: ClipboardCheck,
+      isActive: pathname.startsWith("/appraisals/report"),
     },
     {
-      title: "Components Showcase",
-      url: "/components",
-      icon: BookOpen,
-    },
-    {
-      title: "Settings",
-      url: "#",
+      title: "Manage",
+      url: "/manage/users",
       icon: Settings,
+      isActive: pathname.startsWith("/manage") || pathname.startsWith("/data-management"),
+      items: [
+        {
+          title: "Users",
+          url: "/manage/users",
+          icon: Users,
+          isActive: pathname === "/manage/users",
+        },
+        {
+          title: "Data Management",
+          url: "/data-management",
+          icon: DatabaseBackup,
+          isActive: pathname.startsWith("/data-management"),
+        },
+      ],
     },
-  ];
+  ]
 
   return (
     <Sidebar
@@ -98,13 +113,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   if (isMobile) setOpenMobile(false)
                 }}
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-indigo-600 text-sidebar-primary-foreground">
-                  <Fingerprint className="size-6" />
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm font-black text-xs">
+                  NG
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Boilerplate App</span>
+                  <span className="truncate font-bold tracking-tight">Navgurukul ELC</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    Admin Workspace
+                    Employee Lifecycle
                   </span>
                 </div>
               </Link>
@@ -113,7 +128,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navGeneral} />
+        <NavMain items={navItems} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
     </Sidebar>
