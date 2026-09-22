@@ -53,72 +53,72 @@ export function UsersStatsCards({ users }: UsersStatsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {/* 1. Total Team Users */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col justify-between">
-        <div className="flex items-start justify-between">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Total Users</span>
-          <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
             <Users className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-2 space-y-1">
+        <div className="space-y-0.5">
           <div className="text-2xl font-bold tracking-tight text-foreground">{stats.total}</div>
           <p className="text-xs text-muted-foreground">Registered team members</p>
         </div>
-      </Card>
+      </div>
 
       {/* 2. Activation Rate */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col justify-between">
-        <div className="flex items-start justify-between">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Activation Rate</span>
-          <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+          <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-2 space-y-1">
+        <div className="space-y-0.5">
           <div className="text-2xl font-bold tracking-tight text-foreground">
             {stats.activeRecently} <span className="text-muted-foreground text-sm font-normal">/ {stats.total}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
               ↑ {stats.activePercentage}%
             </span>
             <span>active in last 7 days</span>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* 3. Team Coverage */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col justify-between">
-        <div className="flex items-start justify-between">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Team Coverage</span>
-          <div className="p-2 rounded-lg bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400">
+          <div className="p-1.5 rounded-lg bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400">
             <Layers className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-2 space-y-1">
+        <div className="space-y-0.5">
           <div className="text-2xl font-bold tracking-tight text-foreground">{stats.teamAllocated}</div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-semibold bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300">
               ↑ {stats.teamPercentage}%
             </span>
             <span>assigned to functional teams</span>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* 4. Privileged Admins */}
-      <Card className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col justify-between">
-        <div className="flex items-start justify-between">
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs p-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Admin Privileges</span>
-          <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+          <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
             <Shield className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-2 space-y-1">
+        <div className="space-y-0.5">
           <div className="text-2xl font-bold tracking-tight text-foreground">{stats.admins}</div>
           <p className="text-xs text-muted-foreground">Super Admins & Administrators</p>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
