@@ -96,12 +96,11 @@ export default function ComponentsShowcasePage() {
   const [progress, setProgress] = useState(60);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 max-w-7xl mx-auto w-full pb-20">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
-        badge="Design System"
         title="Components Showcase"
         description="A comprehensive style guide and interactive catalog of all pre-installed shadcn/ui components and design tokens."
-        icon={Layers}
+        icon={<Layers className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
       />
 
       {/* 1. Typography, Buttons & Badges */}

@@ -13,27 +13,25 @@ export default async function ManagerDecisionPage({
 
   if (!confirmation) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
         <PageBanner
-          badge="Error"
           title="Confirmation Not Found"
           description="The requested confirmation decision record could not be found."
-          icon={ShieldCheck}
+          icon={<ShieldCheck className="h-5 w-5 text-destructive" />}
         />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
-        badge="Manager Review"
         title={`Manager Decision — ${confirmation.employees?.name || 'Employee'}`}
         description={`Record final manager evaluation and decision for ${confirmation.employees?.name} (${confirmation.employees?.employee_type || 'Probation'}).`}
-        icon={UserCheck}
+        icon={<UserCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
       />
 
-      <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+      <div className="bg-card border border-border rounded-lg p-6 shadow-xs max-w-2xl">
         <ManagerDecisionForm
           confirmationId={id}
           employeeName={confirmation.employees?.name || 'this employee'}

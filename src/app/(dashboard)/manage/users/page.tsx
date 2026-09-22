@@ -111,7 +111,7 @@ export default async function ManageUsersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6 w-full max-w-7xl mx-auto pb-16">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       {/* Banner */}
       <PageBanner
         title="Users & Roles"

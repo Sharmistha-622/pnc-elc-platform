@@ -13,12 +13,11 @@ export default async function PeerFeedbackPage({
 
   if (!peerFeedback) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
         <PageBanner
-          badge="Error"
           title="Feedback Request Not Found"
           description="The requested peer review questionnaire could not be found or has expired."
-          icon={MessageSquareQuote}
+          icon={<MessageSquareQuote className="h-5 w-5 text-destructive" />}
         />
       </div>
     )
@@ -26,12 +25,11 @@ export default async function PeerFeedbackPage({
 
   if (peerFeedback.response_status === 'submitted') {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
         <PageBanner
-          badge="Completed"
           title="Feedback Recorded"
           description="Thank you, your peer review response has already been submitted and compiled."
-          icon={CheckCircle2}
+          icon={<CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
         />
         <div className="p-8 bg-card border border-border rounded-lg text-center max-w-xl mx-auto space-y-3">
           <div className="w-12 h-12 bg-emerald-500/10 text-emerald-600 rounded-lg flex items-center justify-center mx-auto">
@@ -47,15 +45,14 @@ export default async function PeerFeedbackPage({
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
-        badge="Peer Review"
         title={`Peer Feedback for ${peerFeedback.confirmations?.employees?.name || 'Colleague'}`}
         description="Share constructive feedback to assist with probation evaluation and career progression."
-        icon={MessageSquareQuote}
+        icon={<MessageSquareQuote className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
       />
 
-      <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+      <div className="bg-card border border-border rounded-lg p-6 shadow-xs max-w-2xl">
         <PeerFeedbackForm peerFeedbackId={id} />
       </div>
     </div>

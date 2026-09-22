@@ -53,9 +53,8 @@ export default function NewConfirmationPage() {
 
   if (success) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
         <PageBanner
-          badge="Confirmation"
           title="Process Initiated"
           description="The confirmation timeline and peer feedback collection have been scheduled."
           icon={CheckCircle2}
@@ -84,9 +83,8 @@ export default function NewConfirmationPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
-        badge="Workflow Action"
         title="Start Confirmation Process"
         description="Initiate probation evaluation or role confirmation for team members and assign peer reviewers."
         icon={UserCheck}
