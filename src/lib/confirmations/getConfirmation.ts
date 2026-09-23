@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function getConfirmation(confirmationId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('confirmations')
     .select('*, employees(name, employee_type, joining_date, email)')

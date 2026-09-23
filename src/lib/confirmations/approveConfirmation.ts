@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function approveConfirmation(confirmationId: string, employeeId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const today = new Date().toISOString().split('T')[0]
 
   // Update the confirmations table status

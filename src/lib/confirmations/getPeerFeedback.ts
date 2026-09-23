@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function getPeerFeedback(peerFeedbackId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('peer_feedback')
     .select('*, confirmations(employee_id, employees(name))')

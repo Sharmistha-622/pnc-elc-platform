@@ -90,7 +90,7 @@ export default async function ManageUsersPage() {
   let allUsers: any[] = SAMPLE_USERS;
 
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from("employees").select("id, name, status, teams(name)");
     if (!error && data && data.length > 0) {
       const mappedEmployees = data.map((emp: any) => ({

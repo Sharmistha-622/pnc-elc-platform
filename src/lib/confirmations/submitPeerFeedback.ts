@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function submitPeerFeedback(peerFeedbackId: string, feedbackText: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const { data, error } = await supabase
     .from('peer_feedback')

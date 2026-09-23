@@ -22,7 +22,7 @@ export type ProfileInput = {
 }
 
 export async function createOrUpdateProfile(input: ProfileInput) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const payload = {
     employee_id: input.employeeId,

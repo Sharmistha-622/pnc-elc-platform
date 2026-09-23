@@ -11,7 +11,7 @@ export type Employee = {
 }
 
 export async function getEmployees(): Promise<Employee[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('employees')
     .select(`

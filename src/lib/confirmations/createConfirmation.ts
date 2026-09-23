@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function createConfirmation(employeeId: string, timelineType: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('confirmations')
     .insert({

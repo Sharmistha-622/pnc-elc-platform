@@ -11,7 +11,7 @@ export type AppraisalCohortEntry = {
 }
 
 export async function getAppraisalCohortView(): Promise<AppraisalCohortEntry[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const { data, error } = await supabase
     .from('employees')

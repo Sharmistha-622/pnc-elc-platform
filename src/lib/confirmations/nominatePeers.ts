@@ -7,7 +7,7 @@ export async function nominatePeers(
   confirmationId: string,
   peers: { name: string; employeeId?: string; email?: string }[]
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
    const rows = peers.map((peer) => ({
     confirmation_id: confirmationId,
     peer_name: peer.name,

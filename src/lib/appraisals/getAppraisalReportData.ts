@@ -10,7 +10,7 @@ export type TeamCohortBreakdown = {
 }
 
 export async function getAppraisalReportData() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const { data, error } = await supabase
     .from('employees')

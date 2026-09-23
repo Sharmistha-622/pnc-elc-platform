@@ -23,7 +23,7 @@ export type CompiledFeedback = {
 const RED_FLAG_KEYWORDS = ['concern', 'issue', 'problem', 'difficult', 'poor', 'unprofessional', 'late']
 
 export async function getCompiledFeedback(confirmationId: string): Promise<CompiledFeedback | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const { data: confirmation, error: confirmationError } = await supabase
     .from('confirmations')

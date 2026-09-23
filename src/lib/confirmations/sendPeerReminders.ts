@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/sendEmail'
 
 export async function sendPeerReminders() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const { data: pendingFeedback, error } = await supabase
     .from('peer_feedback')

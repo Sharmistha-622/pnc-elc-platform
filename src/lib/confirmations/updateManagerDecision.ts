@@ -7,7 +7,7 @@ export async function updateManagerDecision(
   decision: 'yes' | 'no',
   rescheduleDate?: string
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const updateData: {
     manager_decision: string

@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function getProfileData(employeeId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   const [profileResult, relationTypesResult, idProofTypesResult, employeeResult] = await Promise.all([
     supabase.from('employee_profiles').select('*').eq('employee_id', employeeId).maybeSingle(),
