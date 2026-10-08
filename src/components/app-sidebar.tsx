@@ -13,6 +13,7 @@ import {
   FilePlus,
   TrendingUp,
   DatabaseBackup,
+  ShieldCheck,
 } from "lucide-react"
 
 import { NavMain, NavItem } from "@/components/nav-main"
@@ -28,28 +29,20 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { canAccessRoute, type UserRole } from "@/lib/role-constants"
 
 const data = {
   navSecondary: [
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-    },
-    {
-      title: "Support",
-      url: "#",
-      icon: LifeBuoy,
-    },
-    {
-      title: "Feedback",
-      url: "#",
-      icon: Send,
-    },
+    { title: "Documentation", url: "#", icon: BookOpen },
+    { title: "Support", url: "#", icon: LifeBuoy },
+    { title: "Feedback", url: "#", icon: Send },
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  userRole,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { userRole?: UserRole | null }) {
   const { setOpenMobile, isMobile } = useSidebar()
   const pathname = usePathname()
 
@@ -111,6 +104,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           isActive: pathname === "/manage/users",
         },
         {
+          title: "Roles",
+          url: "/manage/roles",
+          icon: ShieldCheck,
+          isActive: pathname === "/manage/roles",
+        },
+        {
           title: "Data Management",
           url: "/data-management",
           icon: DatabaseBackup,
@@ -119,6 +118,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ],
     },
   ]
+
+  const visibleNav: NavItem[] = navItems
+    .map((item) => {
+      if (!item.items) return item
+      const kids = item.items.filter((s) => canAccessRoute(userRole, s.url))
+      return { ...item, items: kids, url: kids[0]?.url ?? item.url }
+    })
+    .filter((item) =>
+      item.items ? item.items.length > 0 : canAccessRoute(userRole, item.url)
+    )
 
   return (
     <Sidebar
@@ -150,7 +159,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navItems} />
+        <NavMain items={visibleNav} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
     </Sidebar>

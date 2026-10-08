@@ -1,3 +1,4 @@
+import { getCurrentUserRole } from "@/lib/rbac/getCurrentUserRole"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import {
@@ -18,6 +19,7 @@ export default async function DashboardLayout({
     const cookieStore = await cookies()
     const rawDevOverride = cookieStore.get('dev-role-override')?.value
     const user = await currentUser();
+    const { role } = await getCurrentUserRole();
 
     const baseRole = "Admin"; // Hardcoded for boilerplate
 
@@ -32,7 +34,7 @@ export default async function DashboardLayout({
                 <SidebarProvider className="flex flex-col">
                     <SiteHeader />
                     <div className="flex flex-1">
-                        <AppSidebar />
+                       <AppSidebar userRole={role} />
                         <SidebarInset>
                             {children}
                         </SidebarInset>
