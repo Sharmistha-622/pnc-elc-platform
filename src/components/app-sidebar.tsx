@@ -9,6 +9,8 @@ import {
   Settings,
   Users,
   ClipboardCheck,
+  ClipboardList,
+  FilePlus,
   TrendingUp,
   DatabaseBackup,
 } from "lucide-react"
@@ -63,6 +65,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/employees",
       icon: Users,
       isActive: pathname.startsWith("/employees"),
+    },
+    {
+      title: "Confirmations",
+      url: "/confirmations",
+      icon: ClipboardList,
+      isActive: pathname.startsWith("/confirmations"),
+      items: [
+        {
+          title: "All Confirmations",
+          url: "/confirmations",
+          icon: ClipboardList,
+          isActive: pathname === "/confirmations",
+        },
+        {
+          title: "New Confirmation",
+          url: "/confirmations/new",
+          icon: FilePlus,
+          isActive: pathname === "/confirmations/new",
+        },
+      ],
     },
     {
       title: "Appraisals",
