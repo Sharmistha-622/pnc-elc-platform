@@ -76,7 +76,6 @@ export default function CreateCandidateOnboardingPage() {
   const [campuses, setCampuses] = useState<{ id: string; name: string }[]>([]);
   const [employmentTypes, setEmploymentTypes] = useState<{ id: string; name: string; code: string }[]>([]);
   const [templates, setTemplates] = useState<LetterTemplate[]>([]);
-  const [managers, setManagers] = useState<{ id: string; name: string; email: string | null; team: string | null }[]>([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -86,7 +85,6 @@ export default function CreateCandidateOnboardingPage() {
     designation: '',
     department: 'Tech & Product',
     team_name: 'Tech & Product',
-    manager_id: '' as string | null,
     manager_name: '',
     buddy_name: '',
     location: 'Bangalore',
@@ -135,14 +133,6 @@ export default function CreateCandidateOnboardingPage() {
       .then((res) => res.json())
       .then((json) => {
         if (json.success && json.data) setEmploymentTypes(json.data);
-      })
-      .catch(() => {});
-
-    // Fetch active employees for manager selection
-    fetch('/api/employees')
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && json.data) setManagers(json.data);
       })
       .catch(() => {});
 
@@ -492,36 +482,13 @@ export default function CreateCandidateOnboardingPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Reporting Manager</Label>
-              <Select
-                value={formData.manager_id || 'none'}
-                onValueChange={(val) => {
-                  if (val === 'none') {
-                    handleChange('manager_id', null);
-                    handleChange('manager_name', '');
-                  } else {
-                    const mgr = managers.find((m) => m.id === val);
-                    if (mgr) {
-                      handleChange('manager_id', mgr.id);
-                      handleChange('manager_name', mgr.name);
-                    }
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9 text-xs rounded-lg">
-                  <SelectValue placeholder="Select reporting manager from roster" />
-                </SelectTrigger>
-                <SelectContent className="rounded-lg max-h-56">
-                  <SelectItem value="none" className="text-xs text-muted-foreground">
-                    None / To be assigned
-                  </SelectItem>
-                  {managers.map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      {m.name} {m.team ? `(${m.team})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-medium">Reporting Manager Name</Label>
+              <Input
+                placeholder="e.g., Nitin Sudarshan"
+                value={formData.manager_name}
+                onChange={(e) => handleChange('manager_name', e.target.value)}
+                className="h-9 text-xs rounded-lg"
+              />
             </div>
 
             <div className="space-y-1.5">

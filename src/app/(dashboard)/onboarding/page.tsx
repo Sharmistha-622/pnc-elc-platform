@@ -2,7 +2,6 @@ import { Compass, History, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 
 import { OnboardingHub } from '@/app/(dashboard)/onboarding/_components/OnboardingHub'
-import { RunModeBadge } from '@/app/(dashboard)/onboarding/_components/RunModeBadge'
 import { PageBanner } from '@/components/shared/page-banner'
 import { Button } from '@/components/ui/button'
 import { requireFeature } from '@/lib/rbac/requireFeature'
@@ -10,9 +9,8 @@ import { requireFeature } from '@/lib/rbac/requireFeature'
 /**
  * Onboarding.
  *
- * Two halves of the same journey on one page: the hub covers candidate intake
- * through to joining, the pipeline tab covers the automated communications that
- * run from two days before joining to the end of induction.
+ * The candidate-to-employee hub: intake, offers and document review through to
+ * joining.
  */
 export default async function OnboardingPage() {
   // Gated here rather than in a layout: a layout would also cover
@@ -24,11 +22,10 @@ export default async function OnboardingPage() {
     <div className="animate-in fade-in mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 pb-20 duration-300 md:p-6 lg:p-8">
       <PageBanner
         title="Onboarding"
-        description="Unified command center for pre-joining candidate pipelines and post-joining onboarding."
+        description="Track candidates from offer through to joining."
         icon={<Compass className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
         actions={
           <div className="flex items-center gap-2">
-            <RunModeBadge />
             <Button
               asChild
               variant="outline"
