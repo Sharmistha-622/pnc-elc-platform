@@ -2,7 +2,17 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/lib/role-constants'
 
-export type UserRow = { id: string; email: string; name: string; role: UserRole | null }
+export type UserRow = {
+  id: string
+  email: string
+  name: string
+  role: UserRole | null
+  team?: string | null
+  status?: string | null
+  created_at?: string | null
+  last_active_at?: string | null
+  avatar?: string | null
+}
 
 export async function listUsersWithRoles(): Promise<UserRow[]> {
   const admin = createAdminSupabaseClient()
@@ -17,6 +27,11 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
           role: (u.email?.toLowerCase() === 'nitin@navgurukul.org')
             ? ('Super Admin' as UserRole)
             : ((u.app_metadata?.role as UserRole | undefined) ?? null),
+          team: (u.user_metadata?.team as string) ?? null,
+          status: u.confirmed_at ? 'active' : 'invited',
+          created_at: u.created_at,
+          last_active_at: u.last_sign_in_at,
+          avatar: (u.user_metadata?.avatar_url as string) ?? (u.user_metadata?.picture as string) ?? null,
         }))
       }
     } catch (err) {
@@ -29,7 +44,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
     const supabase = await createServerSupabaseClient()
     const { data: employees } = await supabase
       .from('employees')
-      .select('id, name, email')
+      .select('id, name, email, team, status, created_at')
       .order('name', { ascending: true })
 
     const teamMembers: UserRow[] = [
@@ -38,22 +53,29 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
         email: 'nitin@navgurukul.org',
         name: 'Nitin Sudarshan',
         role: 'Super Admin',
+        team: "CEO's Office",
+        status: 'active',
       },
       {
         id: 'usr-sharmistha',
         email: 'sharmisthamazumdar24@navgurukul.org',
         name: 'Sharmistha Mazumdar',
         role: 'Admin',
+        team: 'PnC',
+        status: 'active',
       },
     ]
 
     const mappedEmployees: UserRow[] = (employees || [])
-      .filter((e: any) => e.email && !teamMembers.some((tm) => tm.email === e.email))
+      .filter((e: any) => e.email && !teamMembers.some((tm) => tm.email.toLowerCase() === e.email.toLowerCase()))
       .map((e: any) => ({
         id: e.id,
         email: e.email,
         name: e.name,
         role: 'Employee' as UserRole,
+        team: e.team || 'None',
+        status: e.status || 'active',
+        created_at: e.created_at || null,
       }))
 
     return [...teamMembers, ...mappedEmployees]

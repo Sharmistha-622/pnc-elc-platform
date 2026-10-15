@@ -41,9 +41,6 @@ export function RoleSelect({ userId, current }: { userId: string; current: UserR
           <SelectValue placeholder="Select role" />
         </SelectTrigger>
         <SelectContent className="rounded-lg">
-          <SelectItem value="Employee" className="text-xs">
-            Employee (Default)
-          </SelectItem>
           {ASSIGNABLE_ROLES.map((r) => (
             <SelectItem key={r} value={r} className="text-xs">
               {r}

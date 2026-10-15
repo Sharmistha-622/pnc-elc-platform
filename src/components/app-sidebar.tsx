@@ -173,16 +173,10 @@ export function AppSidebar({
       isActive: pathname.startsWith("/manage") || pathname.startsWith("/data-management"),
       items: [
         {
-          title: "Users",
+          title: "Users & Roles",
           url: "/manage/users",
           icon: Users,
-          isActive: pathname === "/manage/users",
-        },
-        {
-          title: "Roles",
-          url: "/manage/roles",
-          icon: ShieldCheck,
-          isActive: pathname === "/manage/roles",
+          isActive: pathname === "/manage/users" || pathname === "/manage/roles",
         },
         {
           title: "Letter Templates",
