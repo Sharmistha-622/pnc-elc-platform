@@ -25,6 +25,8 @@ import {
   History,
   ShieldCheck,
   Inbox,
+  Users2,
+  User,
 } from "lucide-react"
 
 import { NavMain, NavItem } from "@/components/nav-main"
@@ -66,6 +68,18 @@ export function AppSidebar({
       url: "/",
       icon: LayoutDashboard,
       isActive: pathname === "/",
+    },
+    {
+      title: "My Profile",
+      url: "/profile",
+      icon: User,
+      isActive: pathname === "/profile",
+    },
+    {
+      title: "My Team",
+      url: "/my-team",
+      icon: Users2,
+      isActive: pathname.startsWith("/my-team"),
     },
     {
       title: "My Forms",
