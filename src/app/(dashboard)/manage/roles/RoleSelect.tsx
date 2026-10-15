@@ -1,44 +1,57 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import React, { useState, useTransition } from 'react'
 import { setUserRole } from '@/lib/rbac/setUserRole'
 import { ASSIGNABLE_ROLES, type UserRole } from '@/lib/role-constants'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Loader2, Check } from 'lucide-react'
+import { toast } from 'sonner'
 
 export function RoleSelect({ userId, current }: { userId: string; current: UserRole | null }) {
-  const [value, setValue] = useState<string>(current ?? '')
-  const [message, setMessage] = useState('')
+  const [value, setValue] = useState<string>(current || 'Employee')
   const [pending, startTransition] = useTransition()
 
-  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const role = e.target.value as UserRole
+  function handleSelect(roleVal: string) {
+    const role = roleVal as UserRole
     const previous = value
     setValue(role)
-    setMessage('')
+
     startTransition(async () => {
       const res = await setUserRole(userId, role)
       if (res.success) {
-        setMessage('Saved')
+        toast.success(`Role updated to ${role}`)
       } else {
         setValue(previous)
-        setMessage(res.error ?? 'Failed')
+        toast.error(res.error || 'Failed to update role')
       }
     })
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <select
-        value={value}
-        onChange={handleChange}
-        disabled={pending}
-        className="border rounded px-2 py-1"
-      >
-        <option value="" disabled>No role set (Employee)</option>
-        {ASSIGNABLE_ROLES.map((r) => (
-          <option key={r} value={r}>{r}</option>
-        ))}
-      </select>
-      {message && <span className="text-sm text-gray-600">{message}</span>}
+    <div className="flex items-center gap-2">
+      <Select value={value} onValueChange={handleSelect} disabled={pending}>
+        <SelectTrigger className="w-[145px] h-8 text-xs rounded-lg font-medium">
+          <SelectValue placeholder="Select role" />
+        </SelectTrigger>
+        <SelectContent className="rounded-lg">
+          <SelectItem value="Employee" className="text-xs">
+            Employee (Default)
+          </SelectItem>
+          {ASSIGNABLE_ROLES.map((r) => (
+            <SelectItem key={r} value={r} className="text-xs">
+              {r}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {pending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
     </div>
   )
 }
