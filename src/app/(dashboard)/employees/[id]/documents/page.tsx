@@ -1,6 +1,18 @@
 import { notFound } from 'next/navigation'
-import { FolderOpen } from 'lucide-react'
+import Link from 'next/link'
+import { FolderOpen, ArrowLeft, ExternalLink, CheckCircle2, AlertCircle, FileText } from 'lucide-react'
 import { PageBanner } from '@/components/shared/page-banner'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { getDocumentTypes } from '@/lib/settings/service'
@@ -39,72 +51,148 @@ export default async function EmployeeDocumentsPage({ params }: { params: Promis
   for (const d of docs ?? []) if (!latest.has(d.document_type)) latest.set(d.document_type, d)
 
   const missing = missingDocuments(types, [...latest.keys()])
-  const requiredCount = types.filter((t) => t.is_required).length
+  const requiredTypes = types.filter((t) => t.is_required)
+  const requiredCount = requiredTypes.length
+  const uploadedRequiredCount = requiredTypes.filter((t) => latest.has(t.name)).length
+  const completionPercentage = requiredCount > 0 ? Math.round((uploadedRequiredCount / requiredCount) * 100) : 100
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
-        title={`${employee.name} — Documents`}
-        description="Upload documents to Google Drive and check which required files are missing."
+        title={`${employee.name} — Compliance Documents`}
+        description="Upload verification files to Google Drive and track compliance documentation completeness."
         icon={<FolderOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+        actions={
+          <Link href={`/employees/${employee.id}/profile`}>
+            <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs gap-1.5 font-semibold">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Employee Profile
+            </Button>
+          </Link>
+        }
       />
 
-      <div
-        className={`rounded-lg border p-3 text-sm ${
-          missing.length === 0
-            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-            : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-        }`}
-      >
-        {missing.length === 0
-          ? `All ${requiredCount} required documents are uploaded.`
-          : `${requiredCount - missing.length} of ${requiredCount} required documents uploaded. Missing: ${missing
-              .map((m) => m.display_name)
-              .join(', ')}.`}
+      {/* Compliance Status Progress Card */}
+      <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            {completionPercentage === 100 ? (
+              <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            ) : (
+              <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-bold text-foreground">
+                {completionPercentage === 100
+                  ? 'All Required Documents Uploaded'
+                  : `${uploadedRequiredCount} of ${requiredCount} Required Documents Uploaded (${completionPercentage}%)`}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {missing.length === 0
+                  ? 'Verification folder in Google Drive is complete.'
+                  : `Missing mandatory documents: ${missing.map((m) => m.display_name).join(', ')}.`}
+              </p>
+            </div>
+          </div>
+
+          <Badge
+            variant={completionPercentage === 100 ? 'default' : 'outline'}
+            className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold shrink-0 ${
+              completionPercentage === 100
+                ? 'bg-emerald-600 text-white border-none'
+                : 'border-amber-400 text-amber-700 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
+            }`}
+          >
+            {completionPercentage}% Complete
+          </Badge>
+        </div>
+
+        <Progress value={completionPercentage} className="h-2 rounded-full" />
       </div>
 
-      <UploadForm employeeId={employee.id} types={types.map((t) => ({ name: t.name, display_name: t.display_name }))} />
+      {/* Upload Form */}
+      <UploadForm
+        employeeId={employee.id}
+        types={types.map((t) => ({ name: t.name, display_name: t.display_name }))}
+      />
 
-      <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="text-left font-medium p-3">Document</th>
-              <th className="text-left font-medium p-3">Folder</th>
-              <th className="text-left font-medium p-3">Required</th>
-              <th className="text-left font-medium p-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Checklist Table */}
+      <div className="rounded-lg border border-border bg-card/60 backdrop-blur-md shadow-xs overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            <TableRow>
+              <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 px-3 text-muted-foreground">
+                Document Name
+              </TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 px-3 text-muted-foreground">
+                Destination Folder
+              </TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 px-3 text-muted-foreground">
+                Requirement
+              </TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 px-3 text-right text-muted-foreground">
+                Status / Link
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {types.map((t) => {
               const doc = latest.get(t.name)
               return (
-                <tr key={t.name} className="border-b last:border-b-0">
-                  <td className="p-3 font-medium">{t.display_name}</td>
-                  <td className="p-3 text-muted-foreground">{FOLDER_LABEL[t.destination] ?? t.destination}</td>
-                  <td className="p-3">{t.is_required ? 'Yes' : 'No'}</td>
-                  <td className="p-3">
+                <TableRow key={t.name} className="hover:bg-muted/30 transition-colors">
+                  <TableCell className="py-3 px-3 font-semibold text-xs text-foreground flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{t.display_name}</span>
+                  </TableCell>
+
+                  <TableCell className="py-3 px-3 text-xs text-muted-foreground">
+                    <Badge variant="secondary" className="text-[11px] font-medium rounded-lg">
+                      {FOLDER_LABEL[t.destination] ?? t.destination}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell className="py-3 px-3 text-xs">
+                    {t.is_required ? (
+                      <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-none font-semibold text-[10px] rounded-md">
+                        Mandatory
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Optional</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell className="py-3 px-3 text-right">
                     {doc ? (
                       doc.drive_url ? (
-                        <a href={doc.drive_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                          Uploaded {doc.created_at.slice(0, 10)}
+                        <a
+                          href={doc.drive_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                        >
+                          <span>Drive File</span>
+                          <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : (
-                        <span>Uploaded {doc.created_at.slice(0, 10)}</span>
+                        <span className="text-xs text-emerald-600 font-medium">Uploaded</span>
                       )
                     ) : t.is_required ? (
-                      <span className="inline-flex rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
+                      <Badge variant="outline" className="border-rose-300 text-rose-700 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/20 text-[11px] rounded-lg font-medium">
                         Missing
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="text-muted-foreground">Not uploaded</span>
+                      <span className="text-xs text-muted-foreground">Not uploaded</span>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
