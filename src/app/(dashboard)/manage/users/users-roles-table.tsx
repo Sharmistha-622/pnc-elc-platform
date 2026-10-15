@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { UserRole, UserTeam, ASSIGNABLE_ROLES } from "@/lib/role-constants";
 import {
   Table,
   TableBody,
@@ -24,10 +23,12 @@ import {
 import {
   Users,
   User,
-  Plane,
   ShieldCheck,
-  Wallet,
   Shield,
+  HeartHandshake,
+  Wallet,
+  Briefcase,
+  SlidersHorizontal,
   Search,
   UserPlus,
   Lock,
@@ -40,33 +41,36 @@ import { AddUserDialog } from "./_components/add-user-dialog";
 import { RoleSelect } from "../roles/RoleSelect";
 import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
 
-export type RoleFilterTab =
-  | "ALL"
-  | "EMPLOYEES"
-  | "PNC_TEAM"
-  | "PNC_ADMIN"
-  | "FINANCE"
-  | "ADMINS";
-
 interface UsersRolesTableProps {
   initialUsers: UserRow[];
   isConfigured?: boolean;
 }
+
+// Actual system roles configured in the app
+const ROLE_TABS: { id: string; label: string; icon: React.ElementType }[] = [
+  { id: "ALL", label: "All Roles", icon: Users },
+  { id: "Super Admin", label: "Super Admin", icon: ShieldCheck },
+  { id: "Admin", label: "Admin", icon: Shield },
+  { id: "PnC", label: "PnC", icon: HeartHandshake },
+  { id: "Finance", label: "Finance", icon: Wallet },
+  { id: "Manager", label: "Manager", icon: Briefcase },
+  { id: "Operations", label: "Operations", icon: SlidersHorizontal },
+  { id: "Employee", label: "Employee", icon: User },
+];
 
 export function UsersRolesTable({
   initialUsers,
   isConfigured = true,
 }: UsersRolesTableProps) {
   const [users, setUsers] = useState<UserRow[]>(initialUsers || []);
-  const [activeTab, setActiveTab] = useState<RoleFilterTab>("ALL");
+  const [activeTab, setActiveTab] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [teamFilter, setTeamFilter] = useState("ALL");
-  const [specificRoleFilter, setSpecificRoleFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
-  // Extract all unique teams from users list
+  // Extract unique teams from users list
   const availableTeams = useMemo(() => {
     const set = new Set<string>();
     users.forEach((u) => {
@@ -77,51 +81,34 @@ export function UsersRolesTable({
     return Array.from(set).sort();
   }, [users]);
 
-  // Tab criteria helper
-  const matchesTabCriteria = (user: UserRow, tab: RoleFilterTab): boolean => {
+  // Check if user matches role tab
+  const userMatchesRoleTab = (user: UserRow, tabId: string): boolean => {
+    if (tabId === "ALL") return true;
     const role = user.role || "Employee";
-    const team = (user.team || "").toLowerCase();
-    const isPnc = team.includes("pnc") || role === "PnC";
-    const isFinance = team.includes("finance") || role === "Finance";
-    const isAdmin = role === "Super Admin" || role === "Admin";
-
-    switch (tab) {
-      case "ALL":
-        return true;
-      case "EMPLOYEES":
-        return (role === "Employee" || role === "Member") && !isPnc && !isFinance;
-      case "PNC_TEAM":
-        return isPnc && !isAdmin;
-      case "PNC_ADMIN":
-        return isPnc && isAdmin;
-      case "FINANCE":
-        return isFinance;
-      case "ADMINS":
-        return isAdmin;
-      default:
-        return true;
+    if (tabId === "Employee") {
+      return role === "Employee" || role === "Member" || !user.role;
     }
+    return role === tabId;
   };
 
-  // Compute live tab counts
+  // Compute live counts per actual role
   const tabCounts = useMemo(() => {
-    return {
+    const counts: Record<string, number> = {
       ALL: users.length,
-      EMPLOYEES: users.filter((u) => matchesTabCriteria(u, "EMPLOYEES")).length,
-      PNC_TEAM: users.filter((u) => matchesTabCriteria(u, "PNC_TEAM")).length,
-      PNC_ADMIN: users.filter((u) => matchesTabCriteria(u, "PNC_ADMIN")).length,
-      FINANCE: users.filter((u) => matchesTabCriteria(u, "FINANCE")).length,
-      ADMINS: users.filter((u) => matchesTabCriteria(u, "ADMINS")).length,
     };
+    ROLE_TABS.forEach((tab) => {
+      if (tab.id !== "ALL") {
+        counts[tab.id] = users.filter((u) => userMatchesRoleTab(u, tab.id)).length;
+      }
+    });
+    return counts;
   }, [users]);
 
   // Filtered users calculation
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      // 1. Tab filter
-      if (!matchesTabCriteria(user, activeTab)) return false;
+      if (!userMatchesRoleTab(user, activeTab)) return false;
 
-      // 2. Search term
       const term = searchTerm.toLowerCase().trim();
       if (term) {
         const email = (user.email || "").toLowerCase();
@@ -138,40 +125,28 @@ export function UsersRolesTable({
         }
       }
 
-      // 3. Team dropdown
       if (teamFilter !== "ALL") {
         const uTeam = (user.team || "None").trim();
         if (uTeam !== teamFilter) return false;
       }
 
-      // 4. Specific role dropdown
-      if (specificRoleFilter !== "ALL") {
-        const uRole = user.role || "Employee";
-        if (uRole !== specificRoleFilter) return false;
-      }
-
       return true;
     });
-  }, [users, activeTab, searchTerm, teamFilter, specificRoleFilter]);
+  }, [users, activeTab, searchTerm, teamFilter]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  // Paginated slice
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredUsers.slice(start, start + itemsPerPage);
   }, [filteredUsers, currentPage, itemsPerPage]);
 
   const hasActiveFilters =
-    activeTab !== "ALL" ||
-    searchTerm !== "" ||
-    teamFilter !== "ALL" ||
-    specificRoleFilter !== "ALL";
+    activeTab !== "ALL" || searchTerm !== "" || teamFilter !== "ALL";
 
   const clearAllFilters = () => {
     setActiveTab("ALL");
     setSearchTerm("");
     setTeamFilter("ALL");
-    setSpecificRoleFilter("ALL");
     setCurrentPage(1);
   };
 
@@ -194,7 +169,7 @@ export function UsersRolesTable({
     switch (role) {
       case "Super Admin":
         return (
-          <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold border-none text-[11px] px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1 w-fit">
+          <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1 w-fit">
             <ShieldCheck className="h-3 w-3" />
             Super Admin
           </Badge>
@@ -223,6 +198,12 @@ export function UsersRolesTable({
             Manager
           </Badge>
         );
+      case "Operations":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
+            Operations
+          </Badge>
+        );
       default:
         return (
           <Badge
@@ -246,324 +227,143 @@ export function UsersRolesTable({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Local Dev Banner if Service Role is not in local env */}
       {!isConfigured && (
-        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-3">
+        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
           <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="text-xs space-y-0.5">
             <p className="font-semibold text-foreground">
               Directory Users Mode (Local)
             </p>
             <p className="text-muted-foreground">
-              Users are mapped from your directory & employee database. On live production, Supabase Auth Sync is active. To enable live Auth Admin user updates locally, add <code className="font-mono px-1 py-0.5 bg-muted rounded">SUPABASE_SERVICE_ROLE_KEY</code> to your <code className="font-mono">.env</code>.
+              Users are mapped from your directory & employee database. On live production, Supabase Auth Sync is active. To enable live Auth Admin user updates locally, add <code className="font-mono px-1 py-0.5 bg-muted rounded-lg">SUPABASE_SERVICE_ROLE_KEY</code> to your <code className="font-mono">.env</code>.
             </p>
           </div>
         </div>
       )}
 
-      {/* Unified Search & Filters Card */}
-      <div className="rounded-2xl border border-border bg-card/70 backdrop-blur-md p-3.5 shadow-xs space-y-3">
-        {/* Top: Pill Tabs matching screenshot exactly */}
-        <div className="overflow-x-auto pb-1 -mb-1 scrollbar-none">
-          <div className="bg-slate-100/80 dark:bg-muted/40 p-1.5 rounded-2xl border border-slate-200/80 dark:border-border inline-flex items-center gap-1.5 min-w-max">
-            {/* 1. All Roles */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("ALL");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "ALL"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <Users
-                className={`h-4 w-4 ${
-                  activeTab === "ALL"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>All Roles</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "ALL"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.ALL}
-              </span>
-            </button>
+      {/* Single-Liner Merged Control Bar: Tabs + Search + Filter + Add Button */}
+      <div className="rounded-lg border border-border bg-card/70 backdrop-blur-md p-2 shadow-xs flex items-center justify-between gap-2.5 flex-wrap">
+        {/* Left: Actual Roles Tabs */}
+        <div className="bg-muted/60 dark:bg-muted/40 p-1 rounded-lg border border-border inline-flex items-center gap-1 overflow-x-auto scrollbar-none max-w-full">
+          {ROLE_TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            const isActive = activeTab === tab.id;
+            const count = tabCounts[tab.id] ?? 0;
 
-            {/* 2. Employees */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("EMPLOYEES");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "EMPLOYEES"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <User
-                className={`h-4 w-4 ${
-                  activeTab === "EMPLOYEES"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>Employees</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "EMPLOYEES"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.EMPLOYEES}
-              </span>
-            </button>
-
-            {/* 3. PNC Team */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("PNC_TEAM");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "PNC_TEAM"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <Plane
-                className={`h-4 w-4 ${
-                  activeTab === "PNC_TEAM"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>PNC Team</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "PNC_TEAM"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.PNC_TEAM}
-              </span>
-            </button>
-
-            {/* 4. PNC Admin */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("PNC_ADMIN");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "PNC_ADMIN"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <ShieldCheck
-                className={`h-4 w-4 ${
-                  activeTab === "PNC_ADMIN"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>PNC Admin</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "PNC_ADMIN"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.PNC_ADMIN}
-              </span>
-            </button>
-
-            {/* 5. Finance */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("FINANCE");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "FINANCE"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <Wallet
-                className={`h-4 w-4 ${
-                  activeTab === "FINANCE"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>Finance</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "FINANCE"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.FINANCE}
-              </span>
-            </button>
-
-            {/* 6. Admins */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("ADMINS");
-                setCurrentPage(1);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs transition-all cursor-pointer font-medium ${
-                activeTab === "ADMINS"
-                  ? "bg-white dark:bg-card text-slate-900 dark:text-foreground shadow-xs font-semibold"
-                  : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-white/60 dark:hover:bg-muted/60"
-              }`}
-            >
-              <Shield
-                className={`h-4 w-4 ${
-                  activeTab === "ADMINS"
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-muted-foreground"
-                }`}
-              />
-              <span>Admins</span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                  activeTab === "ADMINS"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-200/80 dark:bg-muted text-slate-600 dark:text-muted-foreground font-semibold"
-                }`}
-              >
-                {tabCounts.ADMINS}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom: Merged Search Input + Dropdowns + Action Button */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 pt-1 border-t border-border/50">
-          <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search by name, email, role or team..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
                   setCurrentPage(1);
                 }}
-                className="pl-8 pr-8 h-8.5 text-xs rounded-xl"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-xs transition-all cursor-pointer font-medium whitespace-nowrap ${
+                  isActive
+                    ? "bg-background text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                }`}
+              >
+                <TabIcon
+                  className={`h-3.5 w-3.5 ${
+                    isActive
+                      ? "text-indigo-600 dark:text-indigo-400"
+                      : "text-muted-foreground"
+                  }`}
+                />
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-lg font-bold transition-all ${
+                    isActive
+                      ? "bg-indigo-600 text-white"
+                      : "bg-muted text-muted-foreground border border-border/50 font-semibold"
+                  }`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-            {/* Team Dropdown Filter */}
-            <Select
-              value={teamFilter}
-              onValueChange={(val) => {
-                setTeamFilter(val);
+        {/* Right: Search + Team Dropdown + Add User (in the same single line) */}
+        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end min-w-0">
+          {/* Compact Search Input */}
+          <div className="relative w-full sm:w-48 lg:w-56 min-w-[140px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-            >
-              <SelectTrigger className="w-[140px] h-8.5 text-xs rounded-xl font-medium">
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="ALL" className="text-xs">
-                  All Teams
-                </SelectItem>
-                {availableTeams.map((t) => (
-                  <SelectItem key={t} value={t} className="text-xs">
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Specific Role Dropdown Filter */}
-            <Select
-              value={specificRoleFilter}
-              onValueChange={(val) => {
-                setSpecificRoleFilter(val);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[140px] h-8.5 text-xs rounded-xl font-medium">
-                <SelectValue placeholder="All Roles" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="ALL" className="text-xs">
-                  All Specific Roles
-                </SelectItem>
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <SelectItem key={r} value={r} className="text-xs">
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Clear filters pill */}
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllFilters}
-                className="h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-xl flex items-center gap-1 shrink-0"
+              className="pl-8 pr-7 h-8 text-xs rounded-lg bg-background"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3 w-3" />
-                Reset filters
-              </Button>
+              </button>
             )}
           </div>
 
-          {/* Right Action: Add User */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Team Filter Dropdown */}
+          <Select
+            value={teamFilter}
+            onValueChange={(val) => {
+              setTeamFilter(val);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[125px] h-8 text-xs rounded-lg font-medium bg-background shrink-0">
+              <SelectValue placeholder="All Teams" />
+            </SelectTrigger>
+            <SelectContent className="rounded-lg">
+              <SelectItem value="ALL" className="text-xs">
+                All Teams
+              </SelectItem>
+              {availableTeams.map((t) => (
+                <SelectItem key={t} value={t} className="text-xs">
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Reset Filters Icon Button */}
+          {hasActiveFilters && (
             <Button
+              variant="ghost"
               size="sm"
-              onClick={() => setIsAddUserOpen(true)}
-              className="h-8.5 px-3 text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5"
+              onClick={clearAllFilters}
+              title="Reset all filters"
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1 shrink-0"
             >
-              <UserPlus className="h-3.5 w-3.5" />
-              Add User
+              <X className="h-3.5 w-3.5" />
             </Button>
-          </div>
+          )}
+
+          {/* Add User Button */}
+          <Button
+            size="sm"
+            onClick={() => setIsAddUserOpen(true)}
+            className="h-8 px-3 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 shrink-0"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Add User</span>
+          </Button>
         </div>
       </div>
 
-      {/* Unified User & Role Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-xs">
+      {/* Unified User & Role Table with rounded-lg */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-xs">
         <Table>
           <TableHeader className="bg-muted/40">
             <TableRow className="hover:bg-transparent">
@@ -620,13 +420,13 @@ export function UsersRolesTable({
                     className="hover:bg-muted/30 transition-colors"
                   >
                     {/* User Identity */}
-                    <TableCell className="py-3">
+                    <TableCell className="py-2.5">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 rounded-xl border border-border/60">
+                        <Avatar className="h-8.5 w-8.5 rounded-lg border border-border/60">
                           {user.avatar && (
                             <AvatarImage src={user.avatar} alt={user.name} />
                           )}
-                          <AvatarFallback className="rounded-xl text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                          <AvatarFallback className="rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                             {getInitials(user.name, user.email)}
                           </AvatarFallback>
                         </Avatar>
@@ -638,7 +438,7 @@ export function UsersRolesTable({
                             {isImmutable && (
                               <Badge
                                 variant="outline"
-                                className="text-[9px] px-1 py-0 h-4 bg-indigo-50/80 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 font-semibold"
+                                className="text-[9px] px-1 py-0 h-4 bg-indigo-50/80 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 font-semibold rounded-lg"
                               >
                                 Root
                               </Badge>
@@ -652,7 +452,7 @@ export function UsersRolesTable({
                     </TableCell>
 
                     {/* Team */}
-                    <TableCell className="py-3">
+                    <TableCell className="py-2.5">
                       {user.team && user.team !== "None" ? (
                         <Badge
                           variant="secondary"
@@ -668,12 +468,12 @@ export function UsersRolesTable({
                     </TableCell>
 
                     {/* Role Badge */}
-                    <TableCell className="py-3">
+                    <TableCell className="py-2.5">
                       {getRoleBadge(user.role)}
                     </TableCell>
 
                     {/* Inline Role Assignment Dropdown */}
-                    <TableCell className="py-3">
+                    <TableCell className="py-2.5">
                       {isImmutable ? (
                         <Badge
                           variant="outline"
@@ -688,7 +488,7 @@ export function UsersRolesTable({
                     </TableCell>
 
                     {/* Status */}
-                    <TableCell className="py-3">
+                    <TableCell className="py-2.5">
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
@@ -709,20 +509,19 @@ export function UsersRolesTable({
           </TableBody>
         </Table>
 
-        {/* Pagination footer */}
-        <div className="p-3 border-t border-border">
-          <DataTablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            itemsPerPage={itemsPerPage}
-            totalItems={filteredUsers.length}
-            onPageChange={setCurrentPage}
-            onItemsPerPageChange={(val) => {
-              setItemsPerPage(val);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
+        {/* Pagination footer with correct props: pageIndex & pageSize */}
+        <DataTablePagination
+          pageIndex={currentPage}
+          pageSize={itemsPerPage}
+          totalItems={filteredUsers.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(val) => {
+            setItemsPerPage(val);
+            setCurrentPage(1);
+          }}
+          itemLabel="users"
+          className="rounded-b-lg"
+        />
       </div>
 
       {/* Add User Dialog */}
