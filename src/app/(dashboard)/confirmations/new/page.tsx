@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createConfirmation } from '@/lib/confirmations/createConfirmation'
 import { nominatePeers } from '@/lib/confirmations/nominatePeers'
+import { getEmployeeContact } from '@/lib/confirmations/getEmployeeContact'
+import { notifyEmployee } from '@/lib/confirmations/notifyEmployee'
 import { PageBanner } from '@/components/shared/page-banner'
 import { UserCheck, PlusCircle, CheckCircle2, Send, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,6 +18,23 @@ type Peer = {
 
 export default function NewConfirmationPage() {
   const [employeeId, setEmployeeId] = useState('')
+  const [employeeName, setEmployeeName] = useState('')
+  const [employeeEmail, setEmployeeEmail] = useState('')
+
+  // Fill name and email from the directory once a full UUID is pasted
+  useEffect(() => {
+    const id = employeeId.trim()
+    if (id.length !== 36) return
+    let cancelled = false
+    getEmployeeContact(id).then((contact) => {
+      if (cancelled || !contact) return
+      setEmployeeName(contact.name ?? '')
+      setEmployeeEmail(contact.email ?? '')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [employeeId])
   const [timelineType, setTimelineType] = useState('')
   const [peers, setPeers] = useState<Peer[]>([
     { name: '', email: '' },
@@ -45,6 +64,14 @@ export default function NewConfirmationPage() {
         .map((peer) => ({ name: peer.name, email: peer.email || undefined }))
 
       await nominatePeers(confirmation.id, validPeers)
+
+      if (employeeEmail.trim()) {
+        await notifyEmployee({
+          name: employeeName.trim() || 'there',
+          email: employeeEmail.trim(),
+        })
+      }
+
       setSuccess(true)
     }
 
@@ -72,6 +99,8 @@ export default function NewConfirmationPage() {
               setSuccess(false)
               setEmployeeId('')
               setTimelineType('')
+              setEmployeeName('')
+              setEmployeeEmail('')
             }}
             className="rounded-lg"
           >
@@ -103,6 +132,31 @@ export default function NewConfirmationPage() {
               placeholder="Paste employee UUID from the directory"
               required
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Employee Name &amp; Email</Label>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                className="flex-1 rounded-lg text-sm"
+                placeholder="Employee Name"
+                required
+              />
+              <Input
+                type="email"
+                value={employeeEmail}
+                onChange={(e) => setEmployeeEmail(e.target.value)}
+                className="flex-1 rounded-lg text-sm"
+                placeholder="Employee Email"
+                required
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Filled automatically from the directory. The employee will get an email to fill their own form.
+            </p>
           </div>
 
           <div className="space-y-1.5">
