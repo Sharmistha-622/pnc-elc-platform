@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getFormFill } from '@/lib/forms/getFormFill'
 import { saveSubmission } from '@/lib/forms/respondentActions'
+import { visibleSectionIds } from '@/lib/forms/branching'
+import { BranchingForm } from './BranchingForm'
 import { asArray, asObject, asString, formatAnswer } from '@/lib/forms/answers'
 
 function FieldInput({
@@ -145,6 +147,7 @@ export default async function FillFormPage({
 
   const blocked = data.expired || data.cancelled || data.closed
   const editable = !data.submitted && !blocked
+  const visibleIds = visibleSectionIds(data.sections, data.fields, data.answers)
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-3xl mx-auto w-full pb-20">
@@ -192,7 +195,7 @@ export default async function FillFormPage({
             You submitted this form{data.submittedAt ? ` on ${String(data.submittedAt).slice(0, 10)}` : ''}. It can no
             longer be changed.
           </p>
-          {data.sections.map((section) => (
+          {data.sections.filter((section) => visibleIds.has(section.id)).map((section) => (
             <div key={section.id} className="rounded-lg border p-4 space-y-3">
               <h2 className="font-semibold">{section.title}</h2>
               <dl className="space-y-2">
@@ -213,11 +216,11 @@ export default async function FillFormPage({
       )}
 
       {editable && (
-        <form action={saveSubmission} className="space-y-6">
+        <BranchingForm action={saveSubmission} sections={data.sections} fields={data.fields} className="space-y-6">
           <input type="hidden" name="requestId" value={data.requestId} />
 
           {data.sections.map((section) => (
-            <div key={section.id} className="rounded-lg border p-4 space-y-4">
+            <div key={section.id} data-section-id={section.id} hidden={!visibleIds.has(section.id)} className="rounded-lg border p-4 space-y-4">
               <div>
                 <h2 className="font-semibold">{section.title}</h2>
                 {section.description && <p className="text-sm text-gray-600">{section.description}</p>}
@@ -246,7 +249,7 @@ export default async function FillFormPage({
               Submit
             </button>
           </div>
-        </form>
+        </BranchingForm>
       )}
     </div>
   )

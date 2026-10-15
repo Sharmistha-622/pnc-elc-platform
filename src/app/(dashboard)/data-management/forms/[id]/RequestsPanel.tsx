@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createFormRequest } from '@/lib/forms/requestActions'
 import { formatAnswer } from '@/lib/forms/answers'
+import { visibleSectionIds } from '@/lib/forms/branching'
 
 function statusLabel(request: any, submission: any): string {
   if (submission?.status === 'submitted') return 'Submitted'
@@ -69,7 +70,7 @@ export async function RequestsPanel({
       .in('form_version_id', submittedVersionIds)
     const { data: sectionRows } = await supabase
       .from('form_sections')
-      .select('id, order_index')
+      .select('id, form_version_id, order_index, show_when')
       .in('form_version_id', submittedVersionIds)
     answers = (answerRows ?? []) as any[]
     fields = (fieldRows ?? []) as any[]
@@ -139,18 +140,24 @@ export async function RequestsPanel({
               {requests.map((r) => {
                 const submission = submissions.find((s) => s.request_id === r.id)
                 const version = versions.find((v) => v.id === r.form_version_id)
+                const answerByField = new Map<string, unknown>(
+                  answers.filter((a) => a.submission_id === submission?.id).map((a) => [a.field_id as string, a.value])
+                )
+                const versionFields = fields.filter((f) => f.form_version_id === submission?.form_version_id)
+                const visibleIds = visibleSectionIds(
+                  sections.filter((s) => s.form_version_id === submission?.form_version_id),
+                  versionFields,
+                  answerByField
+                )
                 const submittedFields = submission?.status === 'submitted'
-                  ? fields
-                      .filter((f) => f.form_version_id === submission.form_version_id)
+                  ? versionFields
+                      .filter((f) => visibleIds.has(f.section_id))
                       .sort(
                         (a, b) =>
                           (sectionOrder.get(a.section_id) ?? 0) - (sectionOrder.get(b.section_id) ?? 0) ||
                           a.order_index - b.order_index
                       )
                   : []
-                const answerByField = new Map<string, unknown>(
-                  answers.filter((a) => a.submission_id === submission?.id).map((a) => [a.field_id as string, a.value])
-                )
                 return (
                   <tr key={r.id} className="border-b align-top">
                     <td className="p-2">{employeeNames.get(r.respondent_employee_id) ?? '—'}</td>
