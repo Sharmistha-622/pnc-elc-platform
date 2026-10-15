@@ -1,54 +1,40 @@
-import Link from 'next/link'
-import { getConfirmationsList } from '@/lib/confirmations/getConfirmationsList'
+import React from "react";
+import Link from "next/link";
+import { getConfirmationsList } from "@/lib/confirmations/getConfirmationsList";
+import { PageBanner } from "@/components/shared/page-banner";
+import { ConfirmationsStatsCards } from "./confirmations-stats";
+import { ConfirmationsTable } from "./confirmations-table";
+import { ClipboardList, PlusCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default async function ConfirmationsPage() {
-  const confirmations = await getConfirmationsList()
+  const confirmations = await getConfirmationsList();
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Confirmations</h1>
-        <Link
-          href="/confirmations/new"
-          className="bg-black text-white px-4 py-2 rounded text-sm"
-        >
-          + New Confirmation
-        </Link>
-      </div>
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
+      {/* Banner matching manage/users */}
+      <PageBanner
+        title="Employee Confirmations"
+        description="Monitor probation evaluation workflows, 360 peer feedback collection, and managerial decision sign-offs."
+        icon={<ClipboardList className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+        actions={
+          <Link href="/confirmations/new">
+            <Button
+              size="sm"
+              className="h-8 rounded-lg text-xs gap-1.5 font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+            >
+              <PlusCircle className="h-3.5 w-3.5" />
+              New Confirmation
+            </Button>
+          </Link>
+        }
+      />
 
-      {confirmations.length === 0 ? (
-        <p className="text-gray-500">No confirmations yet. Start one with "New Confirmation".</p>
-      ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left p-2">Employee</th>
-              <th className="text-left p-2">Type</th>
-              <th className="text-left p-2">Status</th>
-              <th className="text-left p-2">Manager Decision</th>
-              <th className="text-left p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {confirmations.map((c) => (
-              <tr key={c.id} className="border-b">
-                <td className="p-2">{c.employeeName}</td>
-                <td className="p-2">{c.employeeType}</td>
-                <td className="p-2">{c.status}</td>
-                <td className="p-2">{c.managerDecision ?? 'Pending'}</td>
-                <td className="p-2 space-x-4">
-                  <Link href={`/confirmations/${c.id}/report`} className="text-blue-600 hover:underline">
-                    Report
-                  </Link>
-                  <Link href={`/confirmations/${c.id}/manager-decision`} className="text-blue-600 hover:underline">
-                    Manager Decision
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* 1. Stat Cards */}
+      <ConfirmationsStatsCards confirmations={confirmations} />
+
+      {/* 2. Table with Filter, Search, Sort & Pagination */}
+      <ConfirmationsTable initialConfirmations={confirmations} />
     </div>
-  )
+  );
 }
