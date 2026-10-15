@@ -21,6 +21,10 @@ export async function setUserRole(targetUserId: string, role: UserRole) {
   const { data: target, error: lookupError } = await admin.auth.admin.getUserById(targetUserId)
   if (lookupError || !target.user) return { success: false, error: 'User not found' }
 
+  if (target.user.email?.toLowerCase() === 'nitin@navgurukul.org') {
+    return { success: false, error: 'nitin@navgurukul.org is an immutable Super Admin and cannot be modified' }
+  }
+
   const targetRole = target.user.app_metadata?.role as UserRole | undefined
   const touchesAdmin =
     role === 'Super Admin' || role === 'Admin' ||

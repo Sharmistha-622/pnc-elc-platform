@@ -13,11 +13,12 @@ oAuth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 })
 
-function createEmailBody(to: string, subject: string, htmlBody: string) {
+function createEmailBody(to: string, subject: string, htmlBody: string, cc?: string) {
   const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
   const messageParts = [
     `From: ${senderEmail}`,
     `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
     'Content-Type: text/html; charset=utf-8',
     'MIME-Version: 1.0',
     `Subject: ${subject}`,
@@ -65,7 +66,7 @@ export async function sendEmail(
 
   try {
     const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
-    const raw = createEmailBody(recipient, subject, htmlBody)
+    const raw = createEmailBody(recipient, subject, htmlBody, data.cc)
 
     const response = await gmail.users.messages.send({
       userId: 'me',

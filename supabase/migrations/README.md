@@ -5,11 +5,13 @@ Apply them in filename order.
 
 ## Standing up a project from scratch
 
-Run these two, in this order, on an empty project:
+Run these three, in this order, on an empty project:
 
 1. `202610151400_full_schema.sql` — pg_dump baseline. Creates 21 tables.
 2. `202610152100_complete_schema_for_new_project.sql` — everything else the
    application needs. Takes the schema to 56 tables.
+3. `202610160300_enforce_nitin_super_admin.sql` — pins nitin@navgurukul.org to
+   Super Admin via `current_app_role()` and a trigger on the roles table.
 
 Step 2 is not optional. The baseline dump was taken from a database holding
 only 21 tables, but the application queries 50. On its own it leaves the
@@ -37,10 +39,10 @@ dropped before being created, and seeds are `on conflict do nothing`.
 
 ### Verified
 
-Both files were applied in order against a clean PostgreSQL instance. Result:
-56 tables, all 50 tables referenced by `.from(...)` in `src/` present, the four
-automation tables absent, and a second run of step 2 completing with no errors
-and no duplicate seed rows.
+All three files were applied in order against a clean PostgreSQL instance.
+Result: 56 tables, all 50 tables referenced by `.from(...)` in `src/` present,
+the four automation tables absent, and a second run of steps 2 and 3 completing
+with no errors and no duplicate seed rows.
 
 ## Moving between Supabase projects
 
