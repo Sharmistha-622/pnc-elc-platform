@@ -385,6 +385,115 @@ NavGurukul</p>
 `),
 })
 
+const mergeEmail = (context: EmailTemplateContext): RenderedEmail => ({
+  subject: 'Welcome to NavGurukul! | Pre-Joining Setup & Official Email',
+  html: wrapHtml(`
+<p>Hi ${context.employeeName},</p>
+
+<p>Welcome to NavGurukul!</p>
+<p>We’re so excited to have you join us and look forward to welcoming you tomorrow!</p>
+<p>As you get ready to begin your journey at NavGurukul, here are a few important actions, tools, and resources to help you complete your pre-joining setup and get familiar with how we communicate, work, and collaborate.</p>
+
+<h3>Before Your First Day</h3>
+<p>Please complete the following action items before your Date of Joining (DOJ):</p>
+
+<ul>
+  <li>📧 <strong>Activate your official email</strong> — Please log in using the credentials shared below and start using this email for all official communication.</li>
+  <li>📝 <strong>Complete the <a href="https://docs.google.com/forms/u/0/d/1iD0qz2XjAJ-PLJFHlOxZZjuMVtIX1ZCUbQwgWWiZa-k/preview" target="_blank">NG Annual Database Form</a></strong> — Please use your official email and ensure your bank details, PAN, and other information are accurate.</li>
+</ul>
+
+<p>We recommend completing the above action items within 24 hours of receiving this email to ensure a smooth onboarding experience.</p>
+
+<p><strong>Your official email:</strong><br>
+<strong>Username:</strong> ${context.officialEmail ?? ""}<br>
+<strong>Temporary Password:</strong> ${context.temporaryPassword ?? "(shared separately by People &amp; Culture)"}</p>
+
+<p>🔐 For security, please change your temporary password after your first login.</p>
+
+<h3>Resources to Get You Started</h3>
+
+<table cellpadding="8" cellspacing="0" style="border-collapse: collapse; border: 1px solid #ccc; width: 100%;">
+  <tr style="background-color: #f9f9f9;">
+    <th style="border: 1px solid #ccc; text-align: left;">Resource</th>
+    <th style="border: 1px solid #ccc; text-align: left;">What it’s for</th>
+    <th style="border: 1px solid #ccc; text-align: left;">What you need to do</th>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://drive.google.com/file/d/1oWCgaThcG_EFKsvMe4UX6QfY7GK92FdU/view?usp=sharing" target="_blank">NG Deck</a></td>
+    <td style="border: 1px solid #ccc;">A quick introduction to NavGurukul, our mission, programs, and impact</td>
+    <td style="border: 1px solid #ccc;">Read, understand, and reflect</td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://drive.google.com/file/d/1hWQ9km-Hyt3tw-1OWTyhQvaQaR2s9nBI/view?usp=drive_link" target="_blank">Employee Handbook</a></td>
+    <td style="border: 1px solid #ccc;">An overview of our policies and ways of working</td>
+    <td style="border: 1px solid #ccc;">Please read it and submit the signed acknowledgment through the <a href="https://docs.google.com/forms/d/e/1FAIpQLSdoJRjZK0HBeyQPuHHJnFHjk3GLCYy_Z24el0YKnlNsgzlSnQ/viewform?usp=preview" target="_blank">submission form</a></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://www.notion.so/navgurukul/NG-Values-Cultural-Principles-2cca93c7c3918084990ad262e78eaec4" target="_blank">Culture Principles</a></td>
+    <td style="border: 1px solid #ccc;">A glimpse into our values and how we work together</td>
+    <td style="border: 1px solid #ccc;">Read, understand, and reflect</td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://navgurukul.slack.com/ssb/redirect" target="_blank">Slack</a></td>
+    <td style="border: 1px solid #ccc;">Our primary space for team communication<br><br>Key channels include:<br>#everybody, #team-everybody, #random, #celebrations &amp; #help_pnc</td>
+    <td style="border: 1px solid #ccc;">Sign in using your official NavGurukul email ID and join <a href="http://navgurukul.slack.com/" target="_blank">navgurukul.slack.com</a><br><br>Refer to the <a href="https://drive.google.com/file/d/1iTtQ9Hy7UscNNdp5SUva0Ig8iBFjPuIO/view?usp=sharing" target="_blank">Slack &amp; Async Guide</a></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://discord.com/invite/Rwf9YBTY" target="_blank">Discord</a></td>
+    <td style="border: 1px solid #ccc;">Used especially for campus and student-related coordination<br><br>Mandatory for residential teams and optional for remote/non-residential roles</td>
+    <td style="border: 1px solid #ccc;">Refer to the <a href="https://docs.google.com/document/d/1lGYTqEAEeGZF14CSQbEw6NR9digF0mGjhSN_E-vN3iI/edit?tab=t.0" target="_blank">Discord Guide</a></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc;"><a href="https://stub-client.navgurukul.org/tracker" target="_blank">Activity Tracker</a></td>
+    <td style="border: 1px solid #ccc;">Used to record your attendance, tasks, projects, time spent, and payroll</td>
+    <td style="border: 1px solid #ccc;">Your account will be activated within ~24 hours after completing the NG Annual Database Form.<br><br>Start updating the tracker daily from Day 1</td>
+  </tr>
+</table>
+
+<br>
+<h3>What to Expect on Day 1</h3>
+<ul>
+  <li>🎉 Welcome session: NavGurukul, culture, team, role &amp; initial setup</li>
+  <li>💻 Technical onboarding: Key tools, systems &amp; day-to-day processes</li>
+</ul>
+
+<p>If you have any trouble accessing your email, completing the form, or accessing any of the resources, simply reply to this email — we’re happy to help.</p>
+<p>We’re looking forward to welcoming you and having you join the NavGurukul journey!</p>
+
+<p>Warmly,<br>
+<strong>People &amp; Culture Team</strong><br>
+NavGurukul</p>
+`),
+})
+
+const techResourcesEmail = (context: EmailTemplateContext): RenderedEmail => ({
+  subject: 'Your Technical Onboarding | Session Recap & Resources',
+  html: wrapHtml(`
+  <p>Hi ${context.employeeName},</p>
+  <p>In the Technical Onboarding session, we covered the key tools, systems, and processes to help you get started.</p>
+  <p>You can revisit the <a href="https://gamma.app/docs/Welcome-to-NavGurukul-bz2v24p71iyt06x?mode=doc" target="_blank">Technical Onboarding Deck</a> for a quick refresher.</p>
+  <p>Please access the <a href="https://assets.navgurukul.org/" target="_blank">Asset Dashboard</a> to raise requests for laptops and other assets.</p>
+  <p>If you have any questions, feel free to reach out. We’re happy to support you as you settle in.</p>
+  <p>Warm regards,<br>People & Culture Team<br>NavGurukul</p>
+  
+`),
+})
+
+const techReminderEmail = (context: EmailTemplateContext): RenderedEmail => ({
+  subject: `Mandatory: Technical Onboarding Call | ${context.employeeName}`,
+  html: wrapHtml(`
+  <p>Hi ${context.employeeName},</p>
+  <p>We noticed that you did not attend the technical onboarding call.</p>
+  <p>Attendance for this session is <strong>mandatory and non-negotiable.</strong></p>
+  <p>The session covers the daily work tracking process, which is directly linked to payroll and is therefore an essential process that every team member is expected to understand and follow correctly.</p>
+  <p>Missing the session may result in gaps in understanding the process and can impact the accuracy of your work tracking and payroll processing.</p>
+  <p>Please connect with the PnC team and ensure that you attend the next scheduled technical onboarding session.</p>
+  <p>Thank you for your cooperation.</p>
+  <p>Warm regards,<br>People & Culture Team<br>NavGurukul</p>
+  
+`),
+})
+
 /** Email renderers, keyed by onboarding step. */
 export const EMAIL_TEMPLATES: Record<
   string,
@@ -397,4 +506,7 @@ export const EMAIL_TEMPLATES: Record<
   week1_followup_email: week1FollowupEmail,
   week2_followup_email: week2FollowupEmail,
   milestone_email: milestoneEmail,
+  merge_email: mergeEmail,
+  tech_resources_email: techResourcesEmail,
+  tech_reminder_email: techReminderEmail,
 }

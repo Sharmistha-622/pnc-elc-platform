@@ -1,4 +1,8 @@
-import { getOrgToday, toDateKey } from '@/lib/onboarding/automation/dates'
+import {
+  getOrgToday,
+  parseDateOnly,
+  toDateKey,
+} from '@/lib/onboarding/automation/dates'
 import { planSteps, planTasks } from '@/lib/onboarding/automation/schedule'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -47,6 +51,7 @@ type RecordRow = {
   id: string
   employee_id: string | null
   candidate_name: string
+  designation: string | null
   personal_email: string | null
   department: string | null
   joining_date: string
@@ -134,7 +139,7 @@ export const syncJourneys = async (
   const { data: journeyRows, error: journeysError } = await supabase
     .from('onboarding_journeys')
     .select(
-      'id, employee_id, onboarding_record_id, joining_date, last_completed_step, is_completed'
+      'id, employee_id, onboarding_record_id, joining_date, last_completed_step, is_completed, created_at'
     )
 
   if (journeysError) {
@@ -160,7 +165,7 @@ export const syncJourneys = async (
   const { data: recordRows, error: recordsError } = await supabase
     .from('onboarding_records')
     .select(
-      `id, employee_id, candidate_name, personal_email, department, joining_date, status,
+      `id, employee_id, candidate_name, designation, personal_email, department, joining_date, status,
        manager_id, buddy_id,
        employee_types ( name ),
        employee_account_provisioning ( official_email, credentials_delivery_status )`
@@ -184,6 +189,7 @@ export const syncJourneys = async (
       employeeId: record.employee_id,
       onboardingRecordId: record.id,
       candidateName: record.candidate_name,
+      designation: record.designation,
       employeeType: toEmployeeType(first(record.employee_types)?.name),
       department: record.department,
       joiningDate: record.joining_date,
@@ -228,6 +234,7 @@ export const syncJourneys = async (
       employeeId: employee.id,
       onboardingRecordId: null,
       candidateName: employee.name,
+      designation: null,
       employeeType: employee.employee_type,
       department: employee.team,
       joiningDate: employee.joining_date,
@@ -251,6 +258,7 @@ export const syncJourneys = async (
 }
 
 type SyncInput = {
+  designation: string | null
   employeeId: string | null
   onboardingRecordId: string | null
   candidateName: string
@@ -269,6 +277,7 @@ type ExistingJourney = {
   joining_date: string
   last_completed_step: string | null
   is_completed: boolean
+  created_at: string
 }
 
 /**
@@ -284,6 +293,7 @@ const upsertJourney = async (
     employee_id: input.employeeId,
     onboarding_record_id: input.onboardingRecordId,
     candidate_name: input.candidateName,
+    designation: input.designation,
     joining_date: input.joiningDate,
     department: input.department,
     manager_email: input.managerEmail,
@@ -307,10 +317,18 @@ const upsertJourney = async (
     // Steps are only re-dated when the joining date actually moved.
     if (existing.joining_date === input.joiningDate) return 'unchanged'
 
-    await writeSteps(supabase, existing.id, input, {
-      lastCompletedStep: existing.last_completed_step,
-      isCompleted: existing.is_completed,
-    })
+    // Re-planning uses the journey's original creation date, so a joiner who
+    // was entered late keeps the merge path even when their date later moves.
+    await writeSteps(
+      supabase,
+      existing.id,
+      input,
+      {
+        lastCompletedStep: existing.last_completed_step,
+        isCompleted: existing.is_completed,
+      },
+      parseDateOnly(existing.created_at) ?? getOrgToday()
+    )
 
     return 'rescheduled'
   }
@@ -326,10 +344,13 @@ const upsertJourney = async (
     return 'unchanged'
   }
 
-  await writeSteps(supabase, inserted.id as string, input, {
-    lastCompletedStep: null,
-    isCompleted: false,
-  })
+  await writeSteps(
+    supabase,
+    inserted.id as string,
+    input,
+    { lastCompletedStep: null, isCompleted: false },
+    getOrgToday()
+  )
 
   return 'created'
 }
@@ -344,7 +365,8 @@ const writeSteps = async (
   supabase: SupabaseClient,
   journeyId: string,
   input: SyncInput,
-  state: { lastCompletedStep: string | null; isCompleted: boolean }
+  state: { lastCompletedStep: string | null; isCompleted: boolean },
+  entryDate: Date
 ): Promise<void> => {
   const context: JourneyContext = {
     journeyId,
@@ -360,12 +382,15 @@ const writeSteps = async (
     managerEmail: input.managerEmail,
     buddyEmail: input.buddyEmail,
     slackChannelId: null,
+    designation: input.designation,
+    slackIntroText: null,
+    missedTechCall: false,
     lastCompletedStep: state.lastCompletedStep,
     isCompleted: state.isCompleted,
     employeeStatus: input.employeeStatus,
   }
 
-  const planned = planSteps(context)
+  const planned = planSteps(context, entryDate)
   if (planned.length === 0) return
 
   const { data: existingSteps } = await supabase

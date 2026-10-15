@@ -14,7 +14,15 @@ import type {
  * run, which is how the spreadsheet version behaved.
  */
 export type DispatchOutcome =
-  | { status: 'sent'; externalRef?: string | null }
+  | {
+      status: 'sent'
+      externalRef?: string | null
+      /**
+       * Facts produced by the dispatch that a later step needs to read — the
+       * slot a call actually landed on, and whether it was a placeholder.
+       */
+      meta?: Record<string, unknown>
+    }
   | { status: 'skipped'; reason: string }
   | { status: 'deferred'; reason: string }
   | { status: 'failed'; error: string }
@@ -24,6 +32,11 @@ export type DispatchInput = {
   context: JourneyContext
   step: OnboardingStepRecord
   tasks: OnboardingTaskRecord[]
+  /**
+   * The journey's other steps. The Slack welcome announces the time the manager
+   * connect was actually booked for, which only the calendar step knows.
+   */
+  siblingSteps?: OnboardingStepRecord[]
   /**
    * Other joiners sharing this batched session. The first journey in a batch
    * creates the event for everyone; the rest resolve against the same invite.

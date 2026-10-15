@@ -14,7 +14,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { markStepSent, setTaskCompletion } from '@/lib/onboarding/automation/actions'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  markStepSent,
+  sendPostMeetingEmail,
+  setMissedTechCall,
+  setSlackIntroText,
+  setTaskCompletion,
+} from '@/lib/onboarding/automation/actions'
 import { EMPLOYEE_TYPE_LABELS } from '@/lib/onboarding/automation/constants'
 import { formatDisplayDate } from '@/lib/onboarding/automation/dates'
 
@@ -67,6 +74,7 @@ const Checklist = ({
 export const JourneyDrawer = ({ row, onOpenChange }: JourneyDrawerProps) => {
   const [isPending, startTransition] = useTransition()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [introDraft, setIntroDraft] = useState('')
 
   if (!row) return null
 
@@ -77,6 +85,39 @@ export const JourneyDrawer = ({ row, onOpenChange }: JourneyDrawerProps) => {
       setBusyId(null)
       if (result.success) toast.success('Marked as sent')
       else toast.error(result.error ?? 'Could not update this step')
+    })
+  }
+
+  const handleIntroSave = () => {
+    setBusyId('intro')
+    startTransition(async () => {
+      const result = await setSlackIntroText(row.journeyId, introDraft)
+      setBusyId(null)
+      if (result.success) toast.success('Introduction saved')
+      else toast.error(result.error ?? 'Could not save the introduction')
+    })
+  }
+
+  const handleMissedCall = (missed: boolean) => {
+    setBusyId('missed')
+    startTransition(async () => {
+      const result = await setMissedTechCall(row.journeyId, missed)
+      setBusyId(null)
+      if (!result.success) {
+        toast.error(result.error ?? 'Could not update this journey')
+      }
+    })
+  }
+
+  const handlePostMeeting = (
+    stepKey: 'tech_resources_email' | 'tech_reminder_email'
+  ) => {
+    setBusyId(stepKey)
+    startTransition(async () => {
+      const result = await sendPostMeetingEmail(row.journeyId, stepKey)
+      setBusyId(null)
+      if (result.success) toast.success('Email sent')
+      else toast.error(result.error ?? 'Could not send this email')
     })
   }
 
@@ -150,6 +191,64 @@ export const JourneyDrawer = ({ row, onOpenChange }: JourneyDrawerProps) => {
               ))}
             </section>
           )}
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">Slack introduction</h3>
+            <p className="text-muted-foreground text-xs">
+              Posted to the team channel on the joining date. Written by People
+              &amp; Culture — the automation only decides when to post it.
+            </p>
+            <Textarea
+              value={introDraft || row.slackIntroText || ''}
+              onChange={(event) => setIntroDraft(event.target.value)}
+              placeholder="Introduce the new joiner to the team..."
+              rows={4}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending && busyId === 'intro'}
+              onClick={handleIntroSave}
+            >
+              {isPending && busyId === 'intro' && (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              )}
+              Save introduction
+            </Button>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">After the technical call</h3>
+            <p className="text-muted-foreground text-xs">
+              Sent by hand once you know who attended.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending && busyId === 'tech_resources_email'}
+                onClick={() => handlePostMeeting('tech_resources_email')}
+              >
+                Send resources
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending && busyId === 'tech_reminder_email'}
+                onClick={() => handlePostMeeting('tech_reminder_email')}
+              >
+                Send missed-call reminder
+              </Button>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={row.missedTechCall}
+                disabled={isPending && busyId === 'missed'}
+                onCheckedChange={(checked) => handleMissedCall(checked === true)}
+              />
+              <span>Missed the technical onboarding call</span>
+            </label>
+          </section>
 
           <Checklist title="Emails" progress={row.emailProgress} />
           <Checklist title="Calls" progress={row.calendarProgress} />

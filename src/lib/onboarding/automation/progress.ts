@@ -1,5 +1,7 @@
 import {
   INDUCTION_TASKS,
+  MAX_ATTEMPTS,
+  MAX_LATE_DAYS,
   STEP_DEFINITION_BY_KEY,
   STEP_DEFINITIONS,
 } from '@/lib/onboarding/automation/constants'
@@ -109,6 +111,17 @@ export const deriveAttentionReasons = (
     reasons.push('Buddy missing — assign one before the Buddy Connect')
   }
 
+  // The introduction is written by a person, so a missing one blocks a step
+  // that no amount of retrying will fix.
+  const introStep = steps.find((step) => step.stepKey === 'slack_intro')
+  if (introStep && introStep.status === 'pending') {
+    reasons.push(
+      context.slackIntroText
+        ? 'Slack introduction pending'
+        : 'Slack introduction not written yet'
+    )
+  }
+
   const failedSteps = steps.filter((step) => step.status === 'failed')
   if (failedSteps.length > 0) {
     const labels = failedSteps
@@ -156,15 +169,57 @@ export const deriveAttentionReasons = (
   return reasons
 }
 
-/** Steps due on or before `today` that are still waiting to be dispatched. */
+export type DueStepTriage = {
+  /** Due now and still within the late window. */
+  due: OnboardingStepRecord[]
+  /** Too far past their date to be worth sending. */
+  expired: OnboardingStepRecord[]
+  /** Due, but they have failed too many times to keep retrying. */
+  exhausted: OnboardingStepRecord[]
+}
+
+/**
+ * Sorts the steps of one journey into what should be sent now, what has gone
+ * stale, and what has failed too often.
+ *
+ * The late window is the important one. Every step carries a date, and without
+ * a ceiling the first run after any pause would dispatch a joiner's entire
+ * history at once — a day-one welcome arriving in month three. A step more than
+ * MAX_LATE_DAYS past its date is better skipped than sent wrong.
+ */
 export const getDueSteps = (
   steps: OnboardingStepRecord[],
   today: Date
-): OnboardingStepRecord[] =>
-  steps.filter((step) => {
-    if (step.status !== 'pending' && step.status !== 'failed') return false
+): DueStepTriage => {
+  const triage: DueStepTriage = { due: [], expired: [], exhausted: [] }
+
+  for (const step of steps) {
+    if (step.status !== 'pending' && step.status !== 'failed') continue
+
+    // Post-meeting mails are sent by a person pressing a button, so the
+    // scheduler must never pick them up — nor expire them for being late.
+    if (STEP_DEFINITION_BY_KEY[step.stepKey]?.isManualOnly) continue
+
     const scheduled = parseDateOnly(step.scheduledFor)
-    return scheduled ? diffInDays(scheduled, today) >= 0 : false
-  })
+    if (!scheduled) continue
+
+    const daysLate = diffInDays(scheduled, today)
+    if (daysLate < 0) continue // not due yet
+
+    if (daysLate > MAX_LATE_DAYS) {
+      triage.expired.push(step)
+      continue
+    }
+
+    if (step.attempts >= MAX_ATTEMPTS) {
+      triage.exhausted.push(step)
+      continue
+    }
+
+    triage.due.push(step)
+  }
+
+  return triage
+}
 
 export const getAllStepDefinitions = () => STEP_DEFINITIONS

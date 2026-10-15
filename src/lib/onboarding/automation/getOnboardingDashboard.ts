@@ -60,6 +60,8 @@ export const getOnboardingDashboard =
           attentionReasons,
           managerEmail: context.managerEmail,
           buddyEmail: context.buddyEmail,
+          slackIntroText: context.slackIntroText,
+          missedTechCall: context.missedTechCall,
           manualSteps: steps
             .filter(
               (step) =>

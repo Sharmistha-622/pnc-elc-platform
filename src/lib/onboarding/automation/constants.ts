@@ -34,6 +34,27 @@ export const ONBOARDED_AFTER_DAYS = 15
 /** Slack introductions are pointless long after the fact; the script capped it. */
 export const SLACK_INTRO_MAX_AGE_DAYS = 30
 
+/**
+ * How late a step may be dispatched.
+ *
+ * Without this the first live run would fire every historical step for every
+ * journey at once — a joiner three months in would receive their day-one mail.
+ * Anything past the cap expires unsent.
+ */
+export const MAX_LATE_DAYS = 5
+
+/**
+ * How many dispatch attempts a step gets before it stops being retried.
+ * A permanently failing step should raise an alert, not retry nightly forever.
+ */
+export const MAX_ATTEMPTS = 3
+
+/**
+ * How long a claim may be held before it is treated as abandoned. A run that
+ * dies mid-dispatch would otherwise strand its steps in `in_flight`.
+ */
+export const STALE_CLAIM_MINUTES = 30
+
 /** Employee statuses that halt every automation for that person. */
 export const DROPPED_EMPLOYEE_STATUSES = [
   'resigned',
@@ -73,6 +94,22 @@ export type StepDefinition = {
   requiresAllTasks?: boolean
   /** Only dispatched for these employee types. */
   onlyForEmployeeTypes?: EmployeeType[]
+  /**
+   * Days before `scheduled_for` that the step is dispatched.
+   *
+   * Calendar invites go out the day before the session, as the legacy script
+   * did — booking an 09:00 warm onboarding at 08:00 the same morning gives
+   * nobody time to see it.
+   */
+  leadDays?: number
+  /**
+   * Steps this one makes unnecessary once it is sent. The merge email contains
+   * the credential, pre-joining and access content, so sending it must retire
+   * all three rather than mail the joiner the same thing again.
+   */
+  supersedes?: string[]
+  /** Dispatched only by a person pressing a button, never by the schedule. */
+  isManualOnly?: boolean
   /** Contact that must be present, else the step cannot be dispatched. */
   requiresContact?:
     | 'officialEmail'
@@ -105,6 +142,9 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
     channel: 'email',
     offsetDays: -1,
     requiresContact: 'personalEmail',
+    // The access mail repeats this content, so the legacy script marked it
+    // SKIPPED once pre-joining went out.
+    supersedes: ['access_email'],
   },
   {
     key: 'access_email',
@@ -138,6 +178,36 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
     requiresContact: 'officialEmail',
   },
   {
+    // Sent instead of credential + pre-joining + access when someone is entered
+    // with a day or less to go: three mails in two days reads as a mistake.
+    // Carries credentials, so a human sends it.
+    key: 'merge_email',
+    label: 'Merge Email (urgent joiner)',
+    channel: 'email',
+    offsetDays: 0,
+    requiresContact: 'personalEmail',
+    requiresManualReview: true,
+    supersedes: ['credential_email', 'pre_joining_email', 'access_email'],
+  },
+  {
+    key: 'tech_resources_email',
+    label: 'Technical Onboarding Resources',
+    channel: 'email',
+    offsetDays: 0,
+    isManualOnly: true,
+    requiresContact: 'officialEmail',
+    excludeFromProgress: true,
+  },
+  {
+    key: 'tech_reminder_email',
+    label: 'Missed Technical Call Reminder',
+    channel: 'email',
+    offsetDays: 0,
+    isManualOnly: true,
+    requiresContact: 'officialEmail',
+    excludeFromProgress: true,
+  },
+  {
     key: 'milestone_email',
     label: 'Milestone Email',
     channel: 'email',
@@ -153,7 +223,17 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
     key: 'slack_channel',
     label: 'Create Slack Channel',
     channel: 'slack',
-    offsetDays: -1,
+    // Legacy created the channel on the joining date. See decision #2.
+    offsetDays: 0,
+    requiresInductionEligible: true,
+  },
+  {
+    // The P&C-written introduction, posted to the team channel rather than the
+    // joiner's own. Pointless long after the fact, so it expires at 30 days.
+    key: 'slack_intro',
+    label: 'Slack Introduction',
+    channel: 'slack',
+    offsetDays: 0,
     requiresInductionEligible: true,
   },
   {
@@ -196,6 +276,7 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
   // ---------- Calendar ----------
   {
     key: 'warm_onboarding',
+    leadDays: 1,
     label: 'Warm Onboarding',
     channel: 'calendar',
     offsetDays: 0,
@@ -208,6 +289,7 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
   },
   {
     key: 'manager_connect',
+    leadDays: 1,
     label: 'Manager Connect',
     channel: 'calendar',
     offsetDays: 0,
@@ -219,6 +301,7 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
   },
   {
     key: 'technical_onboarding',
+    leadDays: 1,
     label: 'Technical Onboarding',
     channel: 'calendar',
     offsetDays: 0,
@@ -230,6 +313,7 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
   },
   {
     key: 'buddy_connect',
+    leadDays: 1,
     label: 'Buddy Connect',
     channel: 'calendar',
     offsetDays: 1,
@@ -241,6 +325,7 @@ export const STEP_DEFINITIONS: StepDefinition[] = [
   },
   {
     key: 'pnc_checkin',
+    leadDays: 1,
     label: 'P&C Check-in',
     channel: 'calendar',
     offsetDays: 14,
@@ -287,6 +372,7 @@ export const CHANNEL_LABELS: Record<OnboardingChannel, string> = {
 
 export const STEP_STATUS_LABELS: Record<OnboardingStepStatus, string> = {
   pending: 'Pending',
+  in_flight: 'Sending',
   sent: 'Done',
   skipped: 'Skipped',
   failed: 'Failed',

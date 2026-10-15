@@ -29,6 +29,9 @@ type JourneyRow = {
   employee_id: string | null
   onboarding_record_id: string | null
   candidate_name: string | null
+  designation: string | null
+  slack_intro_text: string | null
+  missed_tech_call: boolean | null
   official_email: string | null
   personal_email: string | null
   joining_date: string
@@ -62,6 +65,7 @@ type StepRow = {
   attempts: number
   last_error: string | null
   skip_reason: string | null
+  dispatch_meta: Record<string, unknown> | null
 }
 
 type TaskRow = {
@@ -78,6 +82,9 @@ const JOURNEY_SELECT = `
   employee_id,
   onboarding_record_id,
   candidate_name,
+  designation,
+  slack_intro_text,
+  missed_tech_call,
   official_email,
   personal_email,
   joining_date,
@@ -121,6 +128,9 @@ const toContext = (row: JourneyRow): JourneyContext => {
     managerEmail: row.manager_email,
     buddyEmail: row.buddy_email,
     slackChannelId: row.slack_channel_id,
+    designation: row.designation,
+    slackIntroText: row.slack_intro_text,
+    missedTechCall: row.missed_tech_call ?? false,
     lastCompletedStep: row.last_completed_step,
     isCompleted: row.is_completed,
     employeeStatus: employee?.status ?? 'active',
@@ -139,6 +149,7 @@ const toStepRecord = (row: StepRow): OnboardingStepRecord => ({
   attempts: row.attempts,
   lastError: row.last_error,
   skipReason: row.skip_reason,
+  dispatchMeta: row.dispatch_meta,
 })
 
 const toTaskRecord = (row: TaskRow): OnboardingTaskRecord => ({

@@ -1,13 +1,10 @@
 import { Compass, History, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 
-import { OnboardingBoard } from '@/app/(dashboard)/onboarding/_components/OnboardingBoard'
 import { OnboardingHub } from '@/app/(dashboard)/onboarding/_components/OnboardingHub'
-import { OnboardingStats } from '@/app/(dashboard)/onboarding/_components/OnboardingStats'
-import { OnboardingTabs } from '@/app/(dashboard)/onboarding/_components/OnboardingTabs'
+import { RunModeBadge } from '@/app/(dashboard)/onboarding/_components/RunModeBadge'
 import { PageBanner } from '@/components/shared/page-banner'
 import { Button } from '@/components/ui/button'
-import { getOnboardingDashboard } from '@/lib/onboarding/automation/getOnboardingDashboard'
 import { requireFeature } from '@/lib/rbac/requireFeature'
 
 /**
@@ -23,8 +20,6 @@ export default async function OnboardingPage() {
   // and no staff role.
   await requireFeature('onboarding')
 
-  const { rows, totals } = await getOnboardingDashboard()
-
   return (
     <div className="animate-in fade-in mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 pb-20 duration-300 md:p-6 lg:p-8">
       <PageBanner
@@ -33,6 +28,7 @@ export default async function OnboardingPage() {
         icon={<Compass className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
         actions={
           <div className="flex items-center gap-2">
+            <RunModeBadge />
             <Button
               asChild
               variant="outline"
@@ -58,15 +54,7 @@ export default async function OnboardingPage() {
         }
       />
 
-      <OnboardingTabs
-        hub={<OnboardingHub />}
-        pipeline={
-          <div className="space-y-4">
-            <OnboardingStats totals={totals} />
-            <OnboardingBoard rows={rows} />
-          </div>
-        }
-      />
+      <OnboardingHub />
     </div>
   )
 }

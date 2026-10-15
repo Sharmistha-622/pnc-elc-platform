@@ -28,7 +28,7 @@ import type {
  * handed, so the whole pipeline can be reasoned about and tested directly.
  */
 
-/** Resolves a step's calendar date from the employee's joining date. */
+/** The date the step's content is *for* — an event date for calendar steps. */
 export const resolveStepDate = (
   definition: StepDefinition,
   joiningDate: Date
@@ -43,6 +43,39 @@ export const resolveStepDate = (
 
   return addDays(joiningDate, definition.offsetDays)
 }
+
+/**
+ * The date the step is acted on, which is the event date minus any lead time.
+ * Calendar invites go out the day before the session.
+ */
+export const resolveDispatchDate = (
+  definition: StepDefinition,
+  joiningDate: Date
+): Date => addDays(resolveStepDate(definition, joiningDate), -(definition.leadDays ?? 0))
+
+/**
+ * How the joiner was entered, which decides whether they get the normal
+ * three-mail run-up or the single merge mail.
+ */
+export type EntryPath = 'normal' | 'merge' | 'post_doj'
+
+/**
+ * Someone entered the day before they join cannot receive a credential mail
+ * two days before. Legacy collapsed that case into one merge mail, and skipped
+ * the run-up entirely for anyone entered after their joining date.
+ */
+export const resolveEntryPath = (
+  joiningDate: Date,
+  entryDate: Date
+): EntryPath => {
+  const daysUntilJoining = diffInDays(entryDate, joiningDate)
+  if (daysUntilJoining < 0) return 'post_doj'
+  if (daysUntilJoining <= 1) return 'merge'
+  return 'normal'
+}
+
+/** Steps the run-up consists of, retired by the merge and post-DOJ paths. */
+const RUN_UP_STEPS = ['credential_email', 'pre_joining_email', 'access_email']
 
 type Eligibility = { status: OnboardingStepStatus; skipReason?: string }
 
@@ -112,13 +145,28 @@ export const isHandledBeforeImport = (
   return stepIndex <= completedIndex
 }
 
-/** Builds the full dated step plan for one employee. */
-export const planSteps = (context: JourneyContext): PlannedStep[] => {
+/**
+ * Builds the full dated step plan for one employee.
+ *
+ * `entryDate` is when the joiner was entered into the system — the journey's
+ * creation date, not today — so re-planning an existing journey never changes
+ * which entry path it took.
+ */
+export const planSteps = (
+  context: JourneyContext,
+  entryDate?: Date
+): PlannedStep[] => {
   const joiningDate = parseDateOnly(context.joiningDate)
   if (!joiningDate) return []
 
+  const entry = entryDate
+    ? resolveEntryPath(joiningDate, entryDate)
+    : 'normal'
+
   return STEP_DEFINITIONS.map((definition) => {
-    const scheduledFor = toDateKey(resolveStepDate(definition, joiningDate))
+    const scheduledFor = toDateKey(
+      resolveDispatchDate(definition, joiningDate)
+    )
 
     if (isHandledBeforeImport(definition.key, context.lastCompletedStep)) {
       return {
@@ -127,6 +175,41 @@ export const planSteps = (context: JourneyContext): PlannedStep[] => {
         scheduledFor,
         status: 'skipped' as const,
         skipReason: 'Completed before import',
+      }
+    }
+
+    // Entry path first: it retires whole groups of steps regardless of the
+    // employee's eligibility for them.
+    if (entry === 'post_doj' && RUN_UP_STEPS.includes(definition.key)) {
+      return {
+        stepKey: definition.key,
+        channel: definition.channel,
+        scheduledFor,
+        status: 'skipped' as const,
+        skipReason: 'Entered after the joining date',
+      }
+    }
+
+    if (entry === 'merge' && RUN_UP_STEPS.includes(definition.key)) {
+      return {
+        stepKey: definition.key,
+        channel: definition.channel,
+        scheduledFor,
+        status: 'skipped' as const,
+        skipReason: 'Covered by the merge email',
+      }
+    }
+
+    if (definition.key === 'merge_email' && entry !== 'merge') {
+      return {
+        stepKey: definition.key,
+        channel: definition.channel,
+        scheduledFor,
+        status: 'skipped' as const,
+        skipReason:
+          entry === 'post_doj'
+            ? 'Entered after the joining date'
+            : 'Not an urgent joiner',
       }
     }
 

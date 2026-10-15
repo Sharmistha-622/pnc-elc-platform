@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/onboarding",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/onboarding-digest",
+      "schedule": "30 10 * * *"
     }
   ]
 }

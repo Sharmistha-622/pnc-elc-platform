@@ -26,10 +26,145 @@ export type VersionEntry = {
   changes: VersionChange[]
 }
 
-export const CURRENT_VERSION = '1.02.03'
+export const CURRENT_VERSION = '1.07.00'
 
 /** Newest first. Prepend new entries; never rewrite a released one. */
 export const VERSION_HISTORY: VersionEntry[] = [
+  {
+    version: '1.07.00',
+    date: '2026-10-15',
+    title: 'Legacy onboarding import tooling and cutover runbooks',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Features',
+        description:
+          'scripts/import-legacy-onboarding.ts reads CSV exports of the legacy tracker tabs and marks the steps that already happened. Dry run by default, and it only ever moves a step out of pending, so it cannot overwrite work this system did and is safe to re-run.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Cutover and rollback runbook, plus operator documentation covering the timeline, exclusions, run modes, safety rails and what People & Culture still do by hand.',
+      },
+      {
+        category: 'Security',
+        description:
+          'The import deliberately never reads the P&C Operations tab, which holds the team email password column.',
+      },
+    ],
+  },
+  {
+    version: '1.06.00',
+    date: '2026-10-15',
+    title: 'Automation pipeline moved into employee onboarding',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Improvements',
+        description:
+          'The automation pipeline now sits beside the post-joining checklist at /onboarding/employee rather than on the candidate hub, which is where the work it describes actually happens. The hub is a hub again.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Automation health strip: deliveries and failures over the last seven days, and when the last run finished, so a silently failing automation does not look like a healthy one.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Drawer actions for People & Culture: write the Slack introduction, flag a missed technical call, and send the two post-meeting emails.',
+      },
+    ],
+  },
+  {
+    version: '1.05.00',
+    date: '2026-10-15',
+    title: 'Onboarding alerts and digests',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Features',
+        description:
+          'Run summary posted after each automation run, batching every failure into one message rather than alerting per error.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Afternoon digest at 16:00 IST: pre-flight check for joiners arriving within two days with an incomplete record, tomorrow\u2019s expected actions, and everything currently needing a human.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Alerts respect the run mode — a dry run logs instead of posting, and sandbox redirects to the sandbox channel.',
+      },
+    ],
+  },
+  {
+    version: '1.04.00',
+    date: '2026-10-15',
+    title: 'Onboarding behaviour parity with the legacy script',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Fixes',
+        description:
+          'The Slack welcome announced a hardcoded 11:00 AM manager connect and never flagged a placeholder booking. It now reads the slot the calendar step actually booked, and says nothing rather than naming an unagreed time.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Batched calendar sessions now join the day\u2019s existing event instead of creating a second one, so a joiner synced later is added as a guest rather than sent a duplicate invite.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Merge email for joiners entered with a day or less to go, post-DOJ entry skipping, and step supersession so pre-joining retires the access mail.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Slack introduction step with a 30-day cap, manager-not-found-in-Slack alert, and the two post-meeting emails as manual P&C actions with a missed-call flag.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Calendar invites dispatch a day before the session; onboarding mail copies P&C and the milestone copies the manager.',
+      },
+    ],
+  },
+  {
+    version: '1.03.00',
+    date: '2026-10-15',
+    title: 'Onboarding automation safety rails',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Security',
+        description:
+          'ONBOARDING_MODE (off | dry_run | sandbox | live), defaulting to off and enforced inside the channel adapters so no code path can dispatch without it. Sandbox redirects every recipient and defers rather than falling through to a real joiner when unconfigured.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Due-step triage now caps lateness at 5 days and attempts at 3. Previously a step had no upper bound, so a first live run would have dispatched every historical step for every journey at once.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Steps are claimed atomically before dispatch, with stale-claim recovery, and runs are recorded in onboarding_runs, so an overlapping or retried cron cannot send the same message twice.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'ONBOARDING_TODAY_OVERRIDE lets staging time-travel through a joiner timeline; ignored in live mode. Run mode is shown as a badge in the onboarding header.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Vitest added with 53 tests covering the late window, mode matrix, date handling, eligibility carve-outs and stage boundaries. Decisions log and .env.example added.',
+      },
+    ],
+  },
   {
     version: '1.02.03',
     date: '2026-10-14',

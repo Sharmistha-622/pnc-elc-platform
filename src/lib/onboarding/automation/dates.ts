@@ -7,6 +7,8 @@
  * as the legacy Apps Script run did in Asia/Kolkata.
  */
 
+import { getRunMode } from '@/lib/onboarding/automation/runMode'
+
 export const ORG_TIME_ZONE = 'Asia/Kolkata'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -36,6 +38,23 @@ export const toDateKey = (date: Date): string => date.toISOString().slice(0, 10)
  * already 08:00 IST — using the raw UTC date would schedule the previous day.
  */
 export const getOrgToday = (now: Date = new Date()): Date => {
+  // Staging can time-travel to test a joiner's whole timeline in one sitting.
+  // Never in live: a wrong date there would re-send a cohort's entire pipeline.
+  const override = process.env.ONBOARDING_TODAY_OVERRIDE?.trim()
+  if (override) {
+    if (getRunMode() === 'live') {
+      console.warn(
+        'Onboarding: ONBOARDING_TODAY_OVERRIDE is set but ignored in live mode.'
+      )
+    } else {
+      const parsed = parseDateOnly(override)
+      if (parsed) return parsed
+      console.warn(
+        `Onboarding: ignoring unparseable ONBOARDING_TODAY_OVERRIDE "${override}".`
+      )
+    }
+  }
+
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: ORG_TIME_ZONE,
     year: 'numeric',

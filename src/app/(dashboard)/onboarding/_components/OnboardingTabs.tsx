@@ -5,8 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { ReactNode } from 'react'
 
 type OnboardingTabsProps = {
-  /** Candidate-to-employee hub: pipeline, offers, document review. */
+  /** The checklist view P&C work through by hand. */
   hub: ReactNode
+  /** Label for the first tab. */
+  hubLabel?: string
   /** Post-joining automation: emails, calls, Slack and induction tasks. */
   pipeline: ReactNode
 }
@@ -17,10 +19,14 @@ type OnboardingTabsProps = {
  * Both halves are rendered on the server and handed in as nodes, so this stays
  * a thin client boundary that owns nothing but the selected tab.
  */
-export const OnboardingTabs = ({ hub, pipeline }: OnboardingTabsProps) => (
+export const OnboardingTabs = ({
+  hub,
+  pipeline,
+  hubLabel = 'Checklist',
+}: OnboardingTabsProps) => (
   <Tabs defaultValue="hub" className="w-full">
     <TabsList>
-      <TabsTrigger value="hub">Hub</TabsTrigger>
+      <TabsTrigger value="hub">{hubLabel}</TabsTrigger>
       <TabsTrigger value="pipeline">Automation Pipeline</TabsTrigger>
     </TabsList>
 

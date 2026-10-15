@@ -2,6 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { dispatchStep } from '@/lib/onboarding/automation/channels'
+import { STEP_DEFINITION_BY_KEY } from '@/lib/onboarding/automation/constants'
+import { loadJourneys } from '@/lib/onboarding/automation/loadJourneys'
+import { requireFeature } from '@/lib/rbac/requireFeature'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
@@ -137,4 +141,117 @@ export async function setTaskCompletion(
 
   revalidatePath('/onboarding')
   return { success: true }
+}
+
+/** Records whether the joiner missed their technical onboarding call. */
+export async function setMissedTechCall(
+  journeyId: string,
+  missed: boolean
+): Promise<ActionResult> {
+  await requireFeature('onboarding')
+  if (!journeyId) return { success: false, error: 'Missing journey' }
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase
+    .from('onboarding_journeys')
+    .update({ missed_tech_call: missed, updated_at: new Date().toISOString() })
+    .eq('id', journeyId)
+
+  if (error) {
+    console.error('Failed to update missed tech call flag:', error.message)
+    return { success: false, error: 'Could not update this journey' }
+  }
+
+  revalidatePath('/onboarding')
+  return { success: true }
+}
+
+/** Saves the P&C-written introduction that gets posted to the team channel. */
+export async function setSlackIntroText(
+  journeyId: string,
+  text: string
+): Promise<ActionResult> {
+  await requireFeature('onboarding')
+  if (!journeyId) return { success: false, error: 'Missing journey' }
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase
+    .from('onboarding_journeys')
+    .update({
+      slack_intro_text: text.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', journeyId)
+
+  if (error) {
+    console.error('Failed to save Slack introduction:', error.message)
+    return { success: false, error: 'Could not save the introduction' }
+  }
+
+  revalidatePath('/onboarding')
+  return { success: true }
+}
+
+/**
+ * Sends one of the two post-meeting emails.
+ *
+ * These are never scheduled: P&C send them after a technical onboarding call,
+ * once they know who attended and who missed it.
+ */
+export async function sendPostMeetingEmail(
+  journeyId: string,
+  stepKey: 'tech_resources_email' | 'tech_reminder_email'
+): Promise<ActionResult> {
+  await requireFeature('onboarding')
+  if (!journeyId) return { success: false, error: 'Missing journey' }
+
+  const definition = STEP_DEFINITION_BY_KEY[stepKey]
+  if (!definition) return { success: false, error: 'Unknown email' }
+
+  const supabase = await createServerSupabaseClient()
+  const journeys = await loadJourneys(supabase)
+  const journey = journeys.find((item) => item.context.journeyId === journeyId)
+
+  if (!journey) return { success: false, error: 'Could not find this journey' }
+
+  const step = journey.steps.find((item) => item.stepKey === stepKey)
+  if (!step) return { success: false, error: 'This email is not set up yet' }
+
+  if (step.status === 'sent') {
+    return { success: false, error: 'This email has already been sent' }
+  }
+
+  const outcome = await dispatchStep({
+    definition,
+    context: journey.context,
+    step,
+    tasks: journey.tasks,
+    siblingSteps: journey.steps,
+  })
+
+  const now = new Date().toISOString()
+
+  if (outcome.status === 'sent') {
+    await supabase
+      .from('onboarding_steps')
+      .update({
+        status: 'sent',
+        completed_at: now,
+        external_ref: outcome.externalRef ?? null,
+        updated_at: now,
+      })
+      .eq('id', step.id)
+
+    revalidatePath('/onboarding')
+    return { success: true }
+  }
+
+  const reason =
+    outcome.status === 'failed'
+      ? outcome.error
+      : outcome.status === 'deferred' || outcome.status === 'skipped'
+        ? outcome.reason
+        : 'Could not send this email'
+
+  return { success: false, error: reason }
 }

@@ -12,7 +12,13 @@ export type OnboardingStage =
 
 export type OnboardingChannel = 'email' | 'slack' | 'calendar' | 'task'
 
-export type OnboardingStepStatus = 'pending' | 'sent' | 'skipped' | 'failed'
+export type OnboardingStepStatus =
+  | 'pending'
+  /** Claimed by a run and currently being dispatched. */
+  | 'in_flight'
+  | 'sent'
+  | 'skipped'
+  | 'failed'
 
 export type EmployeeType =
   | 'apprentice_nontech'
@@ -43,6 +49,12 @@ export type JourneyContext = {
   managerEmail: string | null
   buddyEmail: string | null
   slackChannelId: string | null
+  /** Job title, announced in the Slack welcome. */
+  designation: string | null
+  /** P&C-written introduction posted to the team channel. */
+  slackIntroText: string | null
+  /** Set by P&C when the joiner missed their technical onboarding call. */
+  missedTechCall: boolean
   lastCompletedStep: string | null
   isCompleted: boolean
   employeeStatus: string
@@ -60,6 +72,8 @@ export type OnboardingStepRecord = {
   attempts: number
   lastError: string | null
   skipReason: string | null
+  /** Facts recorded by the dispatch itself, e.g. the slot a call landed on. */
+  dispatchMeta: Record<string, unknown> | null
 }
 
 export type OnboardingTaskRecord = {
@@ -106,6 +120,8 @@ export type OnboardingDashboardRow = {
   attentionReasons: string[]
   managerEmail: string | null
   buddyEmail: string | null
+  slackIntroText: string | null
+  missedTechCall: boolean
   /** Steps a human must send by hand, surfaced with a "mark as sent" action. */
   manualSteps: { id: string; label: string; scheduledFor: string }[]
   tasks: { id: string; label: string; isCompleted: boolean }[]

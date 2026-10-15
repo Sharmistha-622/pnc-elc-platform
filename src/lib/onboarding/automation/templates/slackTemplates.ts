@@ -16,7 +16,8 @@ export type SlackTemplateContext = {
   buddyName: string | null
   designation: string | null
   employeeTypeLabel: string | null
-  managerConnectTime: string
+  /** Null when the call has not been booked yet. */
+  managerConnectTime: string | null
   isPlaceholderSlot: boolean
   completedTaskLabels: string[]
 }
@@ -29,9 +30,13 @@ const slackWelcome = (context: SlackTemplateContext): string => {
     ? ` (${context.employeeTypeLabel})`
     : ''
 
-  const managerConnectLine = context.isPlaceholderSlot
-    ? `📅 Hey ${context.managerTag} — Since we couldn't find a free slot on your calendar today, we have scheduled a placeholder Manager Connect call for *${context.managerConnectTime} IST* with ${context.employeeTag}. Please reschedule it to a time that works best for you!`
-    : `📅 Hey ${context.managerTag} — a Manager Connect call has been scheduled for today at *${context.managerConnectTime} IST* with ${context.employeeTag}. Please join when you get a chance! The invite should already be on your calendar.`
+  // With no booked slot there is no time to announce. Saying nothing is better
+  // than naming an hour nobody agreed to.
+  const managerConnectLine = !context.managerConnectTime
+    ? `📅 Hey ${context.managerTag} — a Manager Connect call with ${context.employeeTag} is being scheduled. The invite will land on your calendar shortly.`
+    : context.isPlaceholderSlot
+      ? `📅 Hey ${context.managerTag} — Since we couldn't find a free slot on your calendar today, we have scheduled a placeholder Manager Connect call for *${context.managerConnectTime} IST* with ${context.employeeTag}. Please reschedule it to a time that works best for you!`
+      : `📅 Hey ${context.managerTag} — a Manager Connect call has been scheduled for today at *${context.managerConnectTime} IST* with ${context.employeeTag}. Please join when you get a chance! The invite should already be on your calendar.`
 
   const buddyLine = context.buddyName
     ? `\nMeet ${context.buddyTag}, your Onboarding Buddy who will help you settle in day-to-day.`

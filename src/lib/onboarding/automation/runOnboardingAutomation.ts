@@ -1,9 +1,26 @@
 import { dispatchStep, type DispatchOutcome } from '@/lib/onboarding/automation/channels'
-import { STEP_DEFINITION_BY_KEY } from '@/lib/onboarding/automation/constants'
+import {
+  MAX_LATE_DAYS,
+  STEP_DEFINITION_BY_KEY,
+} from '@/lib/onboarding/automation/constants'
 import { getOrgToday } from '@/lib/onboarding/automation/dates'
 import { loadJourneys, type LoadedJourney } from '@/lib/onboarding/automation/loadJourneys'
 import { getDueSteps } from '@/lib/onboarding/automation/progress'
 import { deriveStage } from '@/lib/onboarding/automation/schedule'
+import { sendRunSummary } from '@/lib/onboarding/automation/alerts'
+import {
+  beginRun,
+  claimStep,
+  finishRun,
+  releaseClaim,
+  releaseStaleClaims,
+} from '@/lib/onboarding/automation/runLock'
+import {
+  canDispatch,
+  canWriteState,
+  getRunMode,
+  type OnboardingRunMode,
+} from '@/lib/onboarding/automation/runMode'
 import { syncJourneys } from '@/lib/onboarding/automation/syncJourneys'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -20,13 +37,30 @@ import type { OnboardingStepRecord } from '@/types/onboarding'
  * continues, rather than taking the whole cohort down with it.
  */
 
+export type PlannedDispatch = {
+  employee: string
+  step: string
+  channel: string
+  scheduledFor: string
+}
+
 export type RunSummary = {
+  mode: OnboardingRunMode
+  /** True when the run did nothing because the mode is `off`. */
+  skipped: boolean
   journeysCreated: number
   journeysRescheduled: number
   stepsSent: number
   stepsSkipped: number
   stepsDeferred: number
   stepsFailed: number
+  /** Too far past their date to send; marked skipped instead. */
+  stepsExpired: number
+  /** Failed too many times to keep retrying. */
+  stepsExhausted: number
+  staleClaimsReleased: number
+  /** What a dry run would have dispatched. Empty in every other mode. */
+  plannedDispatches: PlannedDispatch[]
   errors: string[]
 }
 
@@ -149,7 +183,7 @@ const persistOutcome = async (
 ) => {
   const now = new Date().toISOString()
 
-  const patch: Record<string, unknown> = { updated_at: now }
+  const patch: Record<string, unknown> = { updated_at: now, claimed_at: null }
 
   switch (outcome.status) {
     case 'sent':
@@ -159,6 +193,7 @@ const persistOutcome = async (
       patch.last_error = null
       patch.skip_reason = null
       patch.attempts = step.attempts + 1
+      if (outcome.meta) patch.dispatch_meta = outcome.meta
       break
     case 'skipped':
       patch.status = 'skipped'
@@ -189,6 +224,38 @@ const persistOutcome = async (
 }
 
 /** Refreshes stage and the terminal completion flag for every journey. */
+/**
+ * Retires the steps a sent step makes unnecessary.
+ *
+ * The merge email contains the credential, pre-joining and access content, and
+ * the pre-joining mail repeats what the access mail would say. Sending one has
+ * to close the others, or the joiner receives the same thing twice.
+ */
+const applySupersession = async (
+  supabase: SupabaseClient,
+  journeyId: string,
+  stepKey: string
+): Promise<void> => {
+  const superseded = STEP_DEFINITION_BY_KEY[stepKey]?.supersedes
+  if (!superseded || superseded.length === 0) return
+
+  const { error } = await supabase
+    .from('onboarding_steps')
+    .update({
+      status: 'skipped',
+      completed_at: new Date().toISOString(),
+      skip_reason: `Covered by ${STEP_DEFINITION_BY_KEY[stepKey]?.label ?? stepKey}`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('journey_id', journeyId)
+    .in('step_key', superseded)
+    .eq('status', 'pending')
+
+  if (error) {
+    console.error('Onboarding run: failed to apply supersession', error.message)
+  }
+}
+
 const refreshStages = async (
   supabase: SupabaseClient,
   journeys: LoadedJourney[]
@@ -265,189 +332,311 @@ const groupBatches = (items: DueItem[]) => {
 export const runOnboardingAutomation = async (
   supabase: SupabaseClient
 ): Promise<RunSummary> => {
+  const mode = getRunMode()
+
   const summary: RunSummary = {
+    mode,
+    skipped: false,
     journeysCreated: 0,
     journeysRescheduled: 0,
     stepsSent: 0,
     stepsSkipped: 0,
     stepsDeferred: 0,
     stepsFailed: 0,
+    stepsExpired: 0,
+    stepsExhausted: 0,
+    staleClaimsReleased: 0,
+    plannedDispatches: [],
     errors: [],
+  }
+
+  // The automation contacts real new joiners, so it stays off until someone
+  // deliberately turns it on.
+  if (mode === 'off') {
+    summary.skipped = true
+    return summary
+  }
+
+  const run = await beginRun(supabase, mode)
+  if (!run) {
+    summary.skipped = true
+    summary.errors.push('Another onboarding run is already in progress')
+    return summary
   }
 
   const logs: LogEntry[] = []
 
   try {
-    const syncSummary = await syncJourneys(supabase)
-    summary.journeysCreated = syncSummary.journeysCreated
-    summary.journeysRescheduled = syncSummary.journeysRescheduled
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    summary.errors.push(`sync: ${message}`)
-    logs.push({
-      journeyId: null,
-      employeeName: 'System',
-      module: 'sync',
-      action: 'Sync journeys',
-      status: 'error',
-      error: message,
-    })
-  }
+    if (canWriteState(mode)) {
+      summary.staleClaimsReleased = await releaseStaleClaims(supabase)
+    }
 
-  const journeys = await loadJourneys(supabase)
-  const today = getOrgToday()
+    // Journey bookkeeping contacts nobody, so it runs in every active mode —
+    // a dry run needs journeys to exist before it can project anything.
+    try {
+      const syncSummary = await syncJourneys(supabase)
+      summary.journeysCreated = syncSummary.journeysCreated
+      summary.journeysRescheduled = syncSummary.journeysRescheduled
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      summary.errors.push(`sync: ${message}`)
+      logs.push({
+        journeyId: null,
+        employeeName: 'System',
+        module: 'sync',
+        action: 'Sync journeys',
+        status: 'error',
+        error: message,
+      })
+    }
 
-  try {
-    await reconcileCredentialDelivery(supabase, journeys)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    summary.errors.push(`credentials: ${message}`)
-  }
+    const journeys = await loadJourneys(supabase)
+    const today = getOrgToday()
 
-  try {
-    await refreshStages(supabase, journeys)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    summary.errors.push(`stages: ${message}`)
-  }
+    if (canWriteState(mode)) {
+      try {
+        await reconcileCredentialDelivery(supabase, journeys)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        summary.errors.push(`credentials: ${message}`)
+      }
 
-  // Collect everything due across all journeys, then dispatch.
-  const due: DueItem[] = []
+      try {
+        await refreshStages(supabase, journeys)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        summary.errors.push(`stages: ${message}`)
+      }
+    }
 
-  for (const journey of journeys) {
-    for (const step of getDueSteps(journey.steps, today)) {
-      const definition = STEP_DEFINITION_BY_KEY[step.stepKey]
+    // Triage every journey into what is due, what has gone stale, and what has
+    // failed too often to keep retrying.
+    const due: DueItem[] = []
+    const expired: DueItem[] = []
+    const exhausted: DueItem[] = []
+
+    for (const journey of journeys) {
+      const triage = getDueSteps(journey.steps, today)
+
+      const keep = (step: OnboardingStepRecord) => {
+        const definition = STEP_DEFINITION_BY_KEY[step.stepKey]
+        if (!definition) return false
+        // A finished journey only still runs its post-onboarding steps.
+        if (journey.context.isCompleted && !definition.excludeFromProgress) {
+          return false
+        }
+        return true
+      }
+
+      for (const step of triage.due) {
+        if (keep(step)) due.push({ journey, step })
+      }
+      for (const step of triage.expired) {
+        if (keep(step)) expired.push({ journey, step })
+      }
+      for (const step of triage.exhausted) {
+        if (keep(step)) exhausted.push({ journey, step })
+      }
+    }
+
+    // Expiring a step is a write, so a dry run only reports it.
+    if (canWriteState(mode)) {
+      for (const item of expired) {
+        await persistOutcome(supabase, item.step, {
+          status: 'skipped',
+          reason: `Expired — more than ${MAX_LATE_DAYS} days late`,
+        })
+        summary.stepsExpired += 1
+        logs.push({
+          journeyId: item.journey.context.journeyId,
+          onboardingRecordId: item.journey.context.onboardingRecordId,
+          employeeName: item.journey.context.employeeName,
+          module: item.step.channel,
+          action: STEP_DEFINITION_BY_KEY[item.step.stepKey]?.label ?? item.step.stepKey,
+          status: 'skipped',
+          error: `Expired — more than ${MAX_LATE_DAYS} days late`,
+        })
+      }
+    } else {
+      summary.stepsExpired = expired.length
+    }
+
+    for (const item of exhausted) {
+      summary.stepsExhausted += 1
+      const action =
+        STEP_DEFINITION_BY_KEY[item.step.stepKey]?.label ?? item.step.stepKey
+      summary.errors.push(
+        `${item.journey.context.employeeName} — ${action}: gave up after ${item.step.attempts} attempts`
+      )
+    }
+
+    // A dry run stops here: it reports what it would have dispatched and
+    // changes no step.
+    if (!canDispatch(mode)) {
+      summary.plannedDispatches = due.map((item) => ({
+        employee: item.journey.context.employeeName,
+        step: STEP_DEFINITION_BY_KEY[item.step.stepKey]?.label ?? item.step.stepKey,
+        channel: item.step.channel,
+        scheduledFor: item.step.scheduledFor,
+      }))
+
+      logs.push({
+        journeyId: null,
+        employeeName: 'System',
+        module: 'runner',
+        action: `Dry run — ${summary.plannedDispatches.length} step(s) would be dispatched`,
+        status: 'success',
+      })
+
+      await writeLogs(supabase, logs)
+      await finishRun(supabase, run, summary)
+      await sendRunSummary(summary)
+      return summary
+    }
+
+    const applyOutcome = async (item: DueItem, outcome: DispatchOutcome) => {
+      await persistOutcome(supabase, item.step, outcome)
+
+      const definition = STEP_DEFINITION_BY_KEY[item.step.stepKey]
+      const action = definition?.label ?? item.step.stepKey
+
+      const entry = {
+        journeyId: item.journey.context.journeyId,
+        onboardingRecordId: item.journey.context.onboardingRecordId,
+        employeeName: item.journey.context.employeeName,
+        module: item.step.channel,
+        action,
+      }
+
+      switch (outcome.status) {
+        case 'sent':
+          summary.stepsSent += 1
+          logs.push({ ...entry, status: 'success' })
+          break
+        case 'skipped':
+          summary.stepsSkipped += 1
+          logs.push({ ...entry, status: 'skipped', error: outcome.reason })
+          break
+        case 'deferred':
+          summary.stepsDeferred += 1
+          break
+        case 'failed':
+          summary.stepsFailed += 1
+          summary.errors.push(
+            `${item.journey.context.employeeName} — ${action}: ${outcome.error}`
+          )
+          logs.push({ ...entry, status: 'error', error: outcome.error })
+          break
+      }
+    }
+
+    const { batched, individual } = groupBatches(due)
+
+    for (const item of individual) {
+      const definition = STEP_DEFINITION_BY_KEY[item.step.stepKey]
       if (!definition) continue
 
-      // A finished journey only still runs its post-onboarding steps.
-      if (journey.context.isCompleted && !definition.excludeFromProgress) {
-        continue
-      }
+      // Claim before dispatching. If another run already took it, skip — this
+      // is what stops a retried or overlapping cron sending twice.
+      if (!(await claimStep(supabase, item.step))) continue
 
-      due.push({ journey, step })
-    }
-  }
-
-  const { batched, individual } = groupBatches(due)
-
-  const applyOutcome = async (item: DueItem, outcome: DispatchOutcome) => {
-    await persistOutcome(supabase, item.step, outcome)
-
-    const definition = STEP_DEFINITION_BY_KEY[item.step.stepKey]
-    const action = definition?.label ?? item.step.stepKey
-
-    switch (outcome.status) {
-      case 'sent':
-        summary.stepsSent += 1
-        logs.push({
-          journeyId: item.journey.context.journeyId,
-          onboardingRecordId: item.journey.context.onboardingRecordId,
-          employeeName: item.journey.context.employeeName,
-          module: item.step.channel,
-          action,
-          status: 'success',
+      try {
+        const outcome = await dispatchStep({
+          definition,
+          context: item.journey.context,
+          step: item.step,
+          tasks: item.journey.tasks,
+          siblingSteps: item.journey.steps,
         })
-        break
-      case 'skipped':
-        summary.stepsSkipped += 1
-        logs.push({
-          journeyId: item.journey.context.journeyId,
-          onboardingRecordId: item.journey.context.onboardingRecordId,
-          employeeName: item.journey.context.employeeName,
-          module: item.step.channel,
-          action,
-          status: 'skipped',
-          error: outcome.reason,
-        })
-        break
-      case 'deferred':
-        summary.stepsDeferred += 1
-        break
-      case 'failed':
-        summary.stepsFailed += 1
-        summary.errors.push(
-          `${item.journey.context.employeeName} — ${action}: ${outcome.error}`
-        )
-        logs.push({
-          journeyId: item.journey.context.journeyId,
-          onboardingRecordId: item.journey.context.onboardingRecordId,
-          employeeName: item.journey.context.employeeName,
-          module: item.step.channel,
-          action,
-          status: 'error',
-          error: outcome.error,
-        })
-        break
-    }
-  }
 
-  for (const item of individual) {
-    const definition = STEP_DEFINITION_BY_KEY[item.step.stepKey]
-    if (!definition) continue
-
-    try {
-      const outcome = await dispatchStep({
-        definition,
-        context: item.journey.context,
-        step: item.step,
-        tasks: item.journey.tasks,
-      })
-
-      await applyOutcome(item, outcome)
-
-      // A newly created Slack channel has to be remembered before the welcome
-      // message can be posted to it.
-      if (
-        item.step.stepKey === 'slack_channel' &&
-        outcome.status === 'sent' &&
-        outcome.externalRef
-      ) {
-        await supabase
-          .from('onboarding_journeys')
-          .update({ slack_channel_id: outcome.externalRef })
-          .eq('id', item.journey.context.journeyId)
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      await applyOutcome(item, { status: 'failed', error: message })
-    }
-  }
-
-  for (const group of batched.values()) {
-    const [primary, ...mates] = group
-    const definition = STEP_DEFINITION_BY_KEY[primary.step.stepKey]
-    if (!definition) continue
-
-    try {
-      const outcome = await dispatchStep({
-        definition,
-        context: primary.journey.context,
-        step: primary.step,
-        tasks: primary.journey.tasks,
-        batchMates: mates.map((item) => item.journey.context),
-      })
-
-      // One invite covers the cohort, so every member's step resolves together.
-      for (const item of group) {
         await applyOutcome(item, outcome)
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      for (const item of group) {
+
+        if (outcome.status === 'sent') {
+          await applySupersession(
+            supabase,
+            item.journey.context.journeyId,
+            item.step.stepKey
+          )
+        }
+
+        // A newly created Slack channel has to be remembered before the welcome
+        // message can be posted to it.
+        if (
+          item.step.stepKey === 'slack_channel' &&
+          outcome.status === 'sent' &&
+          outcome.externalRef
+        ) {
+          await supabase
+            .from('onboarding_journeys')
+            .update({ slack_channel_id: outcome.externalRef })
+            .eq('id', item.journey.context.journeyId)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
         await applyOutcome(item, { status: 'failed', error: message })
       }
     }
+
+    for (const group of batched.values()) {
+      // Claim every member first: one invite resolves the whole cohort, so a
+      // step we could not claim must be left out of this batch entirely.
+      const claimed: DueItem[] = []
+      for (const item of group) {
+        if (await claimStep(supabase, item.step)) claimed.push(item)
+      }
+
+      if (claimed.length === 0) continue
+
+      const [primary, ...mates] = claimed
+      const definition = STEP_DEFINITION_BY_KEY[primary.step.stepKey]
+
+      if (!definition) {
+        for (const item of claimed) await releaseClaim(supabase, item.step)
+        continue
+      }
+
+      try {
+        const outcome = await dispatchStep({
+          definition,
+          context: primary.journey.context,
+          step: primary.step,
+          tasks: primary.journey.tasks,
+          siblingSteps: primary.journey.steps,
+          batchMates: mates.map((item) => item.journey.context),
+        })
+
+        for (const item of claimed) {
+          await applyOutcome(item, outcome)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        for (const item of claimed) {
+          await applyOutcome(item, { status: 'failed', error: message })
+        }
+      }
+    }
+
+    logs.push({
+      journeyId: null,
+      employeeName: 'System',
+      module: 'runner',
+      action: `Run complete — ${summary.stepsSent} sent, ${summary.stepsFailed} failed`,
+      status: summary.stepsFailed > 0 ? 'error' : 'success',
+    })
+
+    await writeLogs(supabase, logs)
+    await finishRun(supabase, run, summary)
+    await sendRunSummary(summary)
+
+    return summary
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    summary.errors.push(`run: ${message}`)
+
+    // Always close the run, or the next one will see it as still in flight.
+    await writeLogs(supabase, logs)
+    await finishRun(supabase, run, summary, message)
+
+    return summary
   }
-
-  logs.push({
-    journeyId: null,
-    employeeName: 'System',
-    module: 'runner',
-    action: `Run complete — ${summary.stepsSent} sent, ${summary.stepsFailed} failed`,
-    status: summary.stepsFailed > 0 ? 'error' : 'success',
-  })
-
-  await writeLogs(supabase, logs)
-
-  return summary
 }

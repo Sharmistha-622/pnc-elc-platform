@@ -32,6 +32,8 @@ export async function GET(request: Request) {
 
     const summary = await runOnboardingAutomation(supabase)
 
+    // A skipped run is not a failure: the automation is off, or another run
+    // already holds the lock.
     return NextResponse.json({ success: true, data: summary })
   } catch (error) {
     console.error('Onboarding cron failed:', error)
