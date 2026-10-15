@@ -26,10 +26,48 @@ export type VersionEntry = {
   changes: VersionChange[]
 }
 
-export const CURRENT_VERSION = '1.02.03'
+export const CURRENT_VERSION = '1.03.00'
 
 /** Newest first. Prepend new entries; never rewrite a released one. */
 export const VERSION_HISTORY: VersionEntry[] = [
+  {
+    version: '1.03.00',
+    date: '2026-10-16',
+    title: 'Unified Users & Roles and Immutable RBAC',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Features',
+        description:
+          'Merged Users and Roles management into a unified view (/manage/users) with seamless redirect from /manage/roles and updated sidebar navigation.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Introduced single-liner toolbar featuring an actual-roles tabbed filter bar with live user count badges, search, team filter, and user creation.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Immutably enforced Super Admin privileges for nitin@navgurukul.org across application auth, RLS database functions, and migration triggers, while restricting the role switcher to admin-style roles.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Standardized all management interface components (containers, buttons, tabs, inputs, dropdowns, badges) to rounded-lg with cohesive theme palette.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Fixed DataTablePagination prop mismatch (pageIndex and pageSize) that caused NaN render errors in user management.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Removed duplicate Employee (Default) option from role assignment dropdown.',
+      },
+    ],
+  },
   {
     version: '1.02.03',
     date: '2026-10-14',
