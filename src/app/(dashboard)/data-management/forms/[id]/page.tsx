@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getFormBuilderData } from '@/lib/forms/getFormBuilderData'
 import { RequestsPanel } from './RequestsPanel'
+import { SectionRuleEditor } from './SectionRuleEditor'
 import { FIELD_TYPES, fieldTypeLabel, workflowLabel } from '@/lib/forms/types'
 import {
   addSection,
@@ -154,6 +155,14 @@ export default async function FormBuilderPage({
                   </form>
                 )}
               </div>
+
+              <SectionRuleEditor
+                formId={form.id}
+                section={section}
+                sections={sections}
+                fields={fields}
+                editable={isDraft && !isArchived}
+              />
 
               {sectionFields.length === 0 ? (
                 <p className="text-sm text-gray-500">No fields in this section yet.</p>
