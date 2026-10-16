@@ -138,20 +138,28 @@ export function deriveBreakdown(
 
   const basic = grossMonthly * basicPct;
   const pfBase = rule.pf_wage_ceiling_monthly > 0 ? Math.min(basic, rule.pf_wage_ceiling_monthly) : basic;
-  const employerPf = pfBase * pfPct;
-  const gratuity = pfBase * gratuityPct;
-  const hra = basic * hraPct;
+
+  const employerPfR = rupees(pfBase * pfPct);
+  const gratuityR = rupees(pfBase * gratuityPct);
+
+  // CTC is the anchor, not an output. Rounding gross, PF and gratuity
+  // independently and adding them up can land a rupee either side of the
+  // figure that was negotiated, so gross is taken as whatever is left of CTC
+  // once the rounded employer contributions are removed.
+  const ctcMonthlyR = rupees(ctcMonthly);
+  const grossR = rule.ctc_includes_employer_pf
+    ? ctcMonthlyR - employerPfR - gratuityR
+    : ctcMonthlyR;
+
+  // Basic and HRA are clamped to what gross can actually carry, so a
+  // misconfigured rule (one whose percentages exceed 100% of gross) produces a
+  // zero special allowance rather than a negative one.
+  const basicR = Math.min(rupees(basic), grossR);
+  const hraR = Math.min(rupees(basic * hraPct), grossR - basicR);
 
   // Special allowance absorbs the remainder, so the parts always sum to gross
   // exactly rather than leaving a few rupees unexplained.
-  const basicR = rupees(basic);
-  const hraR = rupees(hra);
-  const employerPfR = rupees(employerPf);
-  const gratuityR = rupees(gratuity);
-  const grossR = rupees(grossMonthly);
-  const specialR = Math.max(0, grossR - basicR - hraR);
-
-  const ctcMonthlyR = grossR + employerPfR + gratuityR;
+  const specialR = grossR - basicR - hraR;
 
   return {
     basic_monthly: basicR,
@@ -161,8 +169,8 @@ export function deriveBreakdown(
     employer_pf_monthly: employerPfR,
     gratuity_monthly: gratuityR,
     gross_monthly: grossR,
-    ctc_monthly: ctcMonthlyR,
-    ctc_annual: ctcMonthlyR * 12,
+    ctc_monthly: rule.ctc_includes_employer_pf ? ctcMonthlyR : grossR + employerPfR + gratuityR,
+    ctc_annual: (rule.ctc_includes_employer_pf ? ctcMonthlyR : grossR + employerPfR + gratuityR) * 12,
     rule_code: rule.code,
   };
 }

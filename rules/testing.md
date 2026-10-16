@@ -7,10 +7,8 @@ description: What to test, what not to, and where tests live
 
 ## Rules
 
-- No test framework is currently configured in `package.json`. If asked to add
-  tests, use Vitest + React Testing Library for unit/component tests (fits the
-  Next.js/TypeScript setup better than Jest here) — don't introduce a second
-  framework later without discussion.
+- Vitest is the test framework. Add React Testing Library alongside it when
+  component tests are first needed — don't introduce a second framework.
 - Prioritize testing over presentation: `src/lib/**` (parsing, transforms,
   business logic — e.g. `src/lib/onboarding/schedule.ts`) and API route handlers
   (`src/app/api/**`) get unit tests first. These carry the actual risk
@@ -26,3 +24,9 @@ description: What to test, what not to, and where tests live
   clock (see `deriveStage(context, today)`).
 - For anything touching Supabase in a test, use a mocked client — never point
   tests at the real project database.
+
+## Running tests
+
+Vitest is configured. `npm test` runs once; `npm run test:watch` watches.
+Tests live beside the code (`salary.ts` → `salary.test.ts`) and run in the
+node environment. The `@/` alias resolves as it does in the app.
