@@ -95,7 +95,10 @@ export default function CreateCandidateOnboardingPage() {
     manager_name: '',
     buddy_name: '',
     location: 'Bangalore',
-    employee_type_name: 'Consultant',
+    // Both are set together by the employee-type select; the id is what the
+    // salary rule and the employee record are resolved from.
+    employee_type_name: '',
+    employee_type_id: null as string | null,
     joining_date: new Date().toISOString().split('T')[0],
     probation_period: '3 Months',
     notice_period: '1 Month',
@@ -139,7 +142,15 @@ export default function CreateCandidateOnboardingPage() {
     fetch('/api/employment-types?includeArchived=false')
       .then((res) => res.json())
       .then((json) => {
-        if (json.success && json.data) setEmploymentTypes(json.data);
+        if (!json.success || !json.data?.length) return;
+        setEmploymentTypes(json.data);
+        // Default to the first configured type rather than a hardcoded label
+        // that may not correspond to any row.
+        setFormData((prev) =>
+          prev.employee_type_id
+            ? prev
+            : { ...prev, employee_type_name: json.data[0].name, employee_type_id: json.data[0].id }
+        );
       })
       .catch(() => {});
 
@@ -231,6 +242,12 @@ export default function CreateCandidateOnboardingPage() {
     }
     if (!formData.designation.trim()) {
       toast.error('Designation / Role title is required');
+      return;
+    }
+    if (!formData.employee_type_id) {
+      // The salary split and the employee record are both resolved from this,
+      // so creating without it would silently produce an FTE annexure.
+      toast.error('Select an employment type');
       return;
     }
 
@@ -432,17 +449,25 @@ export default function CreateCandidateOnboardingPage() {
               </Label>
               <Select
                 value={formData.employee_type_name}
-                onValueChange={(val) => handleChange('employee_type_name', val)}
+                onValueChange={(val) => {
+                  // Store the id alongside the name. Without the id, every
+                  // candidate fell back to the default salary rule and was
+                  // recorded as an FTE at provisioning — so a consultant got an
+                  // FTE salary split.
+                  const picked = employmentTypes.find((t) => t.name === val);
+                  handleChange('employee_type_name', val);
+                  handleChange('employee_type_id', picked?.id ?? null);
+                }}
               >
                 <SelectTrigger className="h-9 text-xs rounded-lg">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Consultant">Consultant</SelectItem>
-                  <SelectItem value="Full-Time Employee (FTE)">Full-Time Employee (FTE)</SelectItem>
-                  <SelectItem value="Full-Time Consultant">Full-Time Consultant</SelectItem>
-                  <SelectItem value="Intern">Intern</SelectItem>
-                  <SelectItem value="Apprentice">Apprentice</SelectItem>
+                  {employmentTypes.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

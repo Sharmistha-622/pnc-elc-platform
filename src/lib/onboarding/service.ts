@@ -30,6 +30,7 @@ import { upsertSalaryStructure } from './salary';
 import { renderLettersForRecord, storeGeneratedLetters } from './letter-generation';
 import { sendInvitationEmail } from './invitation-email';
 import { CANDIDATE_BUCKET } from './candidate-storage';
+import { carryDocumentsToEmployee } from './document-handover';
 import { DEFAULT_PREJOINING_POLICIES } from './default-policies';
 import { getCandidateDocumentRequirements } from './document-checklist';
 import { auditOnboarding, auditLetters } from '@/lib/audit/events';
@@ -273,6 +274,8 @@ export async function createOnboardingRecord(
       team_id: payload.team_id ?? null,
       manager_id: payload.manager_id ?? null,
       buddy_id: payload.buddy_id ?? null,
+      manager_name: payload.manager_name ?? null,
+      buddy_name: payload.buddy_name ?? null,
       location: payload.location ?? null,
       employee_type_id: payload.employee_type_id ?? null,
       joining_date: payload.joining_date,
@@ -548,6 +551,8 @@ export async function confirmEmploymentDetails(
         team_id: record.team_id ?? null,
         manager_id: record.manager_id ?? null,
         buddy_id: record.buddy_id ?? null,
+        manager_name: record.manager_name ?? null,
+        buddy_name: record.buddy_name ?? null,
         location: record.location ?? null,
         joining_date: record.joining_date,
         employee_type_id: record.employee_type_id ?? null,
@@ -1019,6 +1024,24 @@ async function linkEmployeeRecord(
     .update({ employee_id: employeeId })
     .eq('onboarding_id', record.id);
   if (salaryError) console.error('Failed to attach salary structure to employee:', salaryError.message);
+
+  // The verified dossier becomes the employee's documents. Only verified ones
+  // cross: the in-house audit is what makes an upload part of the record.
+  if (employeeId) {
+    const handover = await carryDocumentsToEmployee(data.documents, {
+      id: employeeId,
+      name: record.candidate_name,
+    });
+    await logActivity(
+      record.id,
+      'system',
+      'Documents Carried to Employee Record',
+      `${handover.carried} verified document(s) attached to the employee record` +
+        (handover.copiedToDrive > 0 ? `, ${handover.copiedToDrive} copied to Drive` : '') +
+        (handover.skipped.length > 0 ? `. Not carried: ${handover.skipped.join(', ')}` : '.'),
+      { carried: handover.carried, copied_to_drive: handover.copiedToDrive, skipped: handover.skipped }
+    );
+  }
 
   // Point the onboarding record at the employee it produced.
   await touchRecord(record.id, { employee_id: employeeId });

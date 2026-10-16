@@ -63,3 +63,31 @@ separate data export/import step.
 `supabase/archive/migrations/` holds the original per-feature migrations that
 predate the baseline. They are the source most of step 2 was composed from.
 Keep them: four of the modules in step 2 exist nowhere else.
+
+## 202610161200_onboarding_persistence_and_annexure.sql
+
+Makes the onboarding module storable. The service modelled far more than the
+schema could hold, so this adds the missing columns rather than new concepts:
+
+- `onboarding_records` / `onboarding_employment_details`: `ctc_amount` and
+  `ctc_frequency`, plus the portal visit counters.
+- `onboarding_documents_generated`: `signature_data_url` and
+  `signature_metadata` (the portal captured both and had nowhere to put them),
+  and a wider `document_type` check covering employee agreement, acceptance
+  letter and annexure.
+- `onboarding_documents`: `document_type_key`, `storage_bucket`, `mime_type`.
+- `employee_account_provisioning`: `orientation_checklist` and
+  `probation_milestones`.
+- `document_types`: `collected_from_candidate`, and the candidate-side types
+  (photo, references, previous experience/relieving letters).
+- `employee_profiles`: date of birth, gender, blood group, photo and emergency
+  contact relation — all collected during onboarding, none of which had a home.
+- `employee_type` enum: adds `part_time` and `fellow`, which `employee_types`
+  seeds but the enum never had, so provisioning either would have failed.
+- `documents`: `storage_bucket` / `storage_reference`, so a document carried
+  over from onboarding can be served from private storage when Drive is not
+  configured.
+- New: `salary_structures`, `salary_rules`, and the private
+  `candidate-documents` storage bucket.
+
+Safe to re-run: every statement is `if not exists` or `on conflict do nothing`.

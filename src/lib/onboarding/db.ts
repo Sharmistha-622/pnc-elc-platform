@@ -49,8 +49,10 @@ export function mapRecord(row: JoinedRow): OnboardingRecord {
     ...(rest as OnboardingRecord),
     ctc_amount: row.ctc_amount === null || row.ctc_amount === undefined ? null : Number(row.ctc_amount),
     team_name: teams?.name ?? undefined,
-    manager_name: employees?.name ?? undefined,
-    buddy_name: buddy?.name ?? undefined,
+    // A linked employee is authoritative; the stored text is the fallback for a
+    // manager or buddy who is not an employee in this system yet.
+    manager_name: employees?.name ?? row.manager_name ?? undefined,
+    buddy_name: buddy?.name ?? row.buddy_name ?? undefined,
     employee_type_name: employee_types?.name ?? undefined,
   };
 }

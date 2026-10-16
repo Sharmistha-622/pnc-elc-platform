@@ -10,7 +10,13 @@
 -------------------------------------------------------------------------
 -- 1. Compensation as an amount plus the period it is paid over
 -------------------------------------------------------------------------
+-- Manager and buddy are captured as free text on the create screen, because a
+-- new joiner's manager is not always already an employee here. The id columns
+-- stay authoritative when they are set; these carry the name when they are not,
+-- and both the letters and probation scheduling depend on having one.
 alter table onboarding_records
+  add column if not exists manager_name text,
+  add column if not exists buddy_name text,
   add column if not exists ctc_amount numeric(12, 2),
   add column if not exists ctc_frequency text,
   add column if not exists first_visited_at timestamptz,
@@ -24,6 +30,8 @@ alter table onboarding_records
   check (ctc_frequency is null or ctc_frequency in ('monthly', 'annual'));
 
 alter table onboarding_employment_details
+  add column if not exists manager_name text,
+  add column if not exists buddy_name text,
   add column if not exists ctc_amount numeric(12, 2),
   add column if not exists ctc_frequency text;
 
@@ -87,18 +95,23 @@ create unique index if not exists onboarding_documents_unique_type
 alter table document_types
   add column if not exists collected_from_candidate boolean not null default false;
 
-update document_types set collected_from_candidate = true
-  where name in ('aadhaar', 'pan');
+-- Aadhaar and PAN were already seeded as verification docs; they are also
+-- candidate-collected. Their sort order is reset here so the portal checklist
+-- reads in a sensible order rather than leading with them.
+update document_types
+   set collected_from_candidate = true,
+       sort_order = case name when 'aadhaar' then 12 when 'pan' then 13 end
+ where name in ('aadhaar', 'pan');
 
 insert into document_types (name, display_name, destination, is_required, collected_from_candidate, sort_order) values
   ('resume',             'Resume / CV',                        'verification_docs', true,  true, 10),
   ('photo',              'Passport-size Photograph',           'verification_docs', true,  true, 11),
-  ('address_proof',      'Address Proof',                      'verification_docs', true,  true, 12),
-  ('education_certificate', 'Highest Education Certificate',   'verification_docs', true,  true, 13),
-  ('bank_proof',         'Bank Account Proof',                 'verification_docs', true,  true, 14),
-  ('prev_experience_letter', 'Previous Experience Letter',     'verification_docs', false, true, 15),
-  ('prev_relieving_letter',  'Previous Relieving Letter',      'verification_docs', false, true, 16),
-  ('reference_details',  'Professional References',            'verification_docs', false, true, 17)
+  ('address_proof',      'Address Proof',                      'verification_docs', true,  true, 14),
+  ('education_certificate', 'Highest Education Certificate',   'verification_docs', true,  true, 15),
+  ('bank_proof',         'Bank Account Proof',                 'verification_docs', true,  true, 16),
+  ('prev_experience_letter', 'Previous Experience Letter',     'verification_docs', false, true, 17),
+  ('prev_relieving_letter',  'Previous Relieving Letter',      'verification_docs', false, true, 18),
+  ('reference_details',  'Professional References',            'verification_docs', false, true, 19)
 on conflict (name) do update
   set collected_from_candidate = excluded.collected_from_candidate,
       destination = excluded.destination,
@@ -114,6 +127,25 @@ alter table employee_account_provisioning
 
 create unique index if not exists employee_account_provisioning_unique_onboarding
   on employee_account_provisioning (onboarding_id);
+
+-------------------------------------------------------------------------
+-- 4a. Employee documents can also live in private storage
+-------------------------------------------------------------------------
+-- Documents a candidate uploaded before they had a Drive folder are carried
+-- across at conversion. They stay in the private bucket and are served by
+-- signed URL, so `drive_url` may be null while the file is perfectly present.
+alter table public.documents
+  add column if not exists storage_bucket text,
+  add column if not exists storage_reference text,
+  add column if not exists file_name text,
+  add column if not exists source text not null default 'upload';
+
+-- Deliberately NOT unique on (employee_id, document_type): the existing upload
+-- flow inserts a new row per upload and the UI shows the latest per type, so a
+-- unique index here would break re-uploading a document. The onboarding
+-- handover keeps itself idempotent by looking for its own row first.
+create index if not exists documents_employee_type_idx
+  on public.documents (employee_id, document_type);
 
 -------------------------------------------------------------------------
 -- 4b. Employee profile fields onboarding collects but had nowhere to put
@@ -193,8 +225,11 @@ create table if not exists salary_structures (
 
 create index if not exists salary_structures_onboarding_idx on salary_structures (onboarding_id);
 create index if not exists salary_structures_employee_idx on salary_structures (employee_id);
+-- Not a partial index: `ON CONFLICT (onboarding_id)` cannot infer a partial
+-- index without repeating its predicate, and a plain unique index already
+-- permits many rows with a null onboarding_id (employee-only structures).
 create unique index if not exists salary_structures_one_per_onboarding
-  on salary_structures (onboarding_id) where onboarding_id is not null;
+  on salary_structures (onboarding_id);
 
 -------------------------------------------------------------------------
 -- 6. Salary rules — how a CTC is split, per employee type

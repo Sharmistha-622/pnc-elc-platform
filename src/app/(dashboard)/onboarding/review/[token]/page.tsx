@@ -232,9 +232,13 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('Official account provisioned & employee record linked!');
+        toast.success('Official account provisioned and employee record created.');
         setProvisionDialogOpen(false);
         fetchData();
+      } else {
+        // Provisioning refuses while a required document is unverified, and the
+        // reason names which ones. Showing it is the whole point.
+        toast.error(json.error || 'Failed to provision account');
       }
     } catch (err) {
       toast.error('Failed to provision account');

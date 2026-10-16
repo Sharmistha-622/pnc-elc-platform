@@ -59,6 +59,14 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
  */
 const ROUTE_FEATURE: [string, Feature][] = [
   ["/employees", "employees"],
+  // API routes carry the same feature gate as the screens they serve. Without
+  // these, an authenticated Viewer was blocked from /employees but could still
+  // read /api/employees directly.
+  ["/api/employees", "employees"],
+  ["/api/onboarding", "onboarding"],
+  ["/api/candidate-letters", "onboarding"],
+  ["/api/letter-templates", "onboarding"],
+  ["/api/audit", "dataManagement"],
   ["/confirmations", "confirmations"],
   ["/appraisals", "appraisals"],
   ["/data-management", "dataManagement"],

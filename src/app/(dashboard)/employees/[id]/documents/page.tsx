@@ -42,12 +42,15 @@ export default async function EmployeeDocumentsPage({ params }: { params: Promis
 
   const { data: docs } = await supabase
     .from('documents')
-    .select('document_type, drive_url, created_at')
+    .select('document_type, drive_url, storage_reference, created_at')
     .eq('employee_id', id)
     .order('created_at', { ascending: false })
 
   // Keep only the latest upload per document type
-  const latest = new Map<string, { drive_url: string | null; created_at: string }>()
+  const latest = new Map<
+    string,
+    { drive_url: string | null; storage_reference: string | null; created_at: string }
+  >()
   for (const d of docs ?? []) if (!latest.has(d.document_type)) latest.set(d.document_type, d)
 
   const missing = missingDocuments(types, [...latest.keys()])
@@ -167,14 +170,17 @@ export default async function EmployeeDocumentsPage({ params }: { params: Promis
 
                   <TableCell className="py-3 px-3 text-right">
                     {doc ? (
-                      doc.drive_url ? (
+                      doc.drive_url || doc.storage_reference ? (
+                        // Goes through a route that signs a fresh URL on each
+                        // click, so no durable link to an ID proof is rendered
+                        // into the page.
                         <a
-                          href={doc.drive_url}
+                          href={`/api/employees/${id}/documents/${encodeURIComponent(t.name)}/file`}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                         >
-                          <span>Drive File</span>
+                          <span>{doc.drive_url ? 'Drive File' : 'Open File'}</span>
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : (
