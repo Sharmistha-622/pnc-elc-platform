@@ -137,13 +137,15 @@ const LoadingView = ({
 }) => {
   return (
     <div
-      className={`flex ${
-        fullScreen ? "w-full h-full min-h-[500px]" : "h-full min-h-[400px]"
-      } items-center justify-center bg-background animate-in fade-in duration-500 ${className}`}
+      className={`flex flex-1 w-full ${
+        fullScreen
+          ? "min-h-[calc(100vh-var(--header-height,3.5rem)-1px)] h-full"
+          : "min-h-[400px] h-full"
+      } items-center justify-center bg-background animate-in fade-in duration-300 ${className}`}
     >
-      <div className="flex flex-col items-center gap-8">
+      <div className="flex flex-col items-center gap-6">
         <LoadingSpinner size="md" />
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1.5">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">
             Loading...
           </p>
