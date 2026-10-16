@@ -8,6 +8,12 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      // The CI scripts are logic too, and have been wrong in ways only a live
+      // merge revealed.
+      '.github/scripts/**/*.test.mjs',
+    ],
   },
 });
