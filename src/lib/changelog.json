@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.04.03",
+    "date": "2026-10-16",
+    "title": "Fix Radix hydration mismatch and introduce persistent shell loader",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Resolved Radix UI ID hydration mismatch on SiteHeader and AppSidebar by removing dynamic ssr:false on HeaderUserMenu and synchronizing DevRoleToggle."
+      },
+      {
+        "category": "Fixes",
+        "description": "Implemented DashboardShellLoader in root loading.tsx so the Header and Sidenav are always visible from 0ms, keeping the loader active and perfectly centered within the remaining viewport canvas."
+      }
+    ]
+  },
+  {
     "version": "1.04.02",
     "date": "2026-10-16",
     "title": "Center dashboard loader in remaining viewport space and prevent pre-shell blank screen",
