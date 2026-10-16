@@ -25,6 +25,7 @@ import {
   MapPin,
   HeartHandshake,
   FileEdit,
+  Loader2,
 } from 'lucide-react';
 import { PageBanner } from '@/components/shared/page-banner';
 import { Button } from '@/components/ui/button';
@@ -42,8 +43,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { FullOnboardingData } from '@/lib/onboarding/types';
+import {
+  FullOnboardingData,
+  GENERATED_DOCUMENT_LABELS,
+  type GeneratedDocumentType,
+  type OnboardingGeneratedDocument,
+} from '@/lib/onboarding/types';
 import { toast } from 'sonner';
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const ACCEPT_ATTRIBUTE = '.pdf,.jpg,.jpeg,.png,.webp';
 
 const STEPS = [
   { id: 1, label: 'Personal Information', icon: User },
@@ -100,7 +110,7 @@ export default function CandidateOnboardingPortalPage({
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [signingDoc, setSigningDoc] = useState<{
-    type: 'offer_letter' | 'appointment_letter';
+    type: GeneratedDocumentType;
     name: string;
     html: string;
   } | null>(null);
@@ -298,38 +308,55 @@ export default function CandidateOnboardingPortalPage({
     }
   };
 
-  const handleMockUpload = async (docType: string) => {
-    const sampleFiles: Record<string, { name: string; size: string }> = {
-      'Resume / CV': { name: `${personalForm.full_name || 'Candidate'}_Resume_2026.pdf`, size: '250 KB' },
-      'Identity Proof (Aadhaar/PAN/Passport)': { name: `Aadhaar_Card_${personalForm.full_name || 'ID'}.pdf`, size: '1.2 MB' },
-      'Address Proof (Electricity/Rent Agreement)': { name: `Electricity_Bill_Current.pdf`, size: '840 KB' },
-      'Highest Educational Certificate': { name: `Degree_Certificate_Final.pdf`, size: '3.1 MB' },
-      'Bank Account Proof (Cancelled Cheque/Passbook)': { name: `Bank_Passbook_Front.pdf`, size: '920 KB' },
-    };
+  // One hidden file input, retargeted at whichever document the candidate
+  // clicked. The portal previously had no file input at all: `handleMockUpload`
+  // invented a filename per document type and posted that, so nothing was ever
+  // actually collected.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingDocType, setPendingDocType] = useState<string | null>(null);
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
 
-    const target = sampleFiles[docType] || { name: `${docType.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, size: '1.0 MB' };
+  const promptForFile = (docType: string) => {
+    setPendingDocType(docType);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const docType = pendingDocType;
+    setPendingDocType(null);
+    if (!file || !docType) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error('That file is larger than 10 MB.');
+      return;
+    }
+    if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+      toast.error('Only PDF, JPG, PNG or WebP files are accepted.');
+      return;
+    }
+
+    const body = new FormData();
+    body.append('file', file);
+    body.append('document_type', docType);
 
     try {
-      setSaving(true);
-      const res = await fetch(`/api/onboarding/token/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'upload_document',
-          document_type: docType,
-          file_name: target.name,
-          file_size: target.size,
-        }),
-      });
+      setUploadingDocType(docType);
+      const res = await fetch(`/api/onboarding/token/${token}/documents`, { method: 'POST', body });
       const json = await res.json();
       if (json.success) {
         toast.success(`Uploaded ${docType}`);
         setData(json.data);
+      } else {
+        toast.error(json.error || 'Failed to upload document');
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to upload document');
     } finally {
-      setSaving(false);
+      setUploadingDocType(null);
     }
   };
 
@@ -417,6 +444,8 @@ export default function CandidateOnboardingPortalPage({
       if (json.success) {
         toast.success('Onboarding submitted to P&C for verification!');
         setData(json.data);
+      } else {
+        toast.error(json.error || 'Failed to submit onboarding');
       }
     } catch (err) {
       toast.error('Failed to submit onboarding');
@@ -436,11 +465,50 @@ export default function CandidateOnboardingPortalPage({
   const { record, documents, policies, generatedDocuments, employmentDetails } = data;
   const isSubmitted = ['submitted', 'under_review', 'approved', 'account_provisioning', 'completed'].includes(record.status);
 
-  const offerDoc = generatedDocuments.find((d) => d.document_type === 'offer_letter');
-  const apptDoc = generatedDocuments.find((d) => d.document_type === 'appointment_letter');
+  // Rendered server-side from the template library. The old portal drew two
+  // hardcoded cards for the offer and appointment letters only, which is why
+  // the Acceptance Letter and the salary annexure had nowhere to appear.
+  const letterHtml = (doc: OnboardingGeneratedDocument): string =>
+    doc.generated_content?.html || doc.content || '';
+
+  // The annexure states the salary; it is read alongside the offer, not signed
+  // separately.
+  const signableDocuments = generatedDocuments.filter((d) => d.document_type !== 'annexure');
+  const annexureDoc = generatedDocuments.find((d) => d.document_type === 'annexure');
+  const allLettersSigned =
+    signableDocuments.length === 0 || signableDocuments.every((d) => d.status === 'signed');
+
+  // What is still outstanding, named rather than left for the candidate to
+  // guess at from a disabled button.
+  const missingRequiredDocs = documents.filter(
+    (d) => d.is_required && d.status !== 'uploaded' && d.status !== 'verified'
+  );
+  const unreadPolicies = policies.filter((p) => p.status !== 'completed');
+
+  const outstanding: string[] = [];
+  if (!data.personalDetails?.full_name) outstanding.push('Personal information');
+  if (missingRequiredDocs.length > 0) {
+    outstanding.push(`${missingRequiredDocs.length} required document(s)`);
+  }
+  if (!employmentDetails?.candidate_confirmed) outstanding.push('Employment terms confirmation');
+  if (unreadPolicies.length > 0) outstanding.push(`${unreadPolicies.length} unread policy document(s)`);
+  if (!allLettersSigned) outstanding.push('Letter signatures');
+
+  const canSubmit = outstanding.length === 0;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
+      {/* One input serves every document row; `promptForFile` sets the target. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPT_ATTRIBUTE}
+        onChange={handleFileSelected}
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+
       {/* 1. Standard PageBanner matching application design system */}
       <PageBanner
         title={`Candidate Onboarding — Welcome, ${record.candidate_name}!`}
@@ -822,6 +890,11 @@ export default function CandidateOnboardingPortalPage({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-foreground">{doc.document_type}</span>
+                        {doc.is_required ? (
+                          <span className="text-rose-600 dark:text-rose-400 text-sm leading-none" title="Required">*</span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">optional</span>
+                        )}
                         <Badge
                           variant="outline"
                           className={`text-[10px] uppercase font-mono rounded-lg ${
@@ -840,10 +913,12 @@ export default function CandidateOnboardingPortalPage({
 
                       {doc.file_name ? (
                         <p className="text-xs text-muted-foreground font-mono mt-1">
-                          File: {doc.file_name} ({doc.file_size || '1 MB'})
+                          File: {doc.file_name}{doc.file_size ? ` (${doc.file_size})` : ''}
                         </p>
                       ) : (
-                        <p className="text-xs text-muted-foreground mt-1">Pending candidate upload (PDF / JPG / PNG)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Not uploaded yet — PDF, JPG, PNG or WebP, up to 10&nbsp;MB
+                        </p>
                       )}
 
                       {isRejected && (
@@ -857,36 +932,24 @@ export default function CandidateOnboardingPortalPage({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {isDone && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            setPreviewDoc({
-                              title: doc.document_type,
-                              html: `<div class="p-8 text-center space-y-4">
-                                <div class="size-16 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 mx-auto flex items-center justify-center font-bold">PDF</div>
-                                <p class="font-bold text-sm text-foreground">${doc.file_name}</p>
-                                <p class="text-xs text-muted-foreground">[Document Vault Storage Reference: secure://${doc.id}]</p>
-                              </div>`,
-                            })
-                          }
-                          className="text-xs h-8 gap-1 rounded-lg"
-                        >
-                          <Eye className="size-3.5" />
-                          <span>View</span>
-                        </Button>
-                      )}
-
                       <Button
                         size="sm"
-                        onClick={() => handleMockUpload(doc.document_type)}
-                        disabled={saving}
+                        onClick={() => promptForFile(doc.document_type)}
+                        disabled={saving || uploadingDocType !== null}
                         variant={isDone ? 'outline' : 'default'}
                         className={`text-xs h-8 gap-1.5 rounded-lg ${!isDone ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
                       >
-                        <Upload className="size-3.5" />
-                        <span>{isDone ? 'Replace File' : isRejected ? 'Re-Upload File' : 'Upload File'}</span>
+                        {uploadingDocType === doc.document_type ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3.5" />
+                            <span>{isDone ? 'Replace File' : isRejected ? 'Re-Upload File' : 'Upload File'}</span>
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -1141,141 +1204,110 @@ export default function CandidateOnboardingPortalPage({
               Review document text and provide your handwritten digital signature in the signature box with metadata audit capture.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Offer Letter */}
-            <div className="p-4 rounded-lg border border-border/80 bg-card flex flex-col justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-foreground">Offer Letter</span>
-                  <Badge
-                    className={`text-[10px] rounded-lg ${
-                      offerDoc?.status === 'signed'
-                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                        : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
-                    }`}
-                  >
-                    {offerDoc?.status === 'signed' ? 'Signed' : 'Pending Signature'}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Formal compensation breakdown, notice period, and role terms.
-                </p>
-                {offerDoc?.signed_at && (
-                  <div className="space-y-1 pt-2 border-t border-border/40 text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
-                    <p>✓ Signed by {offerDoc.signed_by}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Timestamp: {new Date(offerDoc.signed_at).toLocaleString('en-IN')}
+          <CardContent className="pt-6 space-y-4">
+            {annexureDoc && (
+              <div className="p-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <span className="font-bold text-sm text-foreground">Annexure A — Salary Breakdown</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      The detailed split of your compensation, referenced by the letters below.
                     </p>
-                    {offerDoc.signature_data_url && (
-                      <div className="mt-1 p-2 bg-white dark:bg-muted rounded-lg border border-border/60 inline-block">
-                        <img src={offerDoc.signature_data_url} alt="Signature" className="h-8 object-contain" />
-                      </div>
-                    )}
                   </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 pt-2 border-t border-border/40">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setPreviewDoc({
-                      title: 'Offer Letter - ' + record.candidate_name,
-                      html: offerDoc?.generated_content?.contentHtml || '',
-                    })
-                  }
-                  className="text-xs h-8 gap-1 flex-1 rounded-lg"
-                >
-                  <Eye className="size-3.5" />
-                  <span>Preview Document</span>
-                </Button>
-                {offerDoc?.status !== 'signed' && (
                   <Button
                     size="sm"
-                    onClick={() => {
-                      setSigningDoc({
-                        type: 'offer_letter',
-                        name: 'Offer Letter',
-                        html: offerDoc?.generated_content?.contentHtml || '',
-                      });
-                      setTimeout(clearCanvas, 100);
-                    }}
-                    className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex-1 rounded-lg"
+                    variant="outline"
+                    onClick={() =>
+                      setPreviewDoc({
+                        title: `Annexure A — ${record.candidate_name}`,
+                        html: letterHtml(annexureDoc),
+                      })
+                    }
+                    className="text-xs h-8 gap-1 rounded-lg shrink-0"
                   >
-                    <PenTool className="size-3.5" />
-                    <span>Open Signature Box</span>
+                    <Eye className="size-3.5" />
+                    <span>View Annexure</span>
                   </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Appointment Letter */}
-            <div className="p-4 rounded-lg border border-border/80 bg-card flex flex-col justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-foreground">Appointment Letter</span>
-                  <Badge
-                    className={`text-[10px] rounded-lg ${
-                      apptDoc?.status === 'signed'
-                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                        : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
-                    }`}
-                  >
-                    {apptDoc?.status === 'signed' ? 'Signed' : 'Pending Signature'}
-                  </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Appointment covenants, confidentiality, and statutory guidelines.
-                </p>
-                {apptDoc?.signed_at && (
-                  <div className="space-y-1 pt-2 border-t border-border/40 text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
-                    <p>✓ Signed by {apptDoc.signed_by}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Timestamp: {new Date(apptDoc.signed_at).toLocaleString('en-IN')}
-                    </p>
-                    {apptDoc.signature_data_url && (
-                      <div className="mt-1 p-2 bg-white dark:bg-muted rounded-lg border border-border/60 inline-block">
-                        <img src={apptDoc.signature_data_url} alt="Signature" className="h-8 object-contain" />
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
+            )}
 
-              <div className="flex items-center gap-2 pt-2 border-t border-border/40">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setPreviewDoc({
-                      title: 'Appointment Letter - ' + record.candidate_name,
-                      html: apptDoc?.generated_content?.contentHtml || '',
-                    })
-                  }
-                  className="text-xs h-8 gap-1 flex-1 rounded-lg"
-                >
-                  <Eye className="size-3.5" />
-                  <span>Preview Document</span>
-                </Button>
-                {apptDoc?.status !== 'signed' && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setSigningDoc({
-                        type: 'appointment_letter',
-                        name: 'Appointment Letter',
-                        html: apptDoc?.generated_content?.contentHtml || '',
-                      });
-                      setTimeout(clearCanvas, 100);
-                    }}
-                    className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex-1 rounded-lg"
-                  >
-                    <PenTool className="size-3.5" />
-                    <span>Open Signature Box</span>
-                  </Button>
-                )}
+            {signableDocuments.length === 0 && (
+              <div className="p-6 text-center border border-dashed rounded-lg">
+                <p className="text-sm font-medium text-foreground">Your letters are being prepared</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  People &amp; Culture are finalising them. You can complete the other steps meanwhile.
+                </p>
               </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {signableDocuments.map((doc) => {
+                const isSigned = doc.status === 'signed';
+                const label = GENERATED_DOCUMENT_LABELS[doc.document_type] || doc.document_name;
+                return (
+                  <div
+                    key={doc.id}
+                    className="p-4 rounded-lg border border-border/80 bg-card flex flex-col justify-between gap-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-sm text-foreground">{label}</span>
+                        <Badge
+                          className={`text-[10px] rounded-lg ${
+                            isSigned
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                          }`}
+                        >
+                          {isSigned ? 'Signed' : 'Pending Signature'}
+                        </Badge>
+                      </div>
+
+                      {doc.signed_at && (
+                        <div className="space-y-1 pt-2 border-t border-border/40 text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
+                          <p>✓ Signed by {doc.signed_by}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Timestamp: {new Date(doc.signed_at).toLocaleString('en-IN')}
+                          </p>
+                          {doc.signature_data_url && (
+                            <div className="mt-1 p-2 bg-white dark:bg-muted rounded-lg border border-border/60 inline-block">
+                              <img src={doc.signature_data_url} alt="Signature" className="h-8 object-contain" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setPreviewDoc({ title: `${label} — ${record.candidate_name}`, html: letterHtml(doc) })
+                        }
+                        className="text-xs h-8 gap-1 flex-1 rounded-lg"
+                      >
+                        <Eye className="size-3.5" />
+                        <span>Preview</span>
+                      </Button>
+                      {!isSigned && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSigningDoc({ type: doc.document_type, name: label, html: letterHtml(doc) });
+                            setTimeout(clearCanvas, 100);
+                          }}
+                          className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex-1 rounded-lg"
+                        >
+                          <PenTool className="size-3.5" />
+                          <span>Sign</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
           <CardFooter className="pt-4 border-t border-border/50 flex justify-between">
@@ -1333,22 +1365,18 @@ export default function CandidateOnboardingPortalPage({
                   {policies.filter((p) => p.status === 'completed').length} / {policies.length} Read
                 </span>
               </div>
-              <div className="p-3.5 flex items-center justify-between">
-                <span className="font-semibold text-foreground">5. Offer Letter Signature Box</span>
-                {offerDoc?.status === 'signed' ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 rounded-lg">Signed with Metadata</Badge>
-                ) : (
-                  <Badge variant="outline" className="text-rose-700 dark:text-rose-300 rounded-lg">Pending</Badge>
-                )}
-              </div>
-              <div className="p-3.5 flex items-center justify-between">
-                <span className="font-semibold text-foreground">6. Appointment Letter Signature Box</span>
-                {apptDoc?.status === 'signed' ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 rounded-lg">Signed with Metadata</Badge>
-                ) : (
-                  <Badge variant="outline" className="text-rose-700 dark:text-rose-300 rounded-lg">Pending</Badge>
-                )}
-              </div>
+              {signableDocuments.map((doc, index) => (
+                <div key={doc.id} className="p-3.5 flex items-center justify-between">
+                  <span className="font-semibold text-foreground">
+                    {5 + index}. {GENERATED_DOCUMENT_LABELS[doc.document_type] || doc.document_name}
+                  </span>
+                  {doc.status === 'signed' ? (
+                    <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 rounded-lg">Signed with Metadata</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-rose-700 dark:text-rose-300 rounded-lg">Pending</Badge>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
           <CardFooter className="pt-4 border-t border-border/50 flex flex-wrap items-center justify-between gap-3">
@@ -1358,15 +1386,22 @@ export default function CandidateOnboardingPortalPage({
             </Button>
 
             {!isSubmitted ? (
-              <Button
-                size="sm"
-                onClick={handleSubmitOnboarding}
-                disabled={saving}
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 shadow-sm rounded-lg"
-              >
-                <Send className="size-4" />
-                <span>Submit Onboarding to P&C</span>
-              </Button>
+              <div className="flex flex-col items-end gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={handleSubmitOnboarding}
+                  disabled={saving || !canSubmit}
+                  className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 shadow-sm rounded-lg"
+                >
+                  <Send className="size-4" />
+                  <span>Submit Onboarding to P&C</span>
+                </Button>
+                {!canSubmit && (
+                  <p className="text-[11px] text-muted-foreground text-right max-w-xs">
+                    {outstanding.join(' · ')}
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="size-4" />

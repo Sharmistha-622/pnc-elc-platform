@@ -116,6 +116,36 @@ create unique index if not exists employee_account_provisioning_unique_onboardin
   on employee_account_provisioning (onboarding_id);
 
 -------------------------------------------------------------------------
+-- 4b. Employee profile fields onboarding collects but had nowhere to put
+-------------------------------------------------------------------------
+-- The candidate portal asks for these; without somewhere to land them they
+-- were discarded at the moment the candidate became an employee.
+alter table public.employee_profiles
+  add column if not exists date_of_birth date,
+  add column if not exists gender text,
+  add column if not exists blood_group text,
+  add column if not exists profile_photo_url text,
+  add column if not exists emergency_contact_relation text;
+
+-- first_name/last_name are NOT NULL, but a name split is a presentation
+-- concern and some people have one name. Defaulting to '' lets the profile be
+-- created from whatever the candidate actually gave us.
+alter table public.employee_profiles alter column first_name set default '';
+alter table public.employee_profiles alter column last_name set default '';
+
+-------------------------------------------------------------------------
+-- 4c. employee_type enum must cover every seeded employee_types code
+-------------------------------------------------------------------------
+-- `employee_types` seeds part_time and fellow, but the `employee_type` enum on
+-- `employees` never had them. Provisioning a Part-Time Consultant or a Fellow
+-- would have failed on the enum once the conversion started writing employees.
+-- Nothing later in this file references these two values: Postgres allows
+-- ADD VALUE inside a transaction but will not let the new value be used until
+-- that transaction commits.
+alter type public.employee_type add value if not exists 'part_time';
+alter type public.employee_type add value if not exists 'fellow';
+
+-------------------------------------------------------------------------
 -- 5. Salary structure — the Annexure A breakdown
 -------------------------------------------------------------------------
 -- Stored as resolved figures rather than recomputed at render time: an

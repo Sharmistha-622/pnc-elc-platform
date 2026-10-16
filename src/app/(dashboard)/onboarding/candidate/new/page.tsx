@@ -67,6 +67,13 @@ import {
 } from '@/lib/onboarding/compensation';
 import { TONES } from '@/lib/ui/tone';
 
+/** Which generated document a chosen template replaces. */
+const LETTER_TYPE_TO_DOCUMENT: Record<string, string> = {
+  'Offer Letter': 'offer_letter',
+  'Appointment Letter': 'appointment_letter',
+  'Acceptance Letter': 'acceptance_letter',
+};
+
 export default function CreateCandidateOnboardingPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -229,13 +236,21 @@ export default function CreateCandidateOnboardingPage() {
 
     try {
       setSubmitting(true);
-      // 1. Create Onboarding Record
+      // The letter P&C edited here is passed with the record, so the candidate
+      // signs this text. It used to be written to `candidate_letters` after the
+      // fact and shown to nobody — the portal rendered its own hardcoded letter.
+      const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+      const customLetters =
+        isLetterCustomized && customizedLetterContent && selectedTemplate
+          ? { [LETTER_TYPE_TO_DOCUMENT[selectedTemplate.letter_type] ?? 'offer_letter']: customizedLetterContent }
+          : undefined;
+
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // `ctc` stays on the payload as the rendered string letters read from;
         // the amount and period travel alongside it as the source of truth.
-        body: JSON.stringify({ ...formData, ctc: compensationDisplay }),
+        body: JSON.stringify({ ...formData, ctc: compensationDisplay, custom_letters: customLetters }),
       });
 
       const json = await res.json();
@@ -243,46 +258,25 @@ export default function CreateCandidateOnboardingPage() {
         throw new Error(json.error || 'Failed to create onboarding record');
       }
 
-      const createdId = json.data.id;
+      const createdId = json.data.record.id;
 
-      // 2. Save Customized Candidate Letter if generated
-      const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
-      if (isLetterCustomized && customizedLetterContent && selectedTemplate) {
-        try {
-          await fetch('/api/candidate-letters', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              candidate_id: createdId,
-              candidate_name: formData.candidate_name,
-              candidate_email: formData.personal_email,
-              template_id: selectedTemplate.id,
-              template_name: selectedTemplate.name,
-              letter_type: selectedTemplate.letter_type,
-              addendum_type: selectedTemplate.addendum_type,
-              employee_type_name: formData.employee_type_name,
-              content: customizedLetterContent,
-            }),
-          });
-        } catch (e) {
-          console.error('Failed to save candidate letter', e);
-        }
-      }
-
-      // 3. Send Invitation if toggled
       if (formData.send_invite_immediately) {
-        try {
-          const sendRes = await fetch(`/api/onboarding/${createdId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'send_invitation' }),
-          });
-          const sendJson = await sendRes.json();
-          if (sendJson.success) {
-            toast.success(`Candidate created and invitation sent to ${formData.personal_email}`);
-          }
-        } catch (e) {
-          toast.warning('Candidate record created, but invitation email could not be dispatched.');
+        const sendRes = await fetch(`/api/onboarding/${createdId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'send_invitation' }),
+        });
+        const sendJson = await sendRes.json();
+        if (sendJson.success) {
+          toast.success(`Candidate created and invitation sent to ${formData.personal_email}`);
+        } else {
+          // The record exists and is still a draft. Saying so plainly matters:
+          // a silent failure here used to leave P&C believing the candidate had
+          // their link.
+          toast.error(
+            `Candidate created, but the invitation could not be sent: ${sendJson.error || 'unknown error'}. ` +
+              'Send it again from the candidate record.'
+          );
         }
       } else {
         toast.success('Candidate onboarding draft created successfully');

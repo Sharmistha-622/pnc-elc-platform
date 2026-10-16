@@ -930,7 +930,24 @@ async function linkEmployeeRecord(
   const db = onboardingDb();
   const { record } = data;
 
-  const employeeTypeCode = (await employeeTypeCodeFor(record.employee_type_id)) ?? 'fte';
+  // `employees.employee_type` is a Postgres enum; a code outside it would fail
+  // the insert at the worst possible moment, so an unknown one falls back
+  // rather than blocking the person from being created at all.
+  const EMPLOYEE_TYPE_ENUM = [
+    'apprentice_nontech',
+    'apprentice_tech',
+    'intern',
+    'fte',
+    'ftc',
+    'contractor',
+    'part_time',
+    'fellow',
+  ];
+  const rawCode = await employeeTypeCodeFor(record.employee_type_id);
+  const employeeTypeCode = rawCode && EMPLOYEE_TYPE_ENUM.includes(rawCode) ? rawCode : 'fte';
+  if (rawCode && rawCode !== employeeTypeCode) {
+    console.warn(`Unknown employee type code "${rawCode}"; recorded as fte.`);
+  }
 
   // Re-provisioning must not create a second person.
   const { data: existing } = await db
@@ -966,18 +983,28 @@ async function linkEmployeeRecord(
   // day one, and so the candidate never retypes what they already gave us.
   if (data.personalDetails) {
     const pd = data.personalDetails;
+    const nameParts = (pd.full_name || record.candidate_name).trim().split(/\s+/);
+
     const { error } = await db.from('employee_profiles').upsert(
       {
         employee_id: employeeId,
+        // Some people have one name; last_name is simply empty rather than a
+        // repeat of the first.
+        first_name: nameParts[0] ?? '',
+        last_name: nameParts.slice(1).join(' '),
+        personal_email: pd.personal_email ?? record.personal_email,
+        official_email: officialEmail,
+        contact_number: pd.phone ?? record.phone ?? null,
         date_of_birth: pd.date_of_birth ?? null,
         gender: pd.gender ?? null,
         blood_group: pd.blood_group ?? null,
-        personal_email: pd.personal_email ?? record.personal_email,
-        phone: pd.phone ?? record.phone ?? null,
-        current_address: pd.current_address ?? null,
+        profile_photo_url: pd.profile_photo_url ?? null,
         permanent_address: pd.permanent_address ?? null,
+        // "Mailing" here is the address they currently live at.
+        mailing_address: pd.current_address ?? null,
+        mailing_address_same: !pd.current_address || pd.current_address === pd.permanent_address,
         emergency_contact_name: pd.emergency_contact_name ?? null,
-        emergency_contact_phone: pd.emergency_contact_phone ?? null,
+        emergency_contact_number: pd.emergency_contact_phone ?? null,
         emergency_contact_relation: pd.emergency_contact_relation ?? null,
       },
       { onConflict: 'employee_id' }
