@@ -99,17 +99,17 @@ export default async function DashboardLayout({
 
     return (
         <UserProvider user={userData}>
-            <div className="[--header-height:calc(--spacing(14))] min-h-screen w-full">
-                <SidebarProvider className="flex flex-col min-h-screen w-full">
-                    <SiteHeader isSuperAdmin={isSuperAdmin} userRole={effectiveRole} />
-                    <div className="flex flex-1 min-w-0 w-full min-h-[calc(100vh-var(--header-height,3.5rem)-1px)]">
-                        <AppSidebar userRole={effectiveRole} />
-                        <SidebarInset className="min-w-0 flex flex-1 flex-col">
-                            {children}
-                        </SidebarInset>
+                    <div className="[--header-height:calc(--spacing(14))] h-svh w-full flex flex-col overflow-hidden bg-background">
+                        <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
+                            <SiteHeader isSuperAdmin={isSuperAdmin} userRole={effectiveRole} />
+                            <div className="flex flex-1 min-h-0 w-full overflow-hidden">
+                                <AppSidebar userRole={effectiveRole} />
+                                <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
+                                    {children}
+                                </SidebarInset>
+                            </div>
+                        </SidebarProvider>
                     </div>
-                </SidebarProvider>
-            </div>
         </UserProvider>
     )
 }
