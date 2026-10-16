@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const created = await createOnboardingRecord(body);
+    const { custom_letters: customLetters, ...payload } = await req.json();
+    const created = await createOnboardingRecord(payload, customLetters);
     return NextResponse.json({ success: true, data: created });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

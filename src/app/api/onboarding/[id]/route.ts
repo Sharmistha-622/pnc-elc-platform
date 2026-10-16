@@ -8,6 +8,7 @@ import {
   updateOrientationChecklist,
   updateProbationMilestone,
   updateProvisioningDetails,
+  regenerateCandidateDocuments,
 } from '@/lib/onboarding/service';
 
 export async function GET(
@@ -61,6 +62,14 @@ export async function PATCH(
       );
     } else if (action === 'update_provisioning') {
       result = await updateProvisioningDetails(id, body.details || {});
+    } else if (action === 'regenerate_documents') {
+      // Re-renders the annexure and every unsigned letter from the current
+      // templates. Signed letters are left exactly as the candidate signed them.
+      const existing = await getOnboardingById(id);
+      if (existing) {
+        await regenerateCandidateDocuments(existing.record, body.actor_name);
+        result = await getOnboardingById(id);
+      }
     } else {
       return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }

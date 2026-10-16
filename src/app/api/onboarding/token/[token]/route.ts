@@ -4,7 +4,6 @@ import {
   recordPortalVisit,
   updatePersonalDetails,
   confirmEmploymentDetails,
-  uploadCandidateDocument,
   togglePolicyStatus,
   signGeneratedDocument,
   submitCandidateOnboarding,
@@ -53,13 +52,6 @@ export async function POST(
         body.confirmed,
         body.correction_requested,
         body.correction_notes
-      );
-    } else if (action === 'upload_document') {
-      result = await uploadCandidateDocument(
-        id,
-        body.document_type,
-        body.file_name,
-        body.file_size || '1.2 MB'
       );
     } else if (action === 'toggle_policy') {
       result = await togglePolicyStatus(id, body.policy_type, body.status);

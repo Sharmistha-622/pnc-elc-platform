@@ -13,6 +13,28 @@ export type OnboardingStatus =
 
 export type DocumentStatus = 'pending' | 'uploaded' | 'verified' | 'rejected';
 export type GeneratedDocStatus = 'generated' | 'viewed' | 'signed';
+
+/**
+ * Letters the candidate is shown and signs in the portal.
+ *
+ * Previously only `offer_letter` and `appointment_letter` existed, which meant
+ * the Acceptance Letter and Employee Agreement template types had no route to
+ * a candidate, and the salary annexure had nowhere to live at all.
+ */
+export type GeneratedDocumentType =
+  | 'offer_letter'
+  | 'appointment_letter'
+  | 'employee_agreement'
+  | 'acceptance_letter'
+  | 'annexure';
+
+export const GENERATED_DOCUMENT_LABELS: Record<GeneratedDocumentType, string> = {
+  offer_letter: 'Offer Letter',
+  appointment_letter: 'Appointment Letter',
+  employee_agreement: 'Employee Agreement',
+  acceptance_letter: 'Acceptance Letter',
+  annexure: 'Annexure A — Salary Breakdown',
+};
 export type PolicyStatus = 'not_started' | 'in_progress' | 'completed';
 export type ProvisioningStatus = 'pending' | 'generating' | 'active';
 export type DeliveryStatus = 'pending' | 'sent' | 'failed';
@@ -119,9 +141,16 @@ export interface OnboardingDocument {
   id: string;
   onboarding_id: string;
   document_type: string;
+  /** `document_types.name`, so a renamed label does not orphan the upload. */
+  document_type_key?: string | null;
   file_name: string;
   file_size?: string;
-  storage_reference?: string;
+  /** Object path inside `storage_bucket`. Never a public URL. */
+  storage_reference?: string | null;
+  storage_bucket?: string | null;
+  mime_type?: string | null;
+  is_required?: boolean;
+  sort_order?: number;
   status: DocumentStatus;
   rejection_reason?: string;
   uploaded_at?: string | null;
@@ -146,9 +175,15 @@ export interface OnboardingPolicy {
 export interface OnboardingGeneratedDocument {
   id: string;
   onboarding_id: string;
-  document_type: 'offer_letter' | 'appointment_letter';
+  document_type: GeneratedDocumentType;
   document_name: string;
-  template_id?: string;
+  /** The `letter_templates` row this was rendered from, when there was one. */
+  template_id?: string | null;
+  /** The `candidate_letters` row holding the rendered copy. */
+  candidate_letter_id?: string | null;
+  /** Rendered HTML, as shown to the candidate and printed to PDF. */
+  content?: string;
+  sort_order?: number;
   template_version?: string;
   generated_content?: any;
   status: GeneratedDocStatus;
@@ -233,6 +268,19 @@ export interface EmployeeAccountProvisioning {
   probation_milestones?: EmployeeProbationMilestones;
 }
 
+/** The derived Annexure A figures, as stored in `salary_structures`. */
+export interface OnboardingSalaryStructure {
+  basic_monthly: number;
+  hra_monthly: number;
+  special_allowance_monthly: number;
+  other_allowance_monthly: number;
+  employer_pf_monthly: number;
+  gratuity_monthly: number;
+  gross_monthly: number;
+  ctc_monthly: number;
+  ctc_annual: number;
+}
+
 export interface FullOnboardingData {
   record: OnboardingRecord;
   personalDetails?: OnboardingPersonalDetails;
@@ -242,4 +290,5 @@ export interface FullOnboardingData {
   generatedDocuments: OnboardingGeneratedDocument[];
   activityLogs: OnboardingActivityLog[];
   provisioning?: EmployeeAccountProvisioning | null;
+  salaryStructure?: OnboardingSalaryStructure | null;
 }
