@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { UserRole, UserTeam } from "@/lib/role-constants";
+import { assignableRoles, roleLabel, UserRole, UserTeam } from "@/lib/role-constants";
 import {
   Dialog,
   DialogContent,
@@ -26,9 +26,17 @@ interface AddUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserAdded?: (user: any) => void;
+  /**
+   * The signed-in user's own role. The picker offers only what they may
+   * actually grant; the server checks again regardless.
+   */
+  callerRole?: UserRole | null;
 }
 
-export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialogProps) {
+export function AddUserDialog({ open, onOpenChange, onUserAdded, callerRole = null }: AddUserDialogProps) {
+  // Lifecycle roles are absent on purpose: a candidate, pre-joiner or employee
+  // is created by the joiner flow, never by someone picking from a list here.
+  const roleOptions = assignableRoles(callerRole);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<UserRole>("employee");
@@ -145,12 +153,11 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
-                  <SelectItem value="employee" className="rounded-lg text-xs">Member</SelectItem>
-                  <SelectItem value="Viewer" className="rounded-lg text-xs">Viewer</SelectItem>
-                  <SelectItem value="Operations" className="rounded-lg text-xs">Operations</SelectItem>
-                  <SelectItem value="Program" className="rounded-lg text-xs">Program</SelectItem>
-                  <SelectItem value="Manager" className="rounded-lg text-xs">Manager</SelectItem>
-                  <SelectItem value="Admin" className="rounded-lg text-xs">Admin</SelectItem>
+                  {roleOptions.map((r) => (
+                    <SelectItem key={r} value={r} className="rounded-lg text-xs">
+                      {roleLabel(r)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
