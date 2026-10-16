@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from "@/lib/rbac/resolveRole";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -13,13 +14,20 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      if (data?.session?.user?.email?.toLowerCase() === 'nitin@navgurukul.org') {
+      // Keep the immutable owner's stored role correct on sign-in.
+      //
+      // This wrote the old display name 'Super Admin', which the RBAC v1
+      // migration had just replaced with 'super_admin' — so every login undid
+      // the migration for that account. The app read it through normalizeRole
+      // and still worked, which is exactly why it would have gone unnoticed.
+      const email = data?.session?.user?.email?.toLowerCase();
+      if (email && IMMUTABLE_SUPER_ADMIN_EMAILS.includes(email)) {
         try {
           const { createAdminSupabaseClient } = await import('@/lib/supabase/admin');
           const admin = createAdminSupabaseClient();
           if (admin && data.session.user.id) {
             await admin.auth.admin.updateUserById(data.session.user.id, {
-              app_metadata: { ...data.session.user.app_metadata, role: 'Super Admin' },
+              app_metadata: { ...data.session.user.app_metadata, role: 'super_admin' },
             });
           }
         } catch {

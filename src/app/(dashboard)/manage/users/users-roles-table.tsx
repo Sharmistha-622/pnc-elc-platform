@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ALL_ROLES, ROLES, type RoleGroup } from "@/lib/rbac/roles";
+import { RoleBadge } from "@/components/shared/role-badge";
 import { DEFAULT_ROLE, normalizeRole, roleLabel, type UserRole } from "@/lib/role-constants";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -148,7 +149,8 @@ export function UsersRolesTable({
         const email = (user.email || "").toLowerCase();
         const name = (user.name || "").toLowerCase();
         const team = (user.team || "").toLowerCase();
-        const role = (user.role || "").toLowerCase();
+        // Match the label people see ("PnC Admin"), not just the stored code.
+        const role = `${user.role ?? ""} ${roleLabel(normalizeRole(user.role) ?? DEFAULT_ROLE)}`.toLowerCase();
         if (
           !email.includes(term) &&
           !name.includes(term) &&
@@ -197,57 +199,6 @@ export function UsersRolesTable({
       },
       ...prev,
     ]);
-  };
-
-  const getRoleBadge = (role: string | null) => {
-    switch (role) {
-      case "Super Admin":
-        return (
-          <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1 w-fit">
-            <ShieldCheck className="h-3 w-3" />
-            Super Admin
-          </Badge>
-        );
-      case "Admin":
-        return (
-          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
-            Admin
-          </Badge>
-        );
-      case "PnC":
-        return (
-          <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
-            PnC
-          </Badge>
-        );
-      case "Finance":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
-            Finance
-          </Badge>
-        );
-      case "Manager":
-        return (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
-            Manager
-          </Badge>
-        );
-      case "Operations":
-        return (
-          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-semibold border-none text-[11px] px-2 py-0.5 rounded-lg w-fit">
-            Operations
-          </Badge>
-        );
-      default:
-        return (
-          <Badge
-            variant="outline"
-            className="text-muted-foreground font-medium text-[11px] px-2 py-0.5 rounded-lg w-fit"
-          >
-            {role || "Employee"}
-          </Badge>
-        );
-    }
   };
 
   const getInitials = (name?: string, email?: string) => {
@@ -503,7 +454,7 @@ export function UsersRolesTable({
 
                     {/* System Role Badge */}
                     <TableCell className="py-2.5">
-                      {getRoleBadge(user.role)}
+                      <RoleBadge role={user.role} />
                     </TableCell>
 
                     {/* Status */}
@@ -601,6 +552,7 @@ export function UsersRolesTable({
 
       {/* Add User Dialog */}
       <AddUserDialog
+        callerRole={callerRole}
         open={isAddUserOpen}
         onOpenChange={setIsAddUserOpen}
         onUserAdded={handleUserAdded}

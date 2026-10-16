@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { toast } from "sonner";
+import { assignableRoles, normalizeRole, DEFAULT_ROLE, type UserRole } from "@/lib/role-constants";
 import {
   Dialog,
   DialogContent,
@@ -24,9 +25,11 @@ interface BulkUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (users: any[]) => void;
+  /** The signed-in user's role; rows may not assign more than they can grant. */
+  callerRole?: UserRole | null;
 }
 
-export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDialogProps) {
+export function BulkUploadDialog({ open, onOpenChange, onSuccess, callerRole = null }: BulkUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewRows, setPreviewRows] = useState<any[]>([]);
   const [isParsing, setIsParsing] = useState(false);
@@ -49,11 +52,12 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
   };
 
   const handleDownloadTemplate = () => {
+    // Role codes, not display names: these are what the app stores.
     const csvContent =
       "email,full_name,role,team\n" +
-      "rahul.sharma@navgurukul.org,Rahul Sharma,Member,Engineering\n" +
-      "priya.singh@navgurukul.org,Priya Singh,Operations,PnC\n" +
-      "amit.kumar@navgurukul.org,Amit Kumar,Viewer,Operations\n";
+      "rahul.sharma@navgurukul.org,Rahul Sharma,employee,Engineering\n" +
+      "priya.singh@navgurukul.org,Priya Singh,pnc_ops,PnC\n" +
+      "amit.kumar@navgurukul.org,Amit Kumar,fin_ops,Finance\n";
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -95,14 +99,27 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
           rowObj[h] = values[idx] || "";
         });
 
-        const isValid = !!rowObj.email && rowObj.email.includes("@");
+        // A role in the file is only honoured if it is a real role AND one the
+        // signed-in user could grant by hand. A spreadsheet is not a way around
+        // "only Super Admin grants sensitive roles".
+        const requested = rowObj.role?.trim();
+        const normalized = requested ? normalizeRole(requested) : DEFAULT_ROLE;
+        const grantable = normalized ? assignableRoles(callerRole).includes(normalized) : false;
+
+        const emailOk = !!rowObj.email && rowObj.email.includes("@");
+        const roleOk = !requested || grantable;
+
         parsed.push({
           email: rowObj.email,
           full_name: rowObj.full_name || rowObj.name || rowObj.email.split("@")[0],
-          role: rowObj.role || "Member",
+          role: roleOk && normalized ? normalized : DEFAULT_ROLE,
           team: rowObj.team || "None",
-          _valid: isValid,
-          _error: isValid ? undefined : "Invalid or missing email",
+          _valid: emailOk && roleOk,
+          _error: !emailOk
+            ? "Invalid or missing email"
+            : !roleOk
+            ? `You cannot assign the role "${requested}"`
+            : undefined,
         });
       }
 
@@ -142,7 +159,11 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         failed: previewRows.length - validRows.length,
       });
 
-      toast.success(`Successfully imported ${validRows.length} users!`);
+      // Says what actually happened. These rows are staged in this view; no
+      // Supabase Auth user has been created and no invitation has been sent.
+      toast.success(
+        `${validRows.length} row(s) checked and added to the list. No accounts have been created yet.`
+      );
       if (onSuccess) onSuccess(newUsers);
     } catch (err: any) {
       toast.error(err.message || "Bulk import failed.");
@@ -231,9 +252,10 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2.5">
               <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
               <div className="text-xs">
-                <p className="font-bold text-emerald-700 dark:text-emerald-300">Import Complete</p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-300">Rows checked</p>
                 <p className="text-muted-foreground text-[11px]">
-                  {importResult.imported} users created/updated successfully.
+                  {importResult.imported} row(s) look valid and have been added to the list below.
+                  Accounts are not created until each person is invited.
                 </p>
               </div>
             </div>
