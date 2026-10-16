@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.04.01",
+    "date": "2026-10-16",
+    "title": "Claude/vitest and docs cleanup",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Claude/vitest and docs cleanup"
+      }
+    ]
+  },
+  {
     "version": "1.04.00",
     "date": "2026-10-16",
     "title": "Candidate-to-Employee Pipeline: Auth, Persistence, Documents, Letters and Annexure",
