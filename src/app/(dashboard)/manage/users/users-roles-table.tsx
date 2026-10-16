@@ -35,10 +35,20 @@ import {
   X,
   FilterX,
   ShieldAlert,
+  MoreVertical,
+  Edit3,
+  History,
 } from "lucide-react";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AddUserDialog } from "./_components/add-user-dialog";
-import { RoleSelect } from "../roles/RoleSelect";
+import { EditUserDialog } from "./_components/edit-user-dialog";
+import { UserAuditDialog } from "./_components/user-audit-dialog";
 import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
 
 interface UsersRolesTableProps {
@@ -69,6 +79,8 @@ export function UsersRolesTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [auditingUser, setAuditingUser] = useState<UserRow | null>(null);
 
   // Extract unique teams from users list
   const availableTeams = useMemo(() => {
@@ -370,17 +382,17 @@ export function UsersRolesTable({
               <TableHead className="w-[280px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 User
               </TableHead>
-              <TableHead className="w-[160px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="w-[180px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Team / Department
               </TableHead>
-              <TableHead className="w-[140px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="w-[150px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 System Role
               </TableHead>
-              <TableHead className="w-[180px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Assign Role
-              </TableHead>
-              <TableHead className="w-[110px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="w-[120px] text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Status
+              </TableHead>
+              <TableHead className="w-[80px] text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Actions
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -451,7 +463,7 @@ export function UsersRolesTable({
                       </div>
                     </TableCell>
 
-                    {/* Team */}
+                    {/* Team / Department Badge */}
                     <TableCell className="py-2.5">
                       {user.team && user.team !== "None" ? (
                         <Badge
@@ -467,24 +479,9 @@ export function UsersRolesTable({
                       )}
                     </TableCell>
 
-                    {/* Role Badge */}
+                    {/* System Role Badge */}
                     <TableCell className="py-2.5">
                       {getRoleBadge(user.role)}
-                    </TableCell>
-
-                    {/* Inline Role Assignment Dropdown */}
-                    <TableCell className="py-2.5">
-                      {isImmutable ? (
-                        <Badge
-                          variant="outline"
-                          className="h-8 px-2.5 text-xs text-muted-foreground gap-1.5 font-normal rounded-lg border-dashed bg-muted/40"
-                        >
-                          <Lock className="h-3 w-3 text-slate-400" />
-                          Immutable
-                        </Badge>
-                      ) : (
-                        <RoleSelect userId={user.id} current={user.role} />
-                      )}
                     </TableCell>
 
                     {/* Status */}
@@ -501,6 +498,38 @@ export function UsersRolesTable({
                           {user.status || "active"}
                         </span>
                       </div>
+                    </TableCell>
+
+                    {/* Actions: 3 Vertical Dots Menu */}
+                    <TableCell className="py-2.5 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                          >
+                            <span className="sr-only">Open actions menu</span>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-lg w-44">
+                          <DropdownMenuItem
+                            onClick={() => setEditingUser(user)}
+                            className="rounded-lg text-xs cursor-pointer flex items-center gap-2"
+                          >
+                            <Edit3 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <span>Edit Allocations</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setAuditingUser(user)}
+                            className="rounded-lg text-xs cursor-pointer flex items-center gap-2"
+                          >
+                            <History className="h-3.5 w-3.5 text-slate-500" />
+                            <span>View Audit Trail</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
@@ -523,6 +552,29 @@ export function UsersRolesTable({
           className="rounded-b-lg"
         />
       </div>
+
+      {/* Edit User & Allocations Dialog */}
+      <EditUserDialog
+        user={editingUser}
+        open={Boolean(editingUser)}
+        onOpenChange={(open) => {
+          if (!open) setEditingUser(null);
+        }}
+        onUserUpdated={(updated) => {
+          setUsers((prev) =>
+            prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u))
+          );
+        }}
+      />
+
+      {/* User Allocation Audit History Dialog */}
+      <UserAuditDialog
+        user={auditingUser}
+        open={Boolean(auditingUser)}
+        onOpenChange={(open) => {
+          if (!open) setAuditingUser(null);
+        }}
+      />
 
       {/* Add User Dialog */}
       <AddUserDialog

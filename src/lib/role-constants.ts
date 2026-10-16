@@ -35,8 +35,18 @@ export function canImpersonate(actorRole?: UserRole | null, targetRole?: UserRol
 export const DEFAULT_ROLE: UserRole = "Employee";
 
 export const ASSIGNABLE_ROLES: UserRole[] = [
-  "Super Admin", "Admin", "PnC", "Finance", "Manager", "Employee",
+  "Super Admin", "Admin", "PnC", "Finance", "Manager", "Operations", "Employee",
 ];
+
+export const ASSIGNABLE_TEAMS = [
+  "CEO's Office",
+  "Engineering",
+  "Operations",
+  "Design",
+  "Finance",
+  "PnC",
+  "None",
+] as const;
 
 export type Feature = "employees" | "onboarding" | "confirmations" | "appraisals" | "dataManagement" | "manageUsers";
 
