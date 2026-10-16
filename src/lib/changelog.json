@@ -1,0 +1,246 @@
+[
+  {
+    "version": "1.04.00",
+    "date": "2026-10-16",
+    "title": "Candidate-to-Employee Pipeline: Auth, Persistence, Documents, Letters and Annexure",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Added middleware.ts gating every route behind a verified Supabase session. getCurrentUserRole previously returned Super Admin whenever no user was signed in, and no middleware or layout redirect existed, so every dashboard route and server action was open to anonymous visitors."
+      },
+      {
+        "category": "Security",
+        "description": "Enforced canAccessRoute server-side for pages and API routes, matched longest-prefix so /manage/letter-templates, /manage/letters, /manage/signatories and /manage/onboarding stay with the onboarding feature rather than being gated as manage-users."
+      },
+      {
+        "category": "Security",
+        "description": "Candidate documents are stored in a private Supabase Storage bucket and served only through 10-minute signed URLs; employee document links now redirect through a route that signs a fresh URL per click."
+      },
+      {
+        "category": "Security",
+        "description": "Cron routes fail closed when CRON_SECRET is unset, instead of accepting the literal header \"Bearer undefined\"."
+      },
+      {
+        "category": "Fixes",
+        "description": "Onboarding now persists. The service kept state in a process-local Map and its only Supabase insert minted ids like onb-<timestamp> against a uuid column, so it always failed silently; a candidate could complete the entire portal and have nothing survive the request."
+      },
+      {
+        "category": "Fixes",
+        "description": "Removed the demo-seed fallback that made an empty onboarding table display five fabricated candidates."
+      },
+      {
+        "category": "Fixes",
+        "description": "Sending an invitation now actually emails the candidate. sendOnboardingInvitation flipped the status to invited and logged \"invitation sent\" without ever calling sendEmail. It now sends first and records second, and reports failures to P&C."
+      },
+      {
+        "category": "Fixes",
+        "description": "Candidate document upload collects a real file. The portal had no file input: handleMockUpload fabricated a filename and size per document type, so identity and bank proofs existed only as strings."
+      },
+      {
+        "category": "Fixes",
+        "description": "Provisioning creates the employees row. It previously logged \"Employee Record Linked ... in the central NG workforce directory\" and inserted nothing, so a completed onboarding produced no employee."
+      },
+      {
+        "category": "Fixes",
+        "description": "Corrected an employee_profiles write that used columns the table does not have, and added part_time and fellow to the employee_type enum, which employee_types seeds but the enum lacked."
+      },
+      {
+        "category": "Features",
+        "description": "Salary annexure: salary_structures and salary_rules derive the Basic / HRA / Special Allowance / Gross / Employer PF / CTC breakdown per employee type, rendered as Annexure A in the letters, the candidate portal and the P&C review screen."
+      },
+      {
+        "category": "Features",
+        "description": "One letter pipeline. Letters render from letter_templates into candidate_letters and are what the candidate signs; the hardcoded templates.ts offer and appointment letters were deleted. Adds employee agreement, acceptance letter and annexure document types, and persists the captured signature image and metadata, which previously had no columns."
+      },
+      {
+        "category": "Features",
+        "description": "Verified candidate documents are carried to the employee record on provisioning, with a best-effort Drive copy, and personal details are carried into employee_profiles."
+      },
+      {
+        "category": "Improvements",
+        "description": "The candidate document checklist is driven by document_types rather than five hardcoded strings, and adds photograph, professional references and previous experience/relieving letters."
+      },
+      {
+        "category": "Improvements",
+        "description": "Provisioning refuses while a required document is unverified, allocates sequential employee codes instead of random ones, and records credential delivery as pending because the application never stores an account password."
+      },
+      {
+        "category": "Improvements",
+        "description": "Portal submission is gated on what is outstanding and names the remaining items; record reads are batched one query per child table instead of one query per record."
+      }
+    ]
+  },
+  {
+    "version": "1.03.01",
+    "date": "2026-10-16",
+    "title": "User Allocation Action Menu & Audit Trail",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Replaced exposed raw inline table dropdowns with a secure 3-vertical-dots action menu containing \"Edit Allocations\" and \"View Audit Trail\"."
+      },
+      {
+        "category": "Features",
+        "description": "Implemented EditUserDialog modal for safe role and team/department allocation with live change preview and optional audit reasons."
+      },
+      {
+        "category": "Security",
+        "description": "Added comprehensive audit logging for all user role and department modifications, recording exact field-level diffs, actor identity, target user, and timestamps in public.audit_log."
+      },
+      {
+        "category": "Improvements",
+        "description": "Enriched user directory mapping to automatically synchronize employee teams with auth user metadata and display organizational rosters."
+      }
+    ]
+  },
+  {
+    "version": "1.03.00",
+    "date": "2026-10-16",
+    "title": "Unified Users & Roles and Immutable RBAC",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Merged Users and Roles management into a unified view (/manage/users) with seamless redirect from /manage/roles and updated sidebar navigation."
+      },
+      {
+        "category": "Features",
+        "description": "Introduced single-liner toolbar featuring an actual-roles tabbed filter bar with live user count badges, search, team filter, and user creation."
+      },
+      {
+        "category": "Security",
+        "description": "Immutably enforced Super Admin privileges for nitin@navgurukul.org across application auth, RLS database functions, and migration triggers, while restricting the role switcher to admin-style roles."
+      },
+      {
+        "category": "Improvements",
+        "description": "Standardized all management interface components (containers, buttons, tabs, inputs, dropdowns, badges) to rounded-lg with cohesive theme palette."
+      },
+      {
+        "category": "Fixes",
+        "description": "Fixed DataTablePagination prop mismatch (pageIndex and pageSize) that caused NaN render errors in user management."
+      },
+      {
+        "category": "Fixes",
+        "description": "Removed duplicate Employee (Default) option from role assignment dropdown."
+      }
+    ]
+  },
+  {
+    "version": "1.02.03",
+    "date": "2026-10-14",
+    "title": "Remove Header Eye Helper",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Removed the HeaderHelpTrigger eye icon button from the main site header for a cleaner toolbar layout."
+      }
+    ]
+  },
+  {
+    "version": "1.02.02",
+    "date": "2026-10-14",
+    "title": "Widen Role Switcher Dropdown",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Increased width of the DevRoleToggle dropdown menu (w-64 sm:w-72) for improved layout, readability of role titles, and touch targets."
+      }
+    ]
+  },
+  {
+    "version": "1.02.01",
+    "date": "2026-10-14",
+    "title": "Modal 90vw/90vh Standardization & NGConnect UI Alignment",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Enforced 90vw width and 90vh height on all modal dialogs with smooth animation and rounded-2xl styling across the platform, including changelog and preview dialogs."
+      },
+      {
+        "category": "Features",
+        "description": "Integrated NGConnect design language for DevRoleToggle (Staff/Member mode pills), HeaderUserMenu, and HeaderHelpTrigger (amber Eye modal)."
+      },
+      {
+        "category": "Features",
+        "description": "Added 120-variant dynamic hourly greetings banner (DashboardGreeting) on the main dashboard with minute rollover and daily rotation."
+      }
+    ]
+  },
+  {
+    "version": "1.02.00",
+    "date": "2026-10-14",
+    "title": "Role Switcher, User Emulation, and Changelog Suite",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Interactive DevRoleToggle header component supporting live role switching across all 10 platform roles with dev cookie persistence and instant re-evaluation."
+      },
+      {
+        "category": "Features",
+        "description": "User emulation engine with realistic persona presets (Eng Manager, PnC Lead, Finance Executive, Employee) to test role-scoped workflows."
+      },
+      {
+        "category": "Features",
+        "description": "SidebarVersionFooter component and dedicated /changelog dashboard page rendering interactive version history, type badges, and category pills."
+      },
+      {
+        "category": "Improvements",
+        "description": "Tied header user menu and UserContext directly into actual Supabase auth metadata and employee roster records instead of dummy boilerplate."
+      },
+      {
+        "category": "Fixes",
+        "description": "Resolved duplicate /onboarding dashboard key error and Next.js dynamic prerender warning on signatories route."
+      }
+    ]
+  },
+  {
+    "version": "1.01.00",
+    "date": "2026-10-14",
+    "title": "Onboarding automation module",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Onboarding journeys, steps, tasks and logs schema, replacing the external spreadsheet trackers."
+      },
+      {
+        "category": "Features",
+        "description": "DOJ-relative scheduling engine covering the email, Slack, calendar and induction-task pipeline, with the eligibility carve-outs and stage machine ported from the previous automation."
+      },
+      {
+        "category": "Features",
+        "description": "Email, Slack and Google Calendar channel adapters; Slack and Calendar defer cleanly until credentials are configured."
+      },
+      {
+        "category": "Features",
+        "description": "Daily onboarding run at /api/cron/onboarding, and the /onboarding dashboard with progress, filters and a per-employee drawer."
+      },
+      {
+        "category": "Security",
+        "description": "Onboarding moved behind the RBAC matrix, and credential emails are surfaced for manual sending rather than storing any account password."
+      }
+    ]
+  },
+  {
+    "version": "1.00.00",
+    "date": "2026-10-12",
+    "title": "Employee lifecycle platform baseline",
+    "type": "major",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Employee directory and profiles, probation confirmations with peer feedback, appraisal cohorts and reports, and data management with import history and rollback."
+      },
+      {
+        "category": "Security",
+        "description": "Role-based access control backed by Supabase app_metadata."
+      }
+    ]
+  }
+]

@@ -1,5 +1,13 @@
 # Onboarding automation — decisions log
 
+> **Status: the automation this describes was reverted.** See
+> [`onboarding-automation-history.md`](./onboarding-automation-history.md).
+> Nothing below is running. It is kept because the decisions are about what
+> People & Culture want, not about how it was built, so they still stand if the
+> automation is rebuilt. Read it as a record of intent, not of behaviour.
+>
+> Where a decision has since been overtaken by other work, it says so inline.
+
 Decisions that govern what the automation does. Each one needs an owner and a
 date before the behaviour it describes can be considered settled.
 
@@ -18,8 +26,11 @@ date before the behaviour it describes can be considered settled.
 
 Phase 1 had to pick a behaviour for each of these to be implementable. Each was
 resolved by the source-of-truth order at the top of this file: **the legacy code
-wins** unless P&C say otherwise. Changing any of them is a one-line change plus
-a test update.
+wins** unless P&C say otherwise.
+
+Since the port was reverted, none of these is currently implemented either way.
+They are still the questions to answer before rebuilding, and the legacy script
+is still what P&C are actually running.
 
 | # | Decision | Built | Why | Confirm by |
 |---|---|---|---|---|
@@ -36,7 +47,7 @@ a test update.
 |---|---|---|---|---|
 | 6 | `ftc` treated as staff for induction | See note below | P&C | Open |
 | 7 | Cutover owner and 30-day rollback window | — | Eng + P&C | Open |
-| 9 | Legacy sources in a public repo | Make the repo private, redact identifiers, or keep them out of git | Nitin | Open |
+| 9 | Legacy sources in a public repo | Make the repo private, redact identifiers, or keep them out of git | Nitin | Open — still the live question; the sources remain uncommitted, see `legacy/onboarding-apps-script/README.md` |
 
 ### Note on #6 — `ftc`
 
@@ -76,4 +87,5 @@ than accidental.
 | B | Credential and merge emails | Never auto-sent. Surfaced for a human to send, so no account password is stored by this application. | Eng | 2026-10-14 |
 | D | Credential *and* merge emails are manual | Both carry account credentials, so neither is ever auto-sent. | Eng | 2026-10-15 |
 | E | Calendar invites dispatch a day early | Legacy booked on `targetDate = tomorrow`. Invites now go out at DOJ−1 for day-one sessions, matching that, rather than an hour before a 09:00 start. | Eng | 2026-10-15 |
-| C | Onboarding RBAC gate | Applied to the onboarding page, not the `/onboarding` layout, so `/onboarding/review/[token]` stays reachable by candidates holding an invitation token. | Eng | 2026-10-14 |
+| C | Onboarding RBAC gate | **Superseded.** Applied to the onboarding page, not the `/onboarding` layout, so `/onboarding/review/[token]` stayed reachable by anyone holding an invitation token. See F. | Eng | 2026-10-14 |
+| F | `/onboarding/review/[token]` requires a session | Reverses C. That route is the P&C audit screen — it approves candidates and provisions accounts — so it was never a candidate-facing page, and the token in its URL is an identifier, not a credential. The public candidate portal remains `/onboarding/<token>`, matched in `middleware.ts` as a single dynamic segment with the dashboard's own `candidate`, `employee` and `review` segments excluded. | Eng | 2026-10-16 |

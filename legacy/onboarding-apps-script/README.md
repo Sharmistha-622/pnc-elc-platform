@@ -19,9 +19,11 @@ Before adding them, pick one:
    flow reviewable; loses the exact IDs, which are not needed for parity anyway.
 3. **Keep them out of the repository** and share them out of band for review.
 
-Until then, the behaviour they define is captured in:
+**The port that captured this behaviour has since been reverted**, so these
+scripts are once again the only description of it that exists. See
+`docs/onboarding-automation-history.md`. The files that used to hold the ported
+timeline, carve-outs and message copy (`src/lib/onboarding/automation/`) are
+gone; `docs/onboarding-decisions.md` survives as the record of where the port
+knowingly diverged, and of the questions P&C had not yet answered.
 
-- `src/lib/onboarding/automation/constants.ts` — the DOJ-relative timeline
-- `src/lib/onboarding/automation/eligibility.ts` — the carve-outs, ported verbatim
-- `src/lib/onboarding/automation/templates/` — the email, Slack and calendar copy
-- `docs/onboarding-decisions.md` — every place the port knowingly diverges
+This script is still what runs in production.
