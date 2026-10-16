@@ -18,6 +18,8 @@ export default [
       "out/**",
       "build/**",
       "public/**",
+      // Deno, not Next.js — they run inside the vault Supabase project.
+      "supabase/vault/functions/**",
     ],
   },
 ];

@@ -56,6 +56,11 @@ export async function middleware(request: NextRequest) {
     // is the same map the sidebar hides links with, applied here so hiding a link
     // is not the only thing standing between a Viewer and /manage.
     const { role } = resolveRole(user, request.cookies.get('dev-role-override')?.value)
+
+    // Server components cannot read the pathname. Passing it on lets a layout
+    // re-check `canAccessRoute` for itself rather than trusting this one gate.
+    response.headers.set('x-pathname', pathname)
+
     if (!canAccessRoute(role, pathname)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(

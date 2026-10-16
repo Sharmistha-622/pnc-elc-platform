@@ -76,7 +76,7 @@ function formatRelativeTime(dateString?: string | null) {
 export function UsersTable({ initialUsers, canEdit = true }: UsersTableProps) {
   const [users, setUsers] = useState<any[]>(initialUsers || []);
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [editRole, setEditRole] = useState<UserRole>("Member");
+  const [editRole, setEditRole] = useState<UserRole>("employee");
   const [editTeam, setEditTeam] = useState<UserTeam>("None");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -117,7 +117,7 @@ export function UsersTable({ initialUsers, canEdit = true }: UsersTableProps) {
     setSelectedUser(user);
     const email = (user.email || "").toLowerCase();
     const isSuper = ["nitin@navgurukul.org", "nitinsudarshan@gmail.com"].includes(email);
-    const currentRole = isSuper ? "Super Admin" : (user.user_metadata?.role || user.role || "Member");
+    const currentRole = isSuper ? "Super Admin" : (user.user_metadata?.role || user.role || "employee");
     setEditRole(currentRole as UserRole);
     setEditTeam((user.user_metadata?.team || user.team || "None") as UserTeam);
   };
@@ -189,7 +189,7 @@ export function UsersTable({ initialUsers, canEdit = true }: UsersTableProps) {
             Program
           </Badge>
         );
-      case "Member":
+      case "employee":
         return (
           <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300 font-semibold border-none text-[11px] rounded-lg">
             Member
@@ -251,7 +251,7 @@ export function UsersTable({ initialUsers, canEdit = true }: UsersTableProps) {
               <SelectItem value="Manager" className="rounded-lg">Manager</SelectItem>
               <SelectItem value="Operations" className="rounded-lg">Operations</SelectItem>
               <SelectItem value="Program" className="rounded-lg">Program</SelectItem>
-              <SelectItem value="Member" className="rounded-lg">Member</SelectItem>
+              <SelectItem value="employee" className="rounded-lg">Member</SelectItem>
               <SelectItem value="Viewer" className="rounded-lg">Viewer</SelectItem>
             </SelectContent>
           </Select>
@@ -422,7 +422,7 @@ export function UsersTable({ initialUsers, canEdit = true }: UsersTableProps) {
                     <SelectItem value="Manager" className="rounded-lg text-xs">Manager</SelectItem>
                     <SelectItem value="Operations" className="rounded-lg text-xs">Operations</SelectItem>
                     <SelectItem value="Program" className="rounded-lg text-xs">Program</SelectItem>
-                    <SelectItem value="Member" className="rounded-lg text-xs">Member</SelectItem>
+                    <SelectItem value="employee" className="rounded-lg text-xs">Member</SelectItem>
                     <SelectItem value="Viewer" className="rounded-lg text-xs">Viewer</SelectItem>
                   </SelectContent>
                 </Select>

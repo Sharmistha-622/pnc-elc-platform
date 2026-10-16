@@ -10,7 +10,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
-import type { UserRole } from "@/lib/role-constants"
+import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
 
 export default async function DashboardLayout({
     children,
@@ -79,7 +79,7 @@ export default async function DashboardLayout({
         }
     }
 
-    const effectiveRole: UserRole = role || "Employee"
+    const effectiveRole: UserRole = role || DEFAULT_ROLE
 
     const userData: User = {
         id: authUser.id,
@@ -87,21 +87,17 @@ export default async function DashboardLayout({
         email: profileEmail,
         avatar: profileAvatar,
         role: effectiveRole,
-        originalRole: originalRole || "Employee",
+        originalRole: originalRole || DEFAULT_ROLE,
         isEmulating: Boolean(isEmulating || rawDevUserOverride),
         team,
         employeeType,
     }
 
-    // Super Admin is decided by the role on the session, never by what the
-    // address happens to spell — "admin" appearing in an email is not a grant.
-    const isSuperAdmin = effectiveRole === "Super Admin" || originalRole === "Super Admin"
-
     return (
         <UserProvider user={userData}>
                     <div className="[--header-height:calc(--spacing(14))] h-svh w-full flex flex-col overflow-hidden bg-background">
                         <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
-                            <SiteHeader isSuperAdmin={isSuperAdmin} userRole={effectiveRole} />
+                            <SiteHeader userRole={effectiveRole} />
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
                                 <AppSidebar userRole={effectiveRole} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">

@@ -6,7 +6,7 @@ import { PageBanner } from "@/components/shared/page-banner";
 import { Users } from "lucide-react";
 
 export default async function ManageUsersPage() {
-  await requireFeature("manageUsers");
+  const caller = await requireFeature("manageUsers");
   const isConfigured = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
   const users = await listUsersWithRoles();
 
@@ -18,7 +18,11 @@ export default async function ManageUsersPage() {
         icon={<Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
       />
 
-      <UsersRolesTable initialUsers={users} isConfigured={isConfigured} />
+      <UsersRolesTable
+        initialUsers={users}
+        isConfigured={isConfigured}
+        callerRole={caller.originalRole}
+      />
     </div>
   );
 }

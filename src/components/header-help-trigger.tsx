@@ -65,8 +65,10 @@ export function HeaderHelpTrigger() {
   // Global hide check
   if (hiddenGlobal.has(helpId)) return null;
 
-  // Member hide check
-  const isMember = user?.role === "Member" || user?.role === "Employee" || !user?.role;
+  // Hidden from everyone without a staff role: the lifecycle roles and anyone
+  // with no role at all.
+  const LIFECYCLE_ROLES = ["employee", "pre_joiner", "candidate"];
+  const isMember = !user?.role || LIFECYCLE_ROLES.includes(user.role);
   if (isMember && hiddenMembers.has(helpId)) return null;
 
   const entry = getHelpEntry(helpId);

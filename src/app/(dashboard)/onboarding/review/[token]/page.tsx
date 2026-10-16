@@ -48,6 +48,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { displayMaskedNumber } from '@/lib/vault/sealing';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FullOnboardingData, OnboardingStatus } from '@/lib/onboarding/types';
@@ -138,8 +140,14 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
     }
   };
 
-  const handleVerifyDocument = async (docId: string) => {
-    if (!data) return;
+  // Verifying a document is also what moves it out of core, so the number is
+  // captured in the same step. It is sent straight through to the vault — core
+  // keeps only the last four characters.
+  const [verifyingDoc, setVerifyingDoc] = useState<{ id: string; type: string } | null>(null);
+  const [documentNumber, setDocumentNumber] = useState('');
+
+  const handleVerifyDocument = async () => {
+    if (!data || !verifyingDoc) return;
     try {
       setActionLoading(true);
       const res = await fetch(`/api/onboarding/${data.record.id}`, {
@@ -147,21 +155,60 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'verify_document',
-          document_id: docId,
+          document_id: verifyingDoc.id,
           status: 'verified',
+          document_number: documentNumber.trim() || null,
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('Document marked as verified');
+        const sealed = json.data?.documents?.find(
+          (d: { id: string }) => d.id === verifyingDoc.id
+        );
+        if (sealed?.seal_state === 'sealed') {
+          toast.success(`${verifyingDoc.type} verified and secured in the vault`);
+        } else {
+          // Verified but still in core. Not a success worth a green toast.
+          toast.warning(
+            `${verifyingDoc.type} is verified but could not be moved to the vault yet. It stays in the exposure list until it is.`
+          );
+        }
+        setVerifyingDoc(null);
+        setDocumentNumber('');
         fetchData();
+      } else {
+        toast.error(json.error || 'Could not verify that document');
       }
-    } catch (err) {
-      toast.error('Failed to verify document');
+    } catch {
+      toast.error('Could not verify that document');
     } finally {
       setActionLoading(false);
     }
   };
+
+  const handleRetrySeal = async (docId: string) => {
+    if (!data) return;
+    try {
+      setActionLoading(true);
+      const res = await fetch(`/api/onboarding/${data.record.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'retry_seal', document_id: docId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Retried moving the document to the vault');
+        fetchData();
+      } else {
+        toast.error(json.error || 'Retry failed');
+      }
+    } catch {
+      toast.error('Retry failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
 
   const handleRejectDocument = async () => {
     if (!data || !selectedDocId || !rejectionReason.trim()) {
@@ -710,13 +757,48 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
                             </Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground mt-1">
-                            {doc.file_name ? (
+                            {doc.seal_state === 'sealed' ? (
+                              // The residue: enough to show it is done and to
+                              // tell two documents apart. The file is gone.
+                              <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-medium">
+                                <ShieldCheck className="size-3.5" />
+                                Secured in vault
+                                {doc.document_number_last4 && (
+                                  <span className="font-mono text-muted-foreground">
+                                    · {displayMaskedNumber(doc.document_type_key || '', doc.document_number_last4)}
+                                  </span>
+                                )}
+                              </span>
+                            ) : doc.file_name ? (
                               <span className="font-mono">{doc.file_name}{doc.file_size ? ` (${doc.file_size})` : ''}</span>
                             ) : (
                               <span className="italic text-muted-foreground">Pending upload by candidate</span>
                             )}
                             {doc.verified_by && <span>• Verified by {doc.verified_by}</span>}
                           </div>
+
+                          {doc.seal_state === 'seal_failed' && (
+                            // Verified, but still sitting in core. Worse than
+                            // staged: nobody is waiting on it any more.
+                            <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                              <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
+                              <div className="space-y-1.5">
+                                <p>
+                                  <strong>Still in core.</strong> This document is verified but
+                                  could not be moved to the vault: {doc.seal_error}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRetrySeal(doc.id)}
+                                  disabled={actionLoading}
+                                  className="h-7 text-[11px] rounded-lg"
+                                >
+                                  Retry
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
                           {doc.rejection_reason && (
                             <div className="mt-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-1.5">
@@ -729,7 +811,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
 
                       {/* Document Actions */}
                       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        {isUploaded && doc.storage_reference && (
+                        {isUploaded && doc.storage_reference && doc.seal_state !== 'sealed' && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -746,10 +828,13 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
                           </Button>
                         )}
 
-                        {isUploaded && doc.status !== 'verified' && (
+                        {isUploaded && doc.status !== 'verified' && doc.seal_state !== 'sealed' && (
                           <Button
                             size="sm"
-                            onClick={() => handleVerifyDocument(doc.id)}
+                            onClick={() => {
+                              setDocumentNumber('');
+                              setVerifyingDoc({ id: doc.id, type: doc.document_type });
+                            }}
                             disabled={actionLoading}
                             className="text-xs h-8 gap-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg"
                           >
@@ -758,7 +843,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
                           </Button>
                         )}
 
-                        {isUploaded && doc.status !== 'rejected' && (
+                        {isUploaded && doc.status !== 'rejected' && doc.seal_state !== 'sealed' && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1184,6 +1269,68 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
       </Tabs>
 
       {/* Reject Document Reason Dialog */}
+      {/* Verify a document, and capture its number in the same step. */}
+      <Dialog
+        open={Boolean(verifyingDoc)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVerifyingDoc(null);
+            setDocumentNumber('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold">
+              Verify {verifyingDoc?.type}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Verifying moves this document into the vault and removes it from here. That
+              cannot be undone from this screen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <Label htmlFor="document-number" className="text-xs font-medium">
+              Document number <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="document-number"
+              value={documentNumber}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDocumentNumber(e.target.value)}
+              placeholder="As printed on the document"
+              className="h-9 text-xs rounded-lg font-mono"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Stored in the vault. Only the last four characters stay here, so nobody
+              working in this app can read the whole number back.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVerifyingDoc(null)}
+              className="rounded-lg text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleVerifyDocument}
+              disabled={actionLoading}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs gap-1.5"
+            >
+              {actionLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+              <span>Verify and secure</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="w-[90vw] max-w-[90vw] sm:max-w-[90vw] h-[90vh] max-h-[90vh] rounded-2xl border border-border shadow-2xl p-0 overflow-hidden flex flex-col bg-card/95 backdrop-blur-md">
           <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/20 shrink-0">

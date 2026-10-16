@@ -1,5 +1,6 @@
 "use client";
 
+import { roleLabel, type UserRole } from "@/lib/role-constants";
 import React, { useMemo } from "react";
 import { Users, CheckCircle2, Layers, Shield } from "lucide-react";
 
@@ -180,7 +181,7 @@ export function UsersStatsCharts({ users }: UsersStatsProps) {
               return (
                 <div key={role} className="space-y-1">
                   <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-foreground">{role}</span>
+                    <span className="text-foreground">{roleLabel(role as UserRole)}</span>
                     <span className="text-muted-foreground font-mono text-[11px]">
                       {value} ({pct}%)
                     </span>

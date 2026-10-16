@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
-import type { UserRole } from '@/lib/role-constants'
-import { DEFAULT_ROLE } from '@/lib/role-constants'
+import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
+import { canImpersonate } from '@/lib/rbac/roles'
 
 export const IMMUTABLE_SUPER_ADMIN_EMAILS = ['nitin@navgurukul.org']
 
@@ -32,20 +32,22 @@ export function resolveRole(
   const email = user.email?.toLowerCase() ?? null
   const isImmutableSuperAdmin = email ? IMMUTABLE_SUPER_ADMIN_EMAILS.includes(email) : false
 
-  const rawRole = (user.app_metadata?.role as UserRole | undefined) ?? null
-  const originalRole: UserRole = isImmutableSuperAdmin ? 'Super Admin' : (rawRole || DEFAULT_ROLE)
+  // Roles stored before RBAC v1 are still display names; normalizeRole maps
+  // them forward so a user is never locked out mid-migration.
+  const storedRole = normalizeRole(user.app_metadata?.role)
+  const originalRole: UserRole = isImmutableSuperAdmin ? 'super_admin' : (storedRole ?? DEFAULT_ROLE)
 
-  // Only admin-style roles may emulate another role, and emulation can never
-  // widen access — the override is applied on top of an already-admin session.
-  const isAdminActor = originalRole === 'Super Admin' || originalRole === 'Admin'
-  const override = devRoleOverride as UserRole | undefined
-  const effectiveRole: UserRole = isAdminActor && override ? override : originalRole
+  // Impersonation is bounded by rank within a group; `canImpersonate` is the
+  // single place that decides, so the override cookie can never widen access.
+  const requested = normalizeRole(devRoleOverride)
+  const mayEmulate = requested !== null && canImpersonate(originalRole, requested)
+  const effectiveRole: UserRole = mayEmulate ? requested : originalRole
 
   return {
     userId: user.id,
     email: user.email ?? null,
     role: effectiveRole,
     originalRole,
-    isEmulating: Boolean(isAdminActor && override && override !== originalRole),
+    isEmulating: mayEmulate,
   }
 }

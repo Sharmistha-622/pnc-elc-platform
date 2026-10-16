@@ -10,6 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ALL_ROLES, ROLES, type RoleGroup } from "@/lib/rbac/roles";
+import { DEFAULT_ROLE, normalizeRole, roleLabel, type UserRole } from "@/lib/role-constants";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -54,23 +56,45 @@ import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
 interface UsersRolesTableProps {
   initialUsers: UserRow[];
   isConfigured?: boolean;
+  /** The signed-in user's real role, used to scope the role picker. */
+  callerRole?: UserRole | null;
 }
 
-// Actual system roles configured in the app
+// One tab per RBAC v1 group, built from the role definitions so a new role
+// cannot be added without appearing here.
+const GROUP_ICONS: Record<RoleGroup, React.ElementType> = {
+  owner: ShieldCheck,
+  pnc: HeartHandshake,
+  finance: Wallet,
+  leadership: Shield,
+  platform: SlidersHorizontal,
+  line: Briefcase,
+  lifecycle: User,
+};
+
+const GROUP_LABELS: Record<RoleGroup, string> = {
+  owner: "Owner",
+  pnc: "PnC",
+  finance: "Finance",
+  leadership: "Leadership",
+  platform: "Platform",
+  line: "Line",
+  lifecycle: "Lifecycle",
+};
+
 const ROLE_TABS: { id: string; label: string; icon: React.ElementType }[] = [
   { id: "ALL", label: "All Roles", icon: Users },
-  { id: "Super Admin", label: "Super Admin", icon: ShieldCheck },
-  { id: "Admin", label: "Admin", icon: Shield },
-  { id: "PnC", label: "PnC", icon: HeartHandshake },
-  { id: "Finance", label: "Finance", icon: Wallet },
-  { id: "Manager", label: "Manager", icon: Briefcase },
-  { id: "Operations", label: "Operations", icon: SlidersHorizontal },
-  { id: "Employee", label: "Employee", icon: User },
+  ...Array.from(new Set(ALL_ROLES.map((r) => r.group))).map((group) => ({
+    id: group,
+    label: GROUP_LABELS[group],
+    icon: GROUP_ICONS[group],
+  })),
 ];
 
 export function UsersRolesTable({
   initialUsers,
   isConfigured = true,
+  callerRole = null,
 }: UsersRolesTableProps) {
   const [users, setUsers] = useState<UserRow[]>(initialUsers || []);
   const [activeTab, setActiveTab] = useState<string>("ALL");
@@ -93,14 +117,12 @@ export function UsersRolesTable({
     return Array.from(set).sort();
   }, [users]);
 
-  // Check if user matches role tab
+  // Tabs filter by group, so a user with no role still lands under Lifecycle
+  // alongside the employees they are indistinguishable from.
   const userMatchesRoleTab = (user: UserRow, tabId: string): boolean => {
     if (tabId === "ALL") return true;
-    const role = user.role || "Employee";
-    if (tabId === "Employee") {
-      return role === "Employee" || role === "Member" || !user.role;
-    }
-    return role === tabId;
+    const role = normalizeRole(user.role) ?? DEFAULT_ROLE;
+    return ROLES[role].group === tabId;
   };
 
   // Compute live counts per actual role
@@ -555,6 +577,7 @@ export function UsersRolesTable({
 
       {/* Edit User & Allocations Dialog */}
       <EditUserDialog
+        callerRole={callerRole}
         user={editingUser}
         open={Boolean(editingUser)}
         onOpenChange={(open) => {

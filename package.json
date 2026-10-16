@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rbac:matrix": "UPDATE_DOCS=1 vitest run src/lib/rbac/roles.doc.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

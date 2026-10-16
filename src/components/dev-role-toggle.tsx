@@ -13,23 +13,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { ROLE_CODES, canImpersonate } from "@/lib/rbac/roles";
+import { normalizeRole, roleLabel, type UserRole } from "@/lib/role-constants";
 
-const ALL_ROLES = [
-  { label: "Original Role", value: "" },
-  { label: "Super Admin", value: "Super Admin" },
-  { label: "Admin", value: "Admin" },
-  { label: "PnC", value: "PnC" },
-  { label: "Finance", value: "Finance" },
-  { label: "Manager", value: "Manager" },
-  { label: "Program", value: "Program" },
-  { label: "Operations", value: "Operations" },
-  { label: "Viewer", value: "Viewer" },
-  { label: "Member", value: "Member" },
-];
+/**
+ * Which roles this user may actually become.
+ *
+ * Built from `canImpersonate` rather than listed by hand, so the menu offers
+ * exactly what the server will honour. It previously offered every role to any
+ * admin: since `resolveRole` started enforcing rank-within-group, picking a
+ * cross-group role silently did nothing, which looks like a bug.
+ */
+function impersonatableRoles(actor: UserRole | null): { label: string; value: string }[] {
+  return [
+    { label: "Original Role", value: "" },
+    ...ROLE_CODES.filter((code) => canImpersonate(actor, code)).map((code) => ({
+      label: roleLabel(code),
+      value: code,
+    })),
+  ];
+}
 
-const ADMIN_ROLES = ["Super Admin", "Admin"];
-
-export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boolean; userRole?: string }) {
+export function DevRoleToggle({ userRole }: { userRole?: string }) {
   const user = useUserContext();
   const initialOverride =
     user?.isEmulating && user?.role && user?.role !== user?.originalRole
@@ -47,20 +52,16 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
 
   if (!user) return null;
 
-  // Determine user's real base role
-  const isNitin = user.email?.toLowerCase() === "nitin@navgurukul.org";
-  const realRole = (isNitin ? "Super Admin" : (user.originalRole || userRole || user.role || "Employee")) as string;
-  const baseRole = realRole;
-  const isSuper = Boolean(
-    isSuperAdmin ||
-    realRole === "Super Admin" ||
-    user.email?.includes("admin") ||
-    isNitin
-  );
-  const isAdminStyleUser = isSuper || realRole === "Admin";
+  // The real role, never an emulated one — otherwise emulating an admin would
+  // let you keep emulating from there. Note there is no email check here: an
+  // address containing "admin" is not a grant.
+  const realRole = normalizeRole(user.originalRole ?? userRole ?? user.role);
+  const baseRole = roleLabel(realRole);
+  const options = impersonatableRoles(realRole);
 
-  // Only admin-style roles (Super Admin, Admin) are allowed to use the role switcher
-  if (!isAdminStyleUser) return null;
+  // Nothing to switch to means no switcher. The server would refuse anyway;
+  // this just stops it being offered.
+  if (options.length <= 1) return null;
 
   const handleSelectRole = (value: string) => {
     if (value) {
@@ -72,7 +73,8 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
     window.location.reload();
   };
 
-  const isMemberMode = activeOverride === "Member";
+  // "Member mode" is the lifecycle view: what an ordinary employee sees.
+  const isMemberMode = activeOverride === "employee";
 
   return (
     <DropdownMenu>
@@ -96,7 +98,11 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
           )}
 
           <span className="text-xs font-bold tracking-tight hidden md:inline-block">
-            {isMemberMode ? "Member Mode" : activeOverride ? `Role: ${activeOverride}` : `Staff Mode (${baseRole})`}
+            {isMemberMode
+              ? "Employee Mode"
+              : activeOverride
+              ? `Role: ${roleLabel(normalizeRole(activeOverride))}`
+              : `Staff Mode (${baseRole})`}
           </span>
 
           <Badge
@@ -109,7 +115,7 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
                 : "bg-indigo-600 text-white"
             }`}
           >
-            {isMemberMode ? "Member" : "Staff"}
+            {isMemberMode ? "Employee" : "Staff"}
           </Badge>
         </Button>
       </DropdownMenuTrigger>
@@ -120,9 +126,7 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="-mx-1 my-1" />
 
-        {isAdminStyleUser ? (
-          // Admin-style roles see full role switcher options
-          ALL_ROLES.map((role) => {
+        {options.map((role) => {
             const isSelected = activeOverride === role.value;
             return (
               <DropdownMenuItem
@@ -136,39 +140,7 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
                 {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
               </DropdownMenuItem>
             );
-          })
-        ) : (
-          // Staff roles toggle between Staff Mode and Member Mode
-          <>
-            <DropdownMenuItem
-              onClick={() => handleSelectRole("")}
-              className="flex items-center justify-between px-2.5 py-2.5 text-xs font-semibold rounded-lg cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-indigo-600" />
-                <div className="flex flex-col">
-                  <span>Staff Mode</span>
-                  <span className="text-[10px] text-muted-foreground font-normal">Active role: {baseRole}</span>
-                </div>
-              </div>
-              {!activeOverride && <Check className="h-3.5 w-3.5 text-indigo-600 font-bold" />}
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => handleSelectRole("Member")}
-              className="flex items-center justify-between px-2.5 py-2.5 text-xs font-semibold rounded-lg cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <GraduationCap className="h-4 w-4 text-emerald-600" />
-                <div className="flex flex-col">
-                  <span>Member Mode</span>
-                  <span className="text-[10px] text-muted-foreground font-normal">View platform as Member</span>
-                </div>
-              </div>
-              {isMemberMode && <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />}
-            </DropdownMenuItem>
-          </>
-        )}
+          })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

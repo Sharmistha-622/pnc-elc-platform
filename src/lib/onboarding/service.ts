@@ -31,6 +31,8 @@ import { renderLettersForRecord, storeGeneratedLetters } from './letter-generati
 import { sendInvitationEmail } from './invitation-email';
 import { CANDIDATE_BUCKET } from './candidate-storage';
 import { carryDocumentsToEmployee } from './document-handover';
+import { sealIdentityDocument, purgeStagedDocuments } from '@/lib/vault/seal-service';
+import { roleForStatus, canTransition, type JoinerStatus } from '@/lib/rbac/lifecycle';
 import { DEFAULT_PREJOINING_POLICIES } from './default-policies';
 import { getCandidateDocumentRequirements } from './document-checklist';
 import { auditOnboarding, auditLetters } from '@/lib/audit/events';
@@ -772,7 +774,13 @@ export async function verifyOrRejectDocument(
   documentId: string,
   status: 'verified' | 'rejected',
   rejectionReason?: string,
-  reviewerName: string = 'P&C Reviewer'
+  reviewerName: string = 'P&C Reviewer',
+  /**
+   * The number PnC Ops read off the document. It is passed straight to the
+   * vault and never written to core, which keeps only the last four
+   * characters. Optional: a document can be verified without one.
+   */
+  documentNumber?: string | null
 ): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
@@ -809,7 +817,147 @@ export async function verifyOrRejectDocument(
     reason: status === 'rejected' ? rejectionReason : undefined,
   });
 
+  // Approval is what moves the document out of core. Doing it here rather than
+  // on a schedule means the staging window closes the moment a human says the
+  // document is good, which is the point of the whole arrangement.
+  if (status === 'verified') {
+    const outcome = await sealIdentityDocument(documentId, {
+      verifiedBy: reviewerName,
+      documentNumber,
+    });
+
+    if (outcome.ok && !outcome.skipped) {
+      await logActivity(
+        id,
+        'system',
+        'Document Secured in Vault',
+        `${doc.document_type} moved to the vault and removed from core` +
+          (outcome.numberLast4 ? `; number ending ${outcome.numberLast4} recorded.` : '.')
+      );
+    } else if (!outcome.ok) {
+      // The document is verified but still in core. Say so loudly: silence
+      // here is an exposure nobody is watching.
+      await logActivity(
+        id,
+        'system',
+        'Document Could Not Be Secured',
+        `${doc.document_type} is verified but still in core: ${outcome.error}. It will be retried.`,
+        { seal_error: outcome.error }
+      );
+    }
+  }
+
   return refreshProgress(id);
+}
+
+/**
+ * Withdraw a joiner: declined, offer pulled, or a Day 1 no-show.
+ *
+ * The record is kept, never deleted, so no confirmation trigger can fire for
+ * someone who never joined. Their role goes to none and scheduled steps stop.
+ *
+ * Their uploaded documents are deliberately NOT purged here. Nothing will ever
+ * seal them — there is no verification coming — so they show up in
+ * `exposed_records` as orphaned, and a person decides what happens to them.
+ * See open decision #6.
+ */
+export async function withdrawJoiner(
+  id: string,
+  reason: string,
+  actorName: string = 'P&C'
+): Promise<FullOnboardingData | null> {
+  const data = await getOnboardingById(id);
+  if (!data) return null;
+
+  const current = (data.record.joiner_status as JoinerStatus | undefined) ?? 'offer_pending';
+  if (current === 'withdrawn') return data;
+  if (!canTransition(current, 'withdrawn')) {
+    throw new Error(`Cannot withdraw from ${current}.`);
+  }
+
+  await touchRecord(id, { joiner_status: 'withdrawn' });
+
+  await logActivity(
+    id,
+    'pnc',
+    'Joiner Withdrawn',
+    `${data.record.candidate_name} was withdrawn: ${reason}. Scheduled steps stop and access is off.`,
+    { from_status: current, reason }
+  );
+
+  const stillStaged = data.documents.filter(
+    (d) => d.storage_reference && d.seal_state !== 'sealed'
+  );
+  if (stillStaged.length > 0) {
+    await logActivity(
+      id,
+      'system',
+      'Documents Left Unsealed',
+      `${stillStaged.length} document(s) remain in core with no verification coming. ` +
+        'They are listed as orphaned exposures until someone decides whether to keep them.'
+    );
+  }
+
+  await auditOnboarding.statusChanged({
+    subject: auditSubject(data.record),
+    entityId: id,
+    from: current,
+    to: 'withdrawn',
+    note: reason,
+    severity: 'notice',
+  });
+
+  return getOnboardingById(id);
+}
+
+/**
+ * Delete a withdrawn joiner's staged documents.
+ *
+ * Separate from withdrawal on purpose: withdrawing is a workflow step, and
+ * deleting someone's identity documents is a decision. The caller has made it.
+ */
+export async function purgeWithdrawnDocuments(
+  id: string,
+  reason: string,
+  actorName: string = 'P&C'
+): Promise<FullOnboardingData | null> {
+  const data = await getOnboardingById(id);
+  if (!data) return null;
+
+  if (data.record.joiner_status !== 'withdrawn') {
+    throw new Error('Only a withdrawn joiner\'s documents can be purged this way.');
+  }
+
+  const result = await purgeStagedDocuments(id, { purgedBy: actorName, reason });
+
+  await logActivity(
+    id,
+    'pnc',
+    'Staged Documents Purged',
+    `${result.purged} unsealed document(s) deleted from core: ${reason}.` +
+      (result.errors.length > 0 ? ` Failed: ${result.errors.join('; ')}` : ''),
+    { purged: result.purged, errors: result.errors }
+  );
+
+  return getOnboardingById(id);
+}
+
+/** Retry a seal that failed, for the exposure list to act on. */
+export async function retrySealDocument(
+  id: string,
+  documentId: string,
+  reviewerName: string = 'P&C Reviewer'
+): Promise<FullOnboardingData | null> {
+  const outcome = await sealIdentityDocument(documentId, { verifiedBy: reviewerName });
+  await logActivity(
+    id,
+    'system',
+    outcome.ok ? 'Document Secured in Vault' : 'Document Could Not Be Secured',
+    outcome.ok
+      ? 'A previously failed seal completed; the document is out of core.'
+      : `Retry failed: ${'error' in outcome ? outcome.error : 'unknown'}`
+  );
+  return getOnboardingById(id);
 }
 
 export async function updateOnboardingStatus(

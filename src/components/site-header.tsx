@@ -18,7 +18,6 @@ import { DevRoleToggle } from "@/components/dev-role-toggle"
 import { HeaderUserMenu } from "@/components/header-user-menu"
 
 export function SiteHeader({
-  isSuperAdmin,
   userRole,
   ...props
 }: any) {
@@ -58,7 +57,7 @@ export function SiteHeader({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto flex items-center gap-2">
-          <DevRoleToggle isSuperAdmin={isSuperAdmin} userRole={userRole} />
+          <DevRoleToggle userRole={userRole} />
           <ModeToggle />
           <HeaderUserMenu />
         </div>
