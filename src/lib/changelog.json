@@ -1,5 +1,49 @@
 [
   {
+    "version": "1.05.00",
+    "date": "2026-10-16",
+    "title": "RBAC v1 roles, the core/vault split, and record sealing",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Replaced the ten display-name roles with the RBAC v1 twelve-role model; rank now controls impersonation only, and only within a group, so a PnC Admin cannot become a Fin Ops to reach bank details."
+      },
+      {
+        "category": "Security",
+        "description": "Role grants defer to a single authority and use the caller's real role, so impersonating a Super Admin no longer grants like one; Platform Admin can never widen sight of sensitive data, for others or itself."
+      },
+      {
+        "category": "Security",
+        "description": "Fixed current_app_role, can_manage_forms and the enforce-owner trigger, which hardcoded the old role names — can_manage_forms guards ten RLS policies that would all have started denying."
+      },
+      {
+        "category": "Security",
+        "description": "Document numbers are stored in the vault; core keeps only the last four characters, and the full number is readable solely through a logged function that refuses Exec View."
+      },
+      {
+        "category": "Features",
+        "description": "Added the vault project schema, with an append-only access log, service-role-only RLS, and its own role table that refuses core-only roles."
+      },
+      {
+        "category": "Features",
+        "description": "Added sealing — verified documents and closed-cycle feedback move to the vault and leave a completion marker behind, with the database refusing to call a record sealed while the file or text is still in core."
+      },
+      {
+        "category": "Features",
+        "description": "Added withdrawal, which keeps the record so no confirmation trigger can fire for someone who never joined, and surfaces their unsealed documents as orphaned exposures."
+      },
+      {
+        "category": "Improvements",
+        "description": "The role picker and role switcher now offer only what the caller may actually grant or impersonate, instead of static lists the server silently refused."
+      },
+      {
+        "category": "Fixes",
+        "description": "Removed `email.includes(\"admin\")` as a privilege check in two places."
+      }
+    ]
+  },
+  {
     "version": "1.04.04",
     "date": "2026-10-16",
     "title": "Replicate NGConnect viewport architecture and loader centering behavior",
