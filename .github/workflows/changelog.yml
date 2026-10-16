@@ -1,0 +1,67 @@
+name: Changelog
+
+# Writes the release note on main, after a pull request lands.
+#
+# Branches do not touch src/lib/changelog.json at all. That is the point: two
+# branches both prepending an entry to the same file conflict every time, and
+# no amount of CI can resolve that after the fact. Only main writes, so there
+# is nothing to conflict over.
+#
+# Requires contents: write. If main is a protected branch, this workflow's
+# push will be rejected unless the app or a PAT is allowed to bypass the
+# protection — set that up, or the job will fail loudly rather than silently
+# skipping the note.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    # Only a merged PR produces a release note. A closed-without-merging PR
+    # changed nothing.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Work out the entry
+        id: entry
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: node .github/scripts/pr-to-changelog.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Add it
+        if: steps.entry.outputs.skip != 'true'
+        run: |
+          node scripts/changelog.mjs add \
+            --type "${{ steps.entry.outputs.type }}" \
+            --title "${{ steps.entry.outputs.title }}" \
+            ${{ steps.entry.outputs.changeArgs }}
+
+      - name: Commit
+        if: steps.entry.outputs.skip != 'true'
+        run: |
+          if git diff --quiet -- src/lib/changelog.json; then
+            echo "Changelog unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/changelog.json
+          git commit -m "chore(changelog): record $(node -p "require('./src/lib/changelog.json')[0].version") from #${{ github.event.pull_request.number }}"
+          git push origin main
