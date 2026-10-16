@@ -1,5 +1,5 @@
-import DashboardShellLoader from "@/components/dashboard-shell-loader";
+import LoadingView from "@/components/loading-view";
 
 export default function Loading() {
-  return <DashboardShellLoader />;
+  return <LoadingView />;
 }
