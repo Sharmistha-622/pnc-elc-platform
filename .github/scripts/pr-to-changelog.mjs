@@ -8,40 +8,41 @@
  * The bump comes from the conventional-commit prefix on the PR title, or from
  * a `release:major|minor|patch` label, which wins. The entries come from a
  * `## Changelog` section in the PR body when there is one, so the person who
- * wrote the change writes the note; otherwise the PR title is used, which is
- * at least honest about where it came from.
+ * wrote the change writes the note; otherwise the PR title is used.
+ *
+ * The functions are exported and tested: this script has twice been wrong in a
+ * way that only showed up on a live merge.
  */
 
-const CATEGORIES = ['Features', 'Improvements', 'Fixes', 'Security']
+export const CATEGORIES = ['Features', 'Improvements', 'Fixes', 'Security']
 
-const title = (process.env.PR_TITLE ?? '').trim()
-const body = process.env.PR_BODY ?? ''
-const labels = (process.env.PR_LABELS ?? '').split(',').map((l) => l.trim()).filter(Boolean)
-
-const out = []
-const set = (key, value) => out.push(`${key}=${value}`)
-
-/** A PR can opt out entirely — a docs typo does not need a release note. */
-if (labels.includes('no-changelog')) {
-  set('skip', 'true')
-  console.log(out.join('\n'))
-  process.exit(0)
+/**
+ * Remove HTML comments before reading anything out of the body.
+ *
+ * The pull request template explains the rules inside `<!-- -->`, and those
+ * instructions contain the words "BREAKING CHANGE" and example bullets. Left
+ * in, every PR raised from the template was detected as a major release.
+ */
+export function stripComments(body) {
+  return (body ?? '').replace(/<!--[\s\S]*?-->/g, '')
 }
 
-function bumpType() {
+export function bumpType({ title = '', body = '', labels = [] } = {}) {
   const labelled = labels.find((l) => l.startsWith('release:'))
   if (labelled) {
     const t = labelled.slice('release:'.length)
     if (['major', 'minor', 'patch'].includes(t)) return t
   }
+
+  const prose = stripComments(body)
   // `feat!:` or a BREAKING CHANGE footer means major.
-  if (/^[a-z]+(\([^)]*\))?!:/.test(title) || /BREAKING[ -]CHANGE/.test(body)) return 'major'
+  if (/^[a-z]+(\([^)]*\))?!:/.test(title) || /BREAKING[ -]CHANGE/.test(prose)) return 'major'
   if (/^feat(\([^)]*\))?:/.test(title)) return 'minor'
   return 'patch'
 }
 
 /** Strip the conventional-commit prefix for a human-readable title. */
-function cleanTitle() {
+export function cleanTitle(title = '') {
   const stripped = title.replace(/^[a-z]+(\([^)]*\))?!?:\s*/, '').trim()
   const text = stripped || title || 'Untitled change'
   return text.charAt(0).toUpperCase() + text.slice(1)
@@ -49,13 +50,13 @@ function cleanTitle() {
 
 /**
  * Bullets under a `## Changelog` heading, each `Category: description`.
- * Anything not matching a known category is skipped rather than guessed at.
+ *
+ * Not one regex: JavaScript has no \Z, so an "everything up to the next
+ * heading or the end" pattern silently matches nothing when the section runs
+ * to the end of the body — which is the common case.
  */
-function changesFromBody() {
-  // Deliberately not one regex: JavaScript has no \Z, so an "everything up to
-  // the next heading or the end" pattern silently matches nothing when the
-  // section runs to the end of the body — which is the common case.
-  const lines = body.split('\n')
+export function changesFromBody(body = '') {
+  const lines = stripComments(body).split('\n')
   const start = lines.findIndex((l) => /^##+\s*changelog\s*$/i.test(l.trim()))
   if (start === -1) return []
 
@@ -66,30 +67,56 @@ function changesFromBody() {
   return section
     .map((line) => /^\s*[-*]\s+(.*)$/.exec(line)?.[1]?.trim())
     .filter(Boolean)
-    .filter((line) => CATEGORIES.some((c) => line.toLowerCase().startsWith(c.toLowerCase() + ':')))
     .map((line) => {
       const idx = line.indexOf(':')
+      if (idx === -1) return null
       const category = CATEGORIES.find(
         (c) => c.toLowerCase() === line.slice(0, idx).trim().toLowerCase()
       )
-      return `${category}: ${line.slice(idx + 1).trim()}`
+      if (!category) return null
+      const description = line.slice(idx + 1).trim()
+      // An unfilled placeholder — the template ships `- Fixes:` for people to
+      // complete. Treating it as a real entry failed the whole run.
+      if (!description) return null
+      return `${category}: ${description}`
     })
-}
-
-const type = bumpType()
-const changes = changesFromBody()
-
-if (changes.length === 0) {
-  const category = type === 'patch' ? 'Fixes' : 'Features'
-  changes.push(`${category}: ${cleanTitle()}`)
+    .filter(Boolean)
 }
 
 /** Shell-quote for the `run:` step that passes these through. */
-const quote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`
+export function quote(s) {
+  return `'${String(s).replace(/'/g, `'\\''`)}'`
+}
 
-set('skip', 'false')
-set('type', type)
-set('title', cleanTitle().replace(/\n/g, ' '))
-set('changeArgs', changes.map((c) => `--change ${quote(c)}`).join(' '))
+export function buildOutputs({ title = '', body = '', labels = [] } = {}) {
+  if (labels.includes('no-changelog')) return { skip: 'true' }
 
-console.log(out.join('\n'))
+  const type = bumpType({ title, body, labels })
+  const changes = changesFromBody(body)
+
+  if (changes.length === 0) {
+    const category = type === 'patch' ? 'Fixes' : 'Features'
+    changes.push(`${category}: ${cleanTitle(title)}`)
+  }
+
+  return {
+    skip: 'false',
+    type,
+    title: cleanTitle(title).replace(/\n/g, ' '),
+    changeArgs: changes.map((c) => `--change ${quote(c)}`).join(' '),
+  }
+}
+
+// Only act when run as a script, so the functions above can be imported.
+if (process.env.PR_TITLE !== undefined || process.argv[1]?.endsWith('pr-to-changelog.mjs')) {
+  const outputs = buildOutputs({
+    title: (process.env.PR_TITLE ?? '').trim(),
+    body: process.env.PR_BODY ?? '',
+    labels: (process.env.PR_LABELS ?? '').split(',').map((l) => l.trim()).filter(Boolean),
+  })
+  console.log(
+    Object.entries(outputs)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n')
+  )
+}
