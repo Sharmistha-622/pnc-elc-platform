@@ -151,6 +151,14 @@ export interface OnboardingDocument {
   mime_type?: string | null;
   is_required?: boolean;
   sort_order?: number;
+  /** Where this document sits: staged in core, or sealed into the vault. */
+  seal_state?: 'staged' | 'sealing' | 'sealed' | 'seal_failed';
+  staged_at?: string;
+  sealed_at?: string | null;
+  seal_error?: string | null;
+  vault_document_id?: string | null;
+  /** Last four characters only; the full number lives in the vault. */
+  document_number_last4?: string | null;
   status: DocumentStatus;
   rejection_reason?: string;
   uploaded_at?: string | null;

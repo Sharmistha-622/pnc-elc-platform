@@ -9,6 +9,7 @@ import {
   updateProbationMilestone,
   updateProvisioningDetails,
   regenerateCandidateDocuments,
+  retrySealDocument,
 } from '@/lib/onboarding/service';
 
 export async function GET(
@@ -46,8 +47,12 @@ export async function PATCH(
         body.document_id,
         body.status,
         body.rejection_reason,
-        body.reviewer_name
+        body.reviewer_name,
+        // Passed through to the vault; core keeps only the last four digits.
+        body.document_number
       );
+    } else if (action === 'retry_seal') {
+      result = await retrySealDocument(id, body.document_id, body.reviewer_name);
     } else if (action === 'update_status') {
       result = await updateOnboardingStatus(id, body.status, body.note);
     } else if (action === 'provision_account') {

@@ -59,8 +59,9 @@ function, and the access log can be bypassed.
 ## 3. Deploy the functions
 
 ```bash
-supabase functions deploy read-salary --project-ref <ref>
-supabase functions deploy submit-documents --project-ref <ref>
+for fn in read-salary read-feedback submit-documents seal-document seal-feedback; do
+  supabase functions deploy "$fn" --project-ref <ref>
+done
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into the function
@@ -164,17 +165,21 @@ Built and tested:
 - The schema, with the invariants enforced in the database: one active bank
   account per person, one identity document per type, `access_log` immune to
   UPDATE and DELETE, and `vault_roles` refusing core-only roles.
-- `read-salary` — the pattern for a logged read.
-- `submit-documents` — the pattern for an insert-only submission that cannot
-  read back.
+- `read-salary`, `read-feedback` — logged reads. `read-feedback` is limited to
+  Super Admin and PnC Admin: Exec View sees outcomes, not what a colleague
+  wrote, and payroll has no business there at all.
+- `submit-documents` — an insert-only submission that cannot read back.
+- `seal-document`, `seal-feedback` — receive records from core when their
+  process finishes. Both idempotent on the core id, so a retry after a
+  half-finished move returns the same vault id rather than filing a duplicate.
+- `read_identity_number` — the only path to a full document number. Logs, and
+  refuses Exec View.
 
 Not built, and deliberately so — each is blocked on a decision in
 [`rbac.md`](./rbac.md):
 
 | Needed | Blocked on |
 |---|---|
-| `seal-document`, `seal-feedback` | nothing — next in line. Decisions #1 and #2 are settled; the schema on both sides is in place and `src/lib/vault/sealing.ts` holds the state machine |
-| `read-feedback` | nothing; only reads *sealed* feedback, since in-flight feedback is a core read |
 | `submit-bank`, `approve-bank` | nothing |
 | `payroll-export` | needs the Super Admin alert channel decided |
 | `sync-person` (core → vault, one way) | #3 — whether a candidate is a Supabase user at all |

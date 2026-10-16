@@ -10,8 +10,11 @@ therefore no path that skips the access log.
 
 | Function | What it does |
 |---|---|
-| `read-salary` | the pattern for a logged read: vault role required, logged before the data leaves |
-| `submit-documents` | the pattern for an insert-only submission: writes, never reads back |
+| `read-salary` | logged read: vault role required, logged before the data leaves |
+| `read-feedback` | logged read of *sealed* feedback only — in-flight feedback is still a core read |
+| `submit-documents` | insert-only submission: writes, never reads back |
+| `seal-document` | receives a verified document from core; idempotent on `core_document_id` |
+| `seal-feedback` | receives feedback when its cycle closes; idempotent on `core_feedback_id` |
 | `_shared/vault.ts` | role lookup and `logAccess`, which fails closed — a read that cannot be logged does not happen |
 
 See [`docs/vault-setup.md`](../../../docs/vault-setup.md).

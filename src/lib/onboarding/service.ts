@@ -31,6 +31,7 @@ import { renderLettersForRecord, storeGeneratedLetters } from './letter-generati
 import { sendInvitationEmail } from './invitation-email';
 import { CANDIDATE_BUCKET } from './candidate-storage';
 import { carryDocumentsToEmployee } from './document-handover';
+import { sealIdentityDocument } from '@/lib/vault/seal-service';
 import { DEFAULT_PREJOINING_POLICIES } from './default-policies';
 import { getCandidateDocumentRequirements } from './document-checklist';
 import { auditOnboarding, auditLetters } from '@/lib/audit/events';
@@ -772,7 +773,13 @@ export async function verifyOrRejectDocument(
   documentId: string,
   status: 'verified' | 'rejected',
   rejectionReason?: string,
-  reviewerName: string = 'P&C Reviewer'
+  reviewerName: string = 'P&C Reviewer',
+  /**
+   * The number PnC Ops read off the document. It is passed straight to the
+   * vault and never written to core, which keeps only the last four
+   * characters. Optional: a document can be verified without one.
+   */
+  documentNumber?: string | null
 ): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
@@ -809,7 +816,55 @@ export async function verifyOrRejectDocument(
     reason: status === 'rejected' ? rejectionReason : undefined,
   });
 
+  // Approval is what moves the document out of core. Doing it here rather than
+  // on a schedule means the staging window closes the moment a human says the
+  // document is good, which is the point of the whole arrangement.
+  if (status === 'verified') {
+    const outcome = await sealIdentityDocument(documentId, {
+      verifiedBy: reviewerName,
+      documentNumber,
+    });
+
+    if (outcome.ok && !outcome.skipped) {
+      await logActivity(
+        id,
+        'system',
+        'Document Secured in Vault',
+        `${doc.document_type} moved to the vault and removed from core` +
+          (outcome.numberLast4 ? `; number ending ${outcome.numberLast4} recorded.` : '.')
+      );
+    } else if (!outcome.ok) {
+      // The document is verified but still in core. Say so loudly: silence
+      // here is an exposure nobody is watching.
+      await logActivity(
+        id,
+        'system',
+        'Document Could Not Be Secured',
+        `${doc.document_type} is verified but still in core: ${outcome.error}. It will be retried.`,
+        { seal_error: outcome.error }
+      );
+    }
+  }
+
   return refreshProgress(id);
+}
+
+/** Retry a seal that failed, for the exposure list to act on. */
+export async function retrySealDocument(
+  id: string,
+  documentId: string,
+  reviewerName: string = 'P&C Reviewer'
+): Promise<FullOnboardingData | null> {
+  const outcome = await sealIdentityDocument(documentId, { verifiedBy: reviewerName });
+  await logActivity(
+    id,
+    'system',
+    outcome.ok ? 'Document Secured in Vault' : 'Document Could Not Be Secured',
+    outcome.ok
+      ? 'A previously failed seal completed; the document is out of core.'
+      : `Retry failed: ${'error' in outcome ? outcome.error : 'unknown'}`
+  );
+  return getOnboardingById(id);
 }
 
 export async function updateOnboardingStatus(
