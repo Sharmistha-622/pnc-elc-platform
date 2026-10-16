@@ -52,21 +52,51 @@ Two things are deliberately separate:
 `Edit` = read and write · `View` = read only · `Own` / `Own team` = scoped to
 self or reportees · `—` = no access.
 
+## Staged and vault-native
+
+Two resources are born in the vault and never touch core: **bank details**
+(submitted through a vault Edge Function) and **salary** (entered in the vault
+by PnC Admin).
+
+Two others are **staged** — they live in core while a process runs, then seal
+into the vault when it finishes:
+
+| Resource | Lives in core while | Seals on |
+|---|---|---|
+| `identity` | the document is awaiting verification | PnC Ops approves it |
+| `performance` | the confirmation or appraisal cycle is open | the cycle closes |
+
+This is what lets PnC Ops verify documents and a manager read their team's
+in-flight feedback **without either holding a vault login** — during the
+staging window the data is genuinely core data.
+
+The cost is real and was accepted deliberately: **while staged, the platform
+team can read it.** The staging window is the exposure; sealing is the control,
+not housekeeping. `exposed_records` lists everything still open, and
+`src/lib/vault/sealing.ts` sets the budgets — 14 days for a document, 30 for
+feedback.
+
+After sealing, core keeps only a residue: the fact, who did it, when, a pointer
+to the vault row, and for a document the **last four characters** of its
+number. The database refuses to mark a record sealed while the file or text is
+still in core.
+
 ## How a permitted read is served
 
-A cell on a vault-held resource is not automatically a vault read. "Decisions
-and statuses stay in core; written feedback, salary and increments stay in the
-vault", so `canReach()` reports the route as well as the verdict:
+A cell on a vault-held resource is not automatically a vault read, and for a
+staged resource the route changes once it is sealed. `canReach(role, resource,
+{ stage })` reports the route as well as the verdict:
 
 | Route | When | Logged |
 |---|---|---|
-| `core` | plain core data, and the `status only` / `outcomes` cells | only `+ logs` cells |
+| `core` | plain core data, anything still staged, and the `status only` / `outcomes` cells | only `+ logs` cells |
 | `vault_session` | org-wide sight of salary, bank or feedback | yes |
 | `logged_function` | own or own-team scope — a vault function reads on their behalf | yes |
 | `letter` | salary reaching the person as a document, never a screen | yes |
 
-This is why Manager has no vault login yet reads their team's feedback, and why
-PnC Ops can chase a pending submission without being able to read it.
+So a manager reads in-flight feedback straight from core, and the same feedback
+through a logged function once the cycle has closed. PnC Ops can chase a
+pending submission without ever being able to read it.
 
 ## Granting
 
@@ -101,19 +131,28 @@ and loses it when the last one goes. A granted role always outranks the
 lifecycle baseline — someone who is both an employee and a PnC Admin is a PnC
 Admin.
 
-## Open questions
+## Settled
+
+| # | Decision | Outcome | Date |
+|---|---|---|---|
+| 1 | Who verifies ID documents | **PnC Ops**, in core. The document is uploaded to core, verified there, and sealed into the vault on approval, leaving a completion marker and a masked number behind. PnC Ops therefore needs no vault login. | 2026-10-16 |
+| 2 | Where written feedback lives | **Core while the cycle is open, the vault once it closes.** Same mechanism as #1. `logged_function` is a real vault read, but only after sealing. | 2026-10-16 |
+
+Both were answered the same way, and became one mechanism — see
+`src/lib/vault/sealing.ts`.
+
+### Still open
 
 Carried from the source document, plus one found while encoding it. None of
-these blocks the role model; all of them block parts of the vault build.
+these blocks the role model; the remaining ones block parts of the vault build.
 
 | # | Question | Why it matters |
 |---|---|---|
-| 1 | **Who verifies ID documents?** The matrix gives PnC Ops edit rights on identity, but PnC Ops is core-only and ID documents live in the vault. Either PnC Admin verifies, or PnC Ops gets a vault login. | `identity` is the one resource the code marks as split rather than core or vault |
-| 2 | **Where written feedback lives** — in the vault behind a logged function for every manager, or decisions in core and text in the vault. | decides whether `logged_function` is a real Edge Function or a core read |
 | 3 | **Candidate access** — magic link, or a full account for the offer page and portal. | decides whether `candidate` is a Supabase user at all |
 | 4 | **Signing** — e-sign or upload, for the offer, agreement and Form 11. | |
 | 5 | **Account creation** — whether ELC creates Workspace and Slack accounts or only records who did. | |
-| 6 | **Withdrawn joiners** — keep or delete their uploaded documents, and for how long. | the record is kept; the documents are a separate decision |
+| 6 | **Withdrawn joiners** — keep or delete their uploaded documents, and for how long. | the record is kept; the documents are a separate decision. Sharper now: a withdrawn joiner's documents may never have been verified, so they are sitting *staged* in core |
+| 9 | **Who may read a full document number**, and whether capturing Aadhaar at all is wanted. Built as: last four in core for everyone who needs to identify it, full number in the vault behind `read_identity_number`, readable by Super Admin, PnC Admin, Fin Admin and Fin Ops. Exec View is refused. | an Aadhaar number is a key, not a label; UIDAI guidance expects masked display and restricts storage, so this is worth confirming with whoever owns compliance |
 | 7 | **Per-type rules** — document checklist, PF/EPF applicability and confirmation offset per employee type. | |
 | 8 | **Group count.** The summary says six groups; the matrix lists seven (Owner, PnC, Finance, Leadership, Platform, Line, Lifecycle). The code encodes seven. | cosmetic, but the two should agree |
 

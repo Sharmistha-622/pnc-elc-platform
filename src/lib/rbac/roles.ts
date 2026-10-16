@@ -331,17 +331,48 @@ export function isRoleCode(value: unknown): value is RoleCode {
  * without a vault login cannot reach them at all, whatever the matrix says —
  * see `canReach`.
  */
-export const VAULT_RESOURCES: Resource[] = ['bank', 'salary', 'performance']
+/**
+ * Resources that are born in the vault and never exist in core.
+ *
+ * A pre-joiner's bank details arrive through a vault Edge Function; a CTC is
+ * entered by PnC Admin in the vault. Neither ever touches core.
+ */
+export const VAULT_NATIVE_RESOURCES: Resource[] = ['bank', 'salary']
 
 /**
- * `identity` is split: a phone number is core, an ID document is vault. Which
- * side verification sits on is an open decision — the matrix gives PnC Ops edit
- * rights on identity while PnC Ops is core-only. Recorded in docs/rbac.md.
+ * Resources that live in core while a process is running, then seal into the
+ * vault when it finishes.
+ *
+ *   identity     an ID document is uploaded to core, verified there by PnC Ops,
+ *                and sealed into the vault on approval.
+ *   performance  feedback is collected in core while a confirmation or
+ *                appraisal cycle is live, and sealed when the cycle closes.
+ *
+ * This is what lets PnC Ops verify documents and a manager read their team's
+ * in-flight feedback without either holding a vault login: during the staging
+ * window the data is genuinely core data.
+ *
+ * The cost is real and deliberate: while staged, the platform team can read it.
+ * Sealing is what ends that, so an un-sealed record is an open exposure — see
+ * `src/lib/vault/sealing.ts`.
  */
-export const SPLIT_RESOURCES: Resource[] = ['identity']
+export const STAGED_RESOURCES: Resource[] = ['identity', 'performance']
 
-export function isVaultResource(resource: Resource): boolean {
-  return VAULT_RESOURCES.includes(resource)
+/** Where a staged resource currently sits. Vault-native resources ignore it. */
+export type ResourceStage = 'staging' | 'sealed'
+
+export function isVaultNative(resource: Resource): boolean {
+  return VAULT_NATIVE_RESOURCES.includes(resource)
+}
+
+export function isStaged(resource: Resource): boolean {
+  return STAGED_RESOURCES.includes(resource)
+}
+
+/** True when reaching this resource, at this stage, means reaching the vault. */
+export function isVaultResource(resource: Resource, stage: ResourceStage = 'staging'): boolean {
+  if (isVaultNative(resource)) return true
+  return isStaged(resource) && stage === 'sealed'
 }
 
 // ---------------------------------------------------------------------------
@@ -375,9 +406,9 @@ export type Reach =
 /**
  * Whether a role can actually reach a resource, and by what route.
  *
- * The route matters as much as the yes/no. "Decisions and statuses stay in
- * core; written feedback, salary and increments stay in the vault" — so a cell
- * on a vault resource is not automatically a vault read:
+ * The route matters as much as the yes/no, and for a staged resource it
+ * changes once the record is sealed. A cell on a vault-held resource is not
+ * automatically a vault read:
  *
  *   status_only / outcomes_only  the status or decision, which lives in core
  *   via_letters                  built in the vault, delivered as a document
@@ -387,16 +418,18 @@ export type Reach =
 export function canReach(
   role: RoleCode,
   resource: Resource,
-  session: { hasVaultSession: boolean } = { hasVaultSession: false }
+  session: { hasVaultSession?: boolean; stage?: ResourceStage } = {}
 ): Reach {
+  const { hasVaultSession = false, stage = 'staging' } = session
   const access = accessFor(role, resource)
   if (access.level === 'none') return { ok: false, reason: 'no_access' }
 
-  if (!isVaultResource(resource)) {
+  if (!isVaultResource(resource, stage)) {
     return { ok: true, access, via: 'core', logged: access.qualifier === 'with_logs' }
   }
 
-  // The core-side status or decision, not the sensitive text behind it.
+  // The core-side status or decision, not the sensitive text behind it. These
+  // stay readable after sealing: what was sealed is the text, not the fact.
   if (access.qualifier === 'status_only' || access.qualifier === 'outcomes_only') {
     return { ok: true, access, via: 'core', logged: false }
   }
@@ -413,7 +446,7 @@ export function canReach(
 
   // Org-wide sight of sensitive data requires a vault login, and a session.
   if (ROLES[role].login !== 'core+vault') return { ok: false, reason: 'no_access' }
-  if (!session.hasVaultSession) return { ok: false, reason: 'needs_vault_session' }
+  if (!hasVaultSession) return { ok: false, reason: 'needs_vault_session' }
   return { ok: true, access, via: 'vault_session', logged: true }
 }
 

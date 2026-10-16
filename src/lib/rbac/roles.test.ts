@@ -59,7 +59,7 @@ describe('the matrix', () => {
   })
 
   it('never lets a core-only role see anything sensitive', () => {
-    const sensitive = RESOURCES.filter(isVaultResource)
+    const sensitive = RESOURCES.filter((r) => isVaultResource(r, 'sealed'))
     for (const role of ALL_ROLES.filter((r) => r.login === 'core')) {
       for (const resource of sensitive) {
         const access = role.access[resource]
@@ -68,7 +68,7 @@ describe('the matrix', () => {
         // A core-side status or decision, own/own-team data read through a
         // logged vault function, and a letter are all legitimate. What a
         // core-only role must never have is org-wide sight of the text itself.
-        const reach = canReach(role.code, resource, { hasVaultSession: true })
+        const reach = canReach(role.code, resource, { hasVaultSession: true, stage: 'sealed' })
         if (!reach.ok) continue
         expect(reach.via, `${role.code}.${resource}`).not.toBe('vault_session')
       }
@@ -117,24 +117,73 @@ describe('canReach', () => {
     expect(canReach('pnc_ops', 'general')).toMatchObject({ ok: true, logged: false })
   })
 
-  it("serves a manager's own-team feedback through a logged function", () => {
-    // Manager has no vault login, yet reads their team's written feedback.
+  it("lets a manager read their team's in-flight feedback from core", () => {
+    // While the cycle runs the feedback is genuinely core data, which is what
+    // lets a manager — who has no vault login — read it at all.
     expect(ROLES.manager.login).toBe('core')
-    expect(canReach('manager', 'performance')).toMatchObject({
+    expect(canReach('manager', 'performance', { stage: 'staging' })).toMatchObject({
+      ok: true,
+      via: 'core',
+    })
+  })
+
+  it("routes a manager's sealed feedback through a logged function", () => {
+    // Once the cycle closes it moves to the vault, and every read is logged.
+    expect(canReach('manager', 'performance', { stage: 'sealed' })).toMatchObject({
       ok: true,
       via: 'logged_function',
       logged: true,
     })
   })
 
+  it('lets PnC Ops verify an ID document in core, and not after sealing', () => {
+    // The decision that unblocked this: PnC Ops verifies during staging, so it
+    // never needs a vault login. Sealing is what ends its access.
+    expect(ROLES.pnc_ops.login).toBe('core')
+    expect(canReach('pnc_ops', 'identity', { stage: 'staging' })).toMatchObject({
+      ok: true,
+      via: 'core',
+      access: { level: 'edit' },
+    })
+    expect(canReach('pnc_ops', 'identity', { stage: 'sealed' })).toEqual({
+      ok: false,
+      reason: 'no_access',
+    })
+  })
+
+  it('still requires a vault session for a sealed document, even for PnC Admin', () => {
+    expect(canReach('pnc_admin', 'identity', { stage: 'sealed' })).toEqual({
+      ok: false,
+      reason: 'needs_vault_session',
+    })
+    expect(
+      canReach('pnc_admin', 'identity', { stage: 'sealed', hasVaultSession: true })
+    ).toMatchObject({ ok: true, via: 'vault_session', logged: true })
+  })
+
+  it('treats bank and salary as vault-held at every stage', () => {
+    // Neither is ever staged: a pre-joiner's bank details arrive through a
+    // vault function, and a CTC is entered in the vault.
+    for (const stage of ['staging', 'sealed'] as const) {
+      expect(canReach('fin_ops', 'bank', { stage }), stage).toEqual({
+        ok: false,
+        reason: 'needs_vault_session',
+      })
+    }
+  })
+
   it('serves PnC Ops the feedback status from core, never the text', () => {
-    const reach = canReach('pnc_ops', 'performance')
+    const reach = canReach('pnc_ops', 'performance', { stage: 'sealed' })
     expect(reach).toMatchObject({ ok: true, via: 'core', logged: false })
     expect(accessFor('pnc_ops', 'performance').qualifier).toBe('status_only')
   })
 
-  it('serves Fin Admin the outcome from core, not the written feedback', () => {
-    expect(canReach('fin_admin', 'performance')).toMatchObject({ ok: true, via: 'core' })
+  it('serves Fin Admin the outcome from core, even after sealing', () => {
+    // What was sealed is the text; the decision stays a core fact.
+    expect(canReach('fin_admin', 'performance', { stage: 'sealed' })).toMatchObject({
+      ok: true,
+      via: 'core',
+    })
   })
 
   it('reaches an employee with their own salary only through a letter', () => {

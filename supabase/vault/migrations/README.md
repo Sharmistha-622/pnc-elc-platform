@@ -11,3 +11,4 @@ See [`docs/vault-setup.md`](../../../docs/vault-setup.md).
 | File | What |
 |---|---|
 | `0001_vault_schema.sql` | roles, people, compensation, bank details, identity documents, feedback, the append-only access log, break-glass log, private storage, and service-role-only RLS |
+| `0002_sealed_records.sql` | document numbers, provenance for records sealed from core, and `read_identity_number` — the only read path for a full number, which logs and refuses Exec View |

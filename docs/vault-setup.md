@@ -173,10 +173,35 @@ Not built, and deliberately so — each is blocked on a decision in
 
 | Needed | Blocked on |
 |---|---|
-| `read-feedback` | #2 — whether every manager reads through a logged vault function, or decisions live in core and only the text is here |
-| `submit-bank`, `approve-bank` | nothing; next in line after the above is settled |
-| `payroll-export` | nothing; needs the Super Admin alert channel decided |
+| `seal-document`, `seal-feedback` | nothing — next in line. Decisions #1 and #2 are settled; the schema on both sides is in place and `src/lib/vault/sealing.ts` holds the state machine |
+| `read-feedback` | nothing; only reads *sealed* feedback, since in-flight feedback is a core read |
+| `submit-bank`, `approve-bank` | nothing |
+| `payroll-export` | needs the Super Admin alert channel decided |
 | `sync-person` (core → vault, one way) | #3 — whether a candidate is a Supabase user at all |
+
+## Sealing, and the window it leaves open
+
+Decisions #1 and #2 settled the same way: ID documents and written feedback
+live in **core** while someone is working on them, and seal into the vault when
+that work finishes — a document on verification, feedback when its cycle
+closes.
+
+That is what lets PnC Ops verify documents without a vault login, and it is a
+good answer. It also means that, for the length of the staging window, a scan
+of someone's Aadhaar is sitting in core where the platform team can read it.
+
+So the thing to watch after go-live is not the vault, it is `exposed_records`
+in core:
+
+```sql
+select kind, label, seal_state, days_staged, overdue
+  from exposed_records
+ order by days_staged desc;
+```
+
+Every row is an open exposure. A row in `seal_failed` is worse than a row in
+`staged`: it means the move was attempted and did not happen, so nobody is
+waiting on it any more. Neither should sit there for weeks.
 
 ## The uncomfortable part
 
