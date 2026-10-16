@@ -1,5 +1,65 @@
 [
   {
+    "version": "1.04.04",
+    "date": "2026-10-16",
+    "title": "Replicate NGConnect viewport architecture and loader centering behavior",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Replicated NGConnect's layout container architecture (h-svh w-full flex flex-col overflow-hidden with flex-1 min-h-0 and SidebarInset overflow-y-auto), ensuring the header and sidenav remain fixed while the canvas adapts seamlessly."
+      },
+      {
+        "category": "Fixes",
+        "description": "Aligned LoadingView dimensions and animation timing directly with NGConnect, guaranteeing exact vertical and horizontal centering inside the remaining viewport canvas."
+      }
+    ]
+  },
+  {
+    "version": "1.04.03",
+    "date": "2026-10-16",
+    "title": "Fix Radix hydration mismatch and introduce persistent shell loader",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Resolved Radix UI ID hydration mismatch on SiteHeader and AppSidebar by removing dynamic ssr:false on HeaderUserMenu and synchronizing DevRoleToggle."
+      },
+      {
+        "category": "Fixes",
+        "description": "Implemented DashboardShellLoader in root loading.tsx so the Header and Sidenav are always visible from 0ms, keeping the loader active and perfectly centered within the remaining viewport canvas."
+      }
+    ]
+  },
+  {
+    "version": "1.04.02",
+    "date": "2026-10-16",
+    "title": "Center dashboard loader in remaining viewport space and prevent pre-shell blank screen",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Removed root loading.tsx which rendered a full blank screen before the header and sidenav mounted."
+      },
+      {
+        "category": "Improvements",
+        "description": "Properly centered the loader in the remaining viewport canvas (flex-1 and min-h-[calc(100vh-var(--header-height,3.5rem)-1px)]) ignoring the header and sidebar."
+      }
+    ]
+  },
+  {
+    "version": "1.04.01",
+    "date": "2026-10-16",
+    "title": "Claude/vitest and docs cleanup",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Claude/vitest and docs cleanup"
+      }
+    ]
+  },
+  {
     "version": "1.04.00",
     "date": "2026-10-16",
     "title": "Candidate-to-Employee Pipeline: Auth, Persistence, Documents, Letters and Annexure",

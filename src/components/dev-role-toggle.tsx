@@ -31,10 +31,14 @@ const ADMIN_ROLES = ["Super Admin", "Admin"];
 
 export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boolean; userRole?: string }) {
   const user = useUserContext();
-  const [activeOverride, setActiveOverride] = useState<string>("");
+  const initialOverride =
+    user?.isEmulating && user?.role && user?.role !== user?.originalRole
+      ? (user.role as string)
+      : "";
+  const [activeOverride, setActiveOverride] = useState<string>(initialOverride);
 
   useEffect(() => {
-    // Read the initial override cookie
+    // Read the override cookie on client if present
     const match = document.cookie.match(/dev-role-override=([^;]+)/);
     if (match) {
       setActiveOverride(decodeURIComponent(match[1]));
@@ -76,6 +80,7 @@ export function DevRoleToggle({ isSuperAdmin, userRole }: { isSuperAdmin?: boole
         <Button
           variant="ghost"
           size="sm"
+          suppressHydrationWarning
           className={`h-9 px-2.5 rounded-xl border flex items-center gap-1.5 transition-all duration-200 ${
             isMemberMode
               ? "border-emerald-300 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400"

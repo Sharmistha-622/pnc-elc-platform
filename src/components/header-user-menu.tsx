@@ -26,10 +26,10 @@ import { createClient } from "@/lib/supabase/client";
 export function HeaderUserMenu() {
     const router = useRouter();
     const user = useUserContext();
-    const supabase = createClient();
 
     const signOut = async () => {
         try {
+            const supabase = createClient();
             await supabase.auth.signOut();
         } catch {
             // Ignore signOut error
@@ -50,7 +50,7 @@ export function HeaderUserMenu() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-9 gap-2 px-2 rounded-md">
+                <Button variant="ghost" suppressHydrationWarning className="h-9 gap-2 px-2 rounded-md">
                     <Avatar className="h-7 w-7 rounded-md">
                         <AvatarImage src={userAvatar} alt={fullName} />
                         <AvatarFallback className="rounded-md text-xs">{initials}</AvatarFallback>

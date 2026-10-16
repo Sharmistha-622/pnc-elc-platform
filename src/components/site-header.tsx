@@ -14,13 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
-import dynamic from "next/dynamic"
 import { DevRoleToggle } from "@/components/dev-role-toggle"
-
-const HeaderUserMenu = dynamic(
-  () => import("@/components/header-user-menu").then((m) => ({ default: m.HeaderUserMenu })),
-  { ssr: false }
-)
+import { HeaderUserMenu } from "@/components/header-user-menu"
 
 export function SiteHeader({
   isSuperAdmin,
