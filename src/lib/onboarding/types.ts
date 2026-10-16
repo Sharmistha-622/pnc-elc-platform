@@ -68,6 +68,8 @@ export interface OnboardingRecord {
   is_alumni: boolean;
   role_responsibilities?: string;
   status: OnboardingStatus;
+  /** RBAC v1 lifecycle status; the role follows from it. */
+  joiner_status?: string;
   progress_percentage: number;
   invitation_token: string;
   invited_at?: string | null;

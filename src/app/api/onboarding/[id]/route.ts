@@ -10,6 +10,8 @@ import {
   updateProvisioningDetails,
   regenerateCandidateDocuments,
   retrySealDocument,
+  withdrawJoiner,
+  purgeWithdrawnDocuments,
 } from '@/lib/onboarding/service';
 
 export async function GET(
@@ -53,6 +55,13 @@ export async function PATCH(
       );
     } else if (action === 'retry_seal') {
       result = await retrySealDocument(id, body.document_id, body.reviewer_name);
+    } else if (action === 'withdraw') {
+      result = await withdrawJoiner(id, body.reason, body.actor_name);
+    } else if (action === 'purge_documents') {
+      // Deletes a withdrawn joiner's unsealed documents. Deliberately its own
+      // action: withdrawing is a workflow step, deleting someone's identity
+      // documents is a decision.
+      result = await purgeWithdrawnDocuments(id, body.reason, body.actor_name);
     } else if (action === 'update_status') {
       result = await updateOnboardingStatus(id, body.status, body.note);
     } else if (action === 'provision_account') {

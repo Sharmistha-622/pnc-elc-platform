@@ -213,3 +213,66 @@ export async function listExposedRecords() {
 }
 
 export { VaultUnavailable }
+
+// ---------------------------------------------------------------------------
+// Withdrawal
+// ---------------------------------------------------------------------------
+
+/**
+ * Delete a withdrawn joiner's staged documents from core.
+ *
+ * The awkward case sealing creates: sealing is triggered by verification, and
+ * nobody verifies the documents of someone who never joined, so they would sit
+ * in core forever with no event coming.
+ *
+ * This is **not** called automatically. Whether and when to purge is open
+ * decision #6; this is the mechanism, invoked by a person who has decided.
+ *
+ * The rows survive — the fact that a document was submitted and then purged is
+ * part of the record. Only the files go.
+ */
+export async function purgeStagedDocuments(
+  onboardingId: string,
+  options: { purgedBy: string; reason: string }
+): Promise<{ purged: number; errors: string[] }> {
+  const db = onboardingDb()
+  const summary = { purged: 0, errors: [] as string[] }
+
+  const { data: docs, error } = await db
+    .from('onboarding_documents')
+    .select('id, document_type, storage_reference, seal_state')
+    .eq('onboarding_id', onboardingId)
+    .neq('seal_state', 'sealed')
+    .not('storage_reference', 'is', null)
+    .is('purged_at', null)
+  assertOk(error, 'Failed to list documents to purge')
+
+  for (const doc of docs ?? []) {
+    try {
+      if (doc.storage_reference) {
+        const { error: removeError } = await db.storage
+          .from(CANDIDATE_BUCKET)
+          .remove([doc.storage_reference])
+        if (removeError) throw new Error(removeError.message)
+      }
+
+      const { error: updateError } = await db
+        .from('onboarding_documents')
+        .update({
+          storage_reference: null,
+          storage_bucket: null,
+          purged_at: new Date().toISOString(),
+          purged_by: options.purgedBy,
+          purge_reason: options.reason,
+        })
+        .eq('id', doc.id)
+      if (updateError) throw new Error(updateError.message)
+
+      summary.purged += 1
+    } catch (e) {
+      summary.errors.push(`${doc.document_type}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return summary
+}

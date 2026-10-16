@@ -31,7 +31,8 @@ import { renderLettersForRecord, storeGeneratedLetters } from './letter-generati
 import { sendInvitationEmail } from './invitation-email';
 import { CANDIDATE_BUCKET } from './candidate-storage';
 import { carryDocumentsToEmployee } from './document-handover';
-import { sealIdentityDocument } from '@/lib/vault/seal-service';
+import { sealIdentityDocument, purgeStagedDocuments } from '@/lib/vault/seal-service';
+import { roleForStatus, canTransition, type JoinerStatus } from '@/lib/rbac/lifecycle';
 import { DEFAULT_PREJOINING_POLICIES } from './default-policies';
 import { getCandidateDocumentRequirements } from './document-checklist';
 import { auditOnboarding, auditLetters } from '@/lib/audit/events';
@@ -847,6 +848,98 @@ export async function verifyOrRejectDocument(
   }
 
   return refreshProgress(id);
+}
+
+/**
+ * Withdraw a joiner: declined, offer pulled, or a Day 1 no-show.
+ *
+ * The record is kept, never deleted, so no confirmation trigger can fire for
+ * someone who never joined. Their role goes to none and scheduled steps stop.
+ *
+ * Their uploaded documents are deliberately NOT purged here. Nothing will ever
+ * seal them — there is no verification coming — so they show up in
+ * `exposed_records` as orphaned, and a person decides what happens to them.
+ * See open decision #6.
+ */
+export async function withdrawJoiner(
+  id: string,
+  reason: string,
+  actorName: string = 'P&C'
+): Promise<FullOnboardingData | null> {
+  const data = await getOnboardingById(id);
+  if (!data) return null;
+
+  const current = (data.record.joiner_status as JoinerStatus | undefined) ?? 'offer_pending';
+  if (current === 'withdrawn') return data;
+  if (!canTransition(current, 'withdrawn')) {
+    throw new Error(`Cannot withdraw from ${current}.`);
+  }
+
+  await touchRecord(id, { joiner_status: 'withdrawn' });
+
+  await logActivity(
+    id,
+    'pnc',
+    'Joiner Withdrawn',
+    `${data.record.candidate_name} was withdrawn: ${reason}. Scheduled steps stop and access is off.`,
+    { from_status: current, reason }
+  );
+
+  const stillStaged = data.documents.filter(
+    (d) => d.storage_reference && d.seal_state !== 'sealed'
+  );
+  if (stillStaged.length > 0) {
+    await logActivity(
+      id,
+      'system',
+      'Documents Left Unsealed',
+      `${stillStaged.length} document(s) remain in core with no verification coming. ` +
+        'They are listed as orphaned exposures until someone decides whether to keep them.'
+    );
+  }
+
+  await auditOnboarding.statusChanged({
+    subject: auditSubject(data.record),
+    entityId: id,
+    from: current,
+    to: 'withdrawn',
+    note: reason,
+    severity: 'notice',
+  });
+
+  return getOnboardingById(id);
+}
+
+/**
+ * Delete a withdrawn joiner's staged documents.
+ *
+ * Separate from withdrawal on purpose: withdrawing is a workflow step, and
+ * deleting someone's identity documents is a decision. The caller has made it.
+ */
+export async function purgeWithdrawnDocuments(
+  id: string,
+  reason: string,
+  actorName: string = 'P&C'
+): Promise<FullOnboardingData | null> {
+  const data = await getOnboardingById(id);
+  if (!data) return null;
+
+  if (data.record.joiner_status !== 'withdrawn') {
+    throw new Error('Only a withdrawn joiner\'s documents can be purged this way.');
+  }
+
+  const result = await purgeStagedDocuments(id, { purgedBy: actorName, reason });
+
+  await logActivity(
+    id,
+    'pnc',
+    'Staged Documents Purged',
+    `${result.purged} unsealed document(s) deleted from core: ${reason}.` +
+      (result.errors.length > 0 ? ` Failed: ${result.errors.join('; ')}` : ''),
+    { purged: result.purged, errors: result.errors }
+  );
+
+  return getOnboardingById(id);
 }
 
 /** Retry a seal that failed, for the exposure list to act on. */
