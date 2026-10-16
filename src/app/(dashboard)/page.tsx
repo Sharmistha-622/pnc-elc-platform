@@ -15,15 +15,22 @@ import {
 import Link from "next/link";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const supabase = await createServerSupabaseClient();
+  const [{ count: employeeCount }, { count: onboardingCount }] = await Promise.all([
+    supabase.from("employees").select("*", { count: "exact", head: true }),
+    supabase.from("onboarding_records").select("*", { count: "exact", head: true }),
+  ]);
+
   const coreModules = [
     {
       title: "Onboarding Hub",
       description: "Manage pre-joining candidate pipelines, document KYC, account provisioning, and Day-1 orientation.",
       href: "/onboarding",
       icon: Compass,
-      badge: "Hub & Journeys",
+      badge: onboardingCount !== null && onboardingCount !== undefined ? `${onboardingCount} In Pipeline` : "Hub & Journeys",
       gradient: "from-blue-500/10 via-indigo-500/5 to-transparent",
       iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white border-blue-500/20",
       badgeStyle: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/50",
@@ -47,7 +54,7 @@ export default function DashboardPage() {
       description: "Search, filter, and inspect comprehensive employee profiles, roles, designations, and status records.",
       href: "/employees",
       icon: Users,
-      badge: "Core Roster",
+      badge: employeeCount !== null && employeeCount !== undefined ? `${employeeCount} Team Members` : "Core Roster",
       gradient: "from-sky-500/10 via-blue-500/5 to-transparent",
       iconBg: "bg-sky-500/10 text-sky-700 dark:text-sky-400 group-hover:bg-sky-700 group-hover:text-white border-sky-500/20",
       badgeStyle: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900/50",

@@ -128,13 +128,27 @@ export const LoadingSpinner = ({
   );
 };
 
-const LoadingView = ({ fullScreen = true, className = "" }: { fullScreen?: boolean; className?: string }) => {
+const LoadingView = ({
+  fullScreen = true,
+  className = "",
+}: {
+  fullScreen?: boolean;
+  className?: string;
+}) => {
   return (
-    <div className={`flex ${fullScreen ? 'w-full h-full min-h-[500px]' : 'h-full min-h-[400px]'} items-center justify-center bg-background animate-in fade-in duration-500 ${className}`}>
+    <div
+      className={`flex flex-1 w-full ${
+        fullScreen
+          ? "h-full min-h-[calc(100svh-var(--header-height,3.5rem)-1px)]"
+          : "h-full min-h-[400px]"
+      } items-center justify-center bg-background animate-in fade-in duration-500 ${className}`}
+    >
       <div className="flex flex-col items-center gap-8">
         <LoadingSpinner size="md" />
         <div className="text-center space-y-2">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading...</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+            Loading...
+          </p>
         </div>
       </div>
     </div>

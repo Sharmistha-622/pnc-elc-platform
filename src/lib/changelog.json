@@ -1,5 +1,25 @@
 [
   {
+    "version": "1.05.01",
+    "date": "2026-10-16",
+    "title": "Fix pre-shell blank screen and align dashboard loader centering with NGConnect",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Removed root app/loading.tsx which intercepted layout rendering and caused a pre-shell blank screen with off-center loader before the header and sidebar could mount."
+      },
+      {
+        "category": "Improvements",
+        "description": "Made DashboardPage async with Supabase telemetry queries, enabling (dashboard)/loading.tsx to stream seamlessly inside SidebarInset with Header and Sidenav persistently visible, exactly matching NGConnect."
+      },
+      {
+        "category": "Fixes",
+        "description": "Updated LoadingView with flex-1 and min-h-[calc(100svh-var(--header-height,3.5rem)-1px)] to guarantee mathematically exact vertical and horizontal centering inside the remaining content canvas."
+      }
+    ]
+  },
+  {
     "version": "1.05.00",
     "date": "2026-10-16",
     "title": "RBAC v1 roles, the core/vault split, and record sealing",
