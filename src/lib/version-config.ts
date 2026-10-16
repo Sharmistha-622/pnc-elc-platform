@@ -26,10 +26,98 @@ export type VersionEntry = {
   changes: VersionChange[]
 }
 
-export const CURRENT_VERSION = '1.03.00'
+export const CURRENT_VERSION = '1.04.00'
 
 /** Newest first. Prepend new entries; never rewrite a released one. */
 export const VERSION_HISTORY: VersionEntry[] = [
+  {
+    version: '1.04.00',
+    date: '2026-10-16',
+    title: 'Candidate-to-Employee Pipeline: Auth, Persistence, Documents, Letters and Annexure',
+    type: 'minor',
+    changes: [
+      {
+        category: 'Security',
+        description:
+          'Added middleware.ts gating every route behind a verified Supabase session. getCurrentUserRole previously returned Super Admin whenever no user was signed in, and no middleware or layout redirect existed, so every dashboard route and server action was open to anonymous visitors.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Enforced canAccessRoute server-side for pages and API routes, matched longest-prefix so /manage/letter-templates, /manage/letters, /manage/signatories and /manage/onboarding stay with the onboarding feature rather than being gated as manage-users.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Candidate documents are stored in a private Supabase Storage bucket and served only through 10-minute signed URLs; employee document links now redirect through a route that signs a fresh URL per click.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Cron routes fail closed when CRON_SECRET is unset, instead of accepting the literal header "Bearer undefined".',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Onboarding now persists. The service kept state in a process-local Map and its only Supabase insert minted ids like onb-<timestamp> against a uuid column, so it always failed silently; a candidate could complete the entire portal and have nothing survive the request.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Removed the demo-seed fallback that made an empty onboarding table display five fabricated candidates.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Sending an invitation now actually emails the candidate. sendOnboardingInvitation flipped the status to invited and logged "invitation sent" without ever calling sendEmail. It now sends first and records second, and reports failures to P&C.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Candidate document upload collects a real file. The portal had no file input: handleMockUpload fabricated a filename and size per document type, so identity and bank proofs existed only as strings.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Provisioning creates the employees row. It previously logged "Employee Record Linked ... in the central NG workforce directory" and inserted nothing, so a completed onboarding produced no employee.',
+      },
+      {
+        category: 'Fixes',
+        description:
+          'Corrected an employee_profiles write that used columns the table does not have, and added part_time and fellow to the employee_type enum, which employee_types seeds but the enum lacked.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Salary annexure: salary_structures and salary_rules derive the Basic / HRA / Special Allowance / Gross / Employer PF / CTC breakdown per employee type, rendered as Annexure A in the letters, the candidate portal and the P&C review screen.',
+      },
+      {
+        category: 'Features',
+        description:
+          'One letter pipeline. Letters render from letter_templates into candidate_letters and are what the candidate signs; the hardcoded templates.ts offer and appointment letters were deleted. Adds employee agreement, acceptance letter and annexure document types, and persists the captured signature image and metadata, which previously had no columns.',
+      },
+      {
+        category: 'Features',
+        description:
+          'Verified candidate documents are carried to the employee record on provisioning, with a best-effort Drive copy, and personal details are carried into employee_profiles.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'The candidate document checklist is driven by document_types rather than five hardcoded strings, and adds photograph, professional references and previous experience/relieving letters.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Provisioning refuses while a required document is unverified, allocates sequential employee codes instead of random ones, and records credential delivery as pending because the application never stores an account password.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Portal submission is gated on what is outstanding and names the remaining items; record reads are batched one query per child table instead of one query per record.',
+      },
+    ],
+  },
   {
     version: '1.03.01',
     date: '2026-10-16',

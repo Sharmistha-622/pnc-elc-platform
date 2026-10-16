@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
@@ -9,6 +10,13 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 export function LoginForm() {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+
+  // Where the middleware turned the visitor away from, so sign-in returns them
+  // there instead of dumping everyone on the dashboard root. Only same-site
+  // paths are honoured, so `?next=https://evil.example` cannot redirect out.
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
   const handleGoogleLogin = async () => {
     setIsSocialLoading(true);
@@ -18,7 +26,7 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       });
       if (error) throw error;

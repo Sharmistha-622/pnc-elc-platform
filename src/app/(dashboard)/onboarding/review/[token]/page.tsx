@@ -31,7 +31,10 @@ import {
   Award,
   Globe,
   Radio,
+  Loader2,
+  IndianRupee,
 } from 'lucide-react';
+import { AnnexureTable } from '@/components/onboarding/annexure-table';
 import { PageBanner } from '@/components/shared/page-banner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +70,28 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
 
   // Document Preview Dialog State
   const [previewDoc, setPreviewDoc] = useState<{ title: string; html: string } | null>(null);
+
+  // Opening a candidate document fetches a short-lived signed URL rather than
+  // rendering a placeholder: the bucket is private, so identity and bank proofs
+  // are never reachable from a guessable address.
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null);
+
+  const openStoredDocument = async (documentId: string) => {
+    try {
+      setOpeningDocId(documentId);
+      const res = await fetch(`/api/onboarding/${data?.record.id}/documents/${documentId}/url`);
+      const json = await res.json();
+      if (json.success && json.url) {
+        window.open(json.url, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error(json.error || 'Could not open that document.');
+      }
+    } catch {
+      toast.error('Could not open that document.');
+    } finally {
+      setOpeningDocId(null);
+    }
+  };
 
   // Provisioning Dialog State
   const [provisionDialogOpen, setProvisionDialogOpen] = useState(false);
@@ -207,9 +232,13 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('Official account provisioned & employee record linked!');
+        toast.success('Official account provisioned and employee record created.');
         setProvisionDialogOpen(false);
         fetchData();
+      } else {
+        // Provisioning refuses while a required document is unverified, and the
+        // reason names which ones. Showing it is the whole point.
+        toast.error(json.error || 'Failed to provision account');
       }
     } catch (err) {
       toast.error('Failed to provision account');
@@ -226,7 +255,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
     );
   }
 
-  const { record, personalDetails, employmentDetails, documents, policies, generatedDocuments, activityLogs, provisioning } = data;
+  const { record, personalDetails, employmentDetails, documents, policies, generatedDocuments, activityLogs, provisioning, salaryStructure } = data;
 
   const offerDoc = generatedDocuments.find((d) => d.document_type === 'offer_letter');
   const apptDoc = generatedDocuments.find((d) => d.document_type === 'appointment_letter');
@@ -428,7 +457,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
               className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg px-3.5 py-2 text-xs font-semibold gap-1.5 transition-all text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
             >
               <Award className="size-3.5" />
-              <span>Offer & Appointment</span>
+              <span>Letters & Annexure</span>
             </TabsTrigger>
             <TabsTrigger
               value="review"
@@ -682,7 +711,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground mt-1">
                             {doc.file_name ? (
-                              <span className="font-mono">{doc.file_name} ({doc.file_size || '1 MB'})</span>
+                              <span className="font-mono">{doc.file_name}{doc.file_size ? ` (${doc.file_size})` : ''}</span>
                             ) : (
                               <span className="italic text-muted-foreground">Pending upload by candidate</span>
                             )}
@@ -700,27 +729,20 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
 
                       {/* Document Actions */}
                       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        {isUploaded && (
+                        {isUploaded && doc.storage_reference && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                              setPreviewDoc({
-                                title: doc.document_type,
-                                html: `<div class="p-8 text-center text-sm space-y-4">
-                                  <div class="size-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center font-bold">PDF</div>
-                                  <p class="font-bold text-base text-foreground">${doc.file_name}</p>
-                                  <p class="text-xs text-muted-foreground font-mono">Simulated document storage reference: secure-vault://onboarding/${record.id}/${doc.id}</p>
-                                  <div class="border border-dashed border-border p-6 rounded-xl bg-muted/10 text-xs text-muted-foreground">
-                                    [Official Document Content Preview Rendered for Verification Audit]
-                                  </div>
-                                </div>`,
-                              })
-                            }
+                            onClick={() => openStoredDocument(doc.id)}
+                            disabled={openingDocId === doc.id}
                             className="text-xs h-8 gap-1 rounded-lg"
                           >
-                            <Eye className="size-3.5" />
-                            <span>Preview</span>
+                            {openingDocId === doc.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Eye className="size-3.5" />
+                            )}
+                            <span>Open</span>
                           </Button>
                         )}
 
@@ -822,6 +844,35 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
 
         {/* TAB 6: Offer & Appointment Letters */}
         <TabsContent value="letters" className="space-y-6 animate-in fade-in duration-200">
+          {/* Annexure A — the salary split the letters quote. Derived from the
+              agreed CTC and stored, so the letters and the annexure can never
+              disagree about the same figure. */}
+          <Card className="rounded-xl border border-border bg-card shadow-xs">
+            <CardHeader className="pb-4 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <IndianRupee className="size-5 text-indigo-700 dark:text-indigo-300" />
+                <CardTitle className="text-base font-bold">Annexure A — Salary Breakdown</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Derived from the agreed CTC using the rule for this employee type.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-5">
+              {salaryStructure ? (
+                <AnnexureTable
+                  structure={salaryStructure}
+                  employeeName={record.candidate_name}
+                  designation={record.designation}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No salary structure yet. Add a compensation figure to the candidate record and
+                  regenerate the documents to produce the annexure.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Offer Letter Card */}
             <Card className="rounded-xl border border-border bg-card shadow-xs flex flex-col justify-between">

@@ -59,17 +59,41 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   manageUsers: ["Super Admin", "Admin"],
 };
 
+/**
+ * Route prefix to feature. Matched longest-prefix-first, so a specific entry
+ * always beats the general one it sits under.
+ *
+ * The letter and onboarding screens live under `/manage/` for navigation
+ * reasons but belong to the onboarding feature: P&C draft the offer letters,
+ * so gating them as "manage users" would lock out the people who use them.
+ */
 const ROUTE_FEATURE: [string, Feature][] = [
   ["/employees", "employees"],
+  // API routes carry the same feature gate as the screens they serve. Without
+  // these, an authenticated Viewer was blocked from /employees but could still
+  // read /api/employees directly.
+  ["/api/employees", "employees"],
+  ["/api/onboarding", "onboarding"],
+  ["/api/candidate-letters", "onboarding"],
+  ["/api/letter-templates", "onboarding"],
+  ["/api/audit", "dataManagement"],
   ["/confirmations", "confirmations"],
   ["/appraisals", "appraisals"],
   ["/data-management", "dataManagement"],
+  ["/onboarding", "onboarding"],
+  ["/manage/onboarding", "onboarding"],
+  ["/manage/letter-templates", "onboarding"],
+  ["/manage/letters", "onboarding"],
+  ["/manage/signatories", "onboarding"],
   ["/manage", "manageUsers"],
 ];
 
 export function canAccessRoute(role: UserRole | null | undefined, url: string): boolean {
-  const effective = role ?? DEFAULT_ROLE;
-  const match = ROUTE_FEATURE.find(([p]) => url === p || url.startsWith(p + "/"));
-  if (!match) return true;
-  return FEATURE_ACCESS[match[1]].includes(effective);
+  // No role means no session. Deny rather than falling back to a default,
+  // so an unauthenticated caller is never treated as an ordinary Employee.
+  if (!role) return false;
+  const matches = ROUTE_FEATURE.filter(([p]) => url === p || url.startsWith(p + "/"));
+  if (matches.length === 0) return true;
+  const [, feature] = matches.reduce((best, cur) => (cur[0].length > best[0].length ? cur : best));
+  return FEATURE_ACCESS[feature].includes(role);
 }

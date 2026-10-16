@@ -67,6 +67,13 @@ import {
 } from '@/lib/onboarding/compensation';
 import { TONES } from '@/lib/ui/tone';
 
+/** Which generated document a chosen template replaces. */
+const LETTER_TYPE_TO_DOCUMENT: Record<string, string> = {
+  'Offer Letter': 'offer_letter',
+  'Appointment Letter': 'appointment_letter',
+  'Acceptance Letter': 'acceptance_letter',
+};
+
 export default function CreateCandidateOnboardingPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +95,10 @@ export default function CreateCandidateOnboardingPage() {
     manager_name: '',
     buddy_name: '',
     location: 'Bangalore',
-    employee_type_name: 'Consultant',
+    // Both are set together by the employee-type select; the id is what the
+    // salary rule and the employee record are resolved from.
+    employee_type_name: '',
+    employee_type_id: null as string | null,
     joining_date: new Date().toISOString().split('T')[0],
     probation_period: '3 Months',
     notice_period: '1 Month',
@@ -132,7 +142,15 @@ export default function CreateCandidateOnboardingPage() {
     fetch('/api/employment-types?includeArchived=false')
       .then((res) => res.json())
       .then((json) => {
-        if (json.success && json.data) setEmploymentTypes(json.data);
+        if (!json.success || !json.data?.length) return;
+        setEmploymentTypes(json.data);
+        // Default to the first configured type rather than a hardcoded label
+        // that may not correspond to any row.
+        setFormData((prev) =>
+          prev.employee_type_id
+            ? prev
+            : { ...prev, employee_type_name: json.data[0].name, employee_type_id: json.data[0].id }
+        );
       })
       .catch(() => {});
 
@@ -226,16 +244,30 @@ export default function CreateCandidateOnboardingPage() {
       toast.error('Designation / Role title is required');
       return;
     }
+    if (!formData.employee_type_id) {
+      // The salary split and the employee record are both resolved from this,
+      // so creating without it would silently produce an FTE annexure.
+      toast.error('Select an employment type');
+      return;
+    }
 
     try {
       setSubmitting(true);
-      // 1. Create Onboarding Record
+      // The letter P&C edited here is passed with the record, so the candidate
+      // signs this text. It used to be written to `candidate_letters` after the
+      // fact and shown to nobody — the portal rendered its own hardcoded letter.
+      const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+      const customLetters =
+        isLetterCustomized && customizedLetterContent && selectedTemplate
+          ? { [LETTER_TYPE_TO_DOCUMENT[selectedTemplate.letter_type] ?? 'offer_letter']: customizedLetterContent }
+          : undefined;
+
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // `ctc` stays on the payload as the rendered string letters read from;
         // the amount and period travel alongside it as the source of truth.
-        body: JSON.stringify({ ...formData, ctc: compensationDisplay }),
+        body: JSON.stringify({ ...formData, ctc: compensationDisplay, custom_letters: customLetters }),
       });
 
       const json = await res.json();
@@ -243,46 +275,25 @@ export default function CreateCandidateOnboardingPage() {
         throw new Error(json.error || 'Failed to create onboarding record');
       }
 
-      const createdId = json.data.id;
+      const createdId = json.data.record.id;
 
-      // 2. Save Customized Candidate Letter if generated
-      const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
-      if (isLetterCustomized && customizedLetterContent && selectedTemplate) {
-        try {
-          await fetch('/api/candidate-letters', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              candidate_id: createdId,
-              candidate_name: formData.candidate_name,
-              candidate_email: formData.personal_email,
-              template_id: selectedTemplate.id,
-              template_name: selectedTemplate.name,
-              letter_type: selectedTemplate.letter_type,
-              addendum_type: selectedTemplate.addendum_type,
-              employee_type_name: formData.employee_type_name,
-              content: customizedLetterContent,
-            }),
-          });
-        } catch (e) {
-          console.error('Failed to save candidate letter', e);
-        }
-      }
-
-      // 3. Send Invitation if toggled
       if (formData.send_invite_immediately) {
-        try {
-          const sendRes = await fetch(`/api/onboarding/${createdId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'send_invitation' }),
-          });
-          const sendJson = await sendRes.json();
-          if (sendJson.success) {
-            toast.success(`Candidate created and invitation sent to ${formData.personal_email}`);
-          }
-        } catch (e) {
-          toast.warning('Candidate record created, but invitation email could not be dispatched.');
+        const sendRes = await fetch(`/api/onboarding/${createdId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'send_invitation' }),
+        });
+        const sendJson = await sendRes.json();
+        if (sendJson.success) {
+          toast.success(`Candidate created and invitation sent to ${formData.personal_email}`);
+        } else {
+          // The record exists and is still a draft. Saying so plainly matters:
+          // a silent failure here used to leave P&C believing the candidate had
+          // their link.
+          toast.error(
+            `Candidate created, but the invitation could not be sent: ${sendJson.error || 'unknown error'}. ` +
+              'Send it again from the candidate record.'
+          );
         }
       } else {
         toast.success('Candidate onboarding draft created successfully');
@@ -438,17 +449,25 @@ export default function CreateCandidateOnboardingPage() {
               </Label>
               <Select
                 value={formData.employee_type_name}
-                onValueChange={(val) => handleChange('employee_type_name', val)}
+                onValueChange={(val) => {
+                  // Store the id alongside the name. Without the id, every
+                  // candidate fell back to the default salary rule and was
+                  // recorded as an FTE at provisioning — so a consultant got an
+                  // FTE salary split.
+                  const picked = employmentTypes.find((t) => t.name === val);
+                  handleChange('employee_type_name', val);
+                  handleChange('employee_type_id', picked?.id ?? null);
+                }}
               >
                 <SelectTrigger className="h-9 text-xs rounded-lg">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Consultant">Consultant</SelectItem>
-                  <SelectItem value="Full-Time Employee (FTE)">Full-Time Employee (FTE)</SelectItem>
-                  <SelectItem value="Full-Time Consultant">Full-Time Consultant</SelectItem>
-                  <SelectItem value="Intern">Intern</SelectItem>
-                  <SelectItem value="Apprentice">Apprentice</SelectItem>
+                  {employmentTypes.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

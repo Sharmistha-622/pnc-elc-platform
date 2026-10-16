@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/sidebar"
 
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
 import type { UserRole } from "@/lib/role-constants"
@@ -21,6 +22,12 @@ export default async function DashboardLayout({
 
     const supabase = await createServerSupabaseClient()
     const { data: { user: authUser } } = await supabase.auth.getUser()
+
+    // Defence in depth. `middleware.ts` already turns anonymous traffic away,
+    // but the layout is the last gate before any dashboard page renders, and a
+    // matcher change should not silently expose the whole app.
+    if (!authUser) redirect("/login")
+
     const { role, originalRole, isEmulating } = await getCurrentUserRole()
 
     // Default base user details
@@ -72,21 +79,23 @@ export default async function DashboardLayout({
         }
     }
 
-    const effectiveRole: UserRole = role || (authUser ? "Employee" : "Super Admin")
+    const effectiveRole: UserRole = role || "Employee"
 
     const userData: User = {
-        id: authUser?.id || "admin-user-id",
+        id: authUser.id,
         name: profileName,
         email: profileEmail,
         avatar: profileAvatar,
         role: effectiveRole,
-        originalRole: originalRole || (authUser ? "Employee" : "Super Admin"),
+        originalRole: originalRole || "Employee",
         isEmulating: Boolean(isEmulating || rawDevUserOverride),
         team,
         employeeType,
     }
 
-    const isSuperAdmin = effectiveRole === "Super Admin" || (originalRole === "Super Admin") || profileEmail?.includes("admin") || profileEmail?.includes("nitin@navgurukul.org")
+    // Super Admin is decided by the role on the session, never by what the
+    // address happens to spell — "admin" appearing in an email is not a grant.
+    const isSuperAdmin = effectiveRole === "Super Admin" || originalRole === "Super Admin"
 
     return (
         <UserProvider user={userData}>
