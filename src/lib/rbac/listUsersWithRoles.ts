@@ -16,11 +16,13 @@ export type UserRow = {
 
 export async function listUsersWithRoles(): Promise<UserRow[]> {
   const admin = createAdminSupabaseClient()
+  let authUsers: UserRow[] = []
+
   if (admin) {
     try {
       const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
       if (!error && data && data.users.length > 0) {
-        return data.users.map((u) => ({
+        authUsers = data.users.map((u) => ({
           id: u.id,
           email: u.email ?? '',
           name: (u.user_metadata?.full_name as string) ?? (u.user_metadata?.name as string) ?? '',
@@ -39,7 +41,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
     }
   }
 
-  // Fallback for environments without SUPABASE_SERVICE_ROLE_KEY (e.g. local development)
+  // Fetch employees to enrich team info and incorporate directory roster
   try {
     const supabase = await createServerSupabaseClient()
     const { data: employees } = await supabase
@@ -47,7 +49,22 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
       .select('id, name, email, team, status, created_at')
       .order('name', { ascending: true })
 
-    const teamMembers: UserRow[] = [
+    const employeeMap = new Map<string, any>()
+    employees?.forEach((e: any) => {
+      if (e.email) employeeMap.set(e.email.toLowerCase(), e)
+    })
+
+    // Enrich auth users with team and profile info from employees table
+    authUsers.forEach((u) => {
+      const emp = employeeMap.get(u.email.toLowerCase())
+      if (emp) {
+        if (!u.team || u.team === 'None') u.team = emp.team || 'None'
+        if (!u.name && emp.name) u.name = emp.name
+      }
+    })
+
+    // Fixed default staff entries for development / seed
+    const defaultStaff: UserRow[] = [
       {
         id: 'usr-nitin',
         email: 'nitin@navgurukul.org',
@@ -66,8 +83,19 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
       },
     ]
 
+    const existingEmails = new Set(authUsers.map((u) => u.email.toLowerCase()))
+
+    // Merge default staff if not already in authUsers
+    defaultStaff.forEach((staff) => {
+      if (!existingEmails.has(staff.email.toLowerCase())) {
+        authUsers.push(staff)
+        existingEmails.add(staff.email.toLowerCase())
+      }
+    })
+
+    // Include directory employees who do not have an auth user yet
     const mappedEmployees: UserRow[] = (employees || [])
-      .filter((e: any) => e.email && !teamMembers.some((tm) => tm.email.toLowerCase() === e.email.toLowerCase()))
+      .filter((e: any) => e.email && !existingEmails.has(e.email.toLowerCase()))
       .map((e: any) => ({
         id: e.id,
         email: e.email,
@@ -78,9 +106,9 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
         created_at: e.created_at || null,
       }))
 
-    return [...teamMembers, ...mappedEmployees]
+    return [...authUsers, ...mappedEmployees]
   } catch (err) {
-    console.error('Error fetching fallback users:', err)
-    return []
+    console.error('Error fetching employees roster:', err)
+    return authUsers
   }
 }

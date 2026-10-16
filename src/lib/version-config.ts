@@ -119,6 +119,34 @@ export const VERSION_HISTORY: VersionEntry[] = [
     ],
   },
   {
+    version: '1.03.01',
+    date: '2026-10-16',
+    title: 'User Allocation Action Menu & Audit Trail',
+    type: 'patch',
+    changes: [
+      {
+        category: 'Features',
+        description:
+          'Replaced exposed raw inline table dropdowns with a secure 3-vertical-dots action menu containing "Edit Allocations" and "View Audit Trail".',
+      },
+      {
+        category: 'Features',
+        description:
+          'Implemented EditUserDialog modal for safe role and team/department allocation with live change preview and optional audit reasons.',
+      },
+      {
+        category: 'Security',
+        description:
+          'Added comprehensive audit logging for all user role and department modifications, recording exact field-level diffs, actor identity, target user, and timestamps in public.audit_log.',
+      },
+      {
+        category: 'Improvements',
+        description:
+          'Enriched user directory mapping to automatically synchronize employee teams with auth user metadata and display organizational rosters.',
+      },
+    ],
+  },
+  {
     version: '1.03.00',
     date: '2026-10-16',
     title: 'Unified Users & Roles and Immutable RBAC',
