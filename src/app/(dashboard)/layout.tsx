@@ -93,15 +93,11 @@ export default async function DashboardLayout({
         employeeType,
     }
 
-    // Super Admin is decided by the role on the session, never by what the
-    // address happens to spell — "admin" appearing in an email is not a grant.
-    const isSuperAdmin = effectiveRole === "super_admin" || originalRole === "super_admin"
-
     return (
         <UserProvider user={userData}>
                     <div className="[--header-height:calc(--spacing(14))] h-svh w-full flex flex-col overflow-hidden bg-background">
                         <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
-                            <SiteHeader isSuperAdmin={isSuperAdmin} userRole={effectiveRole} />
+                            <SiteHeader userRole={effectiveRole} />
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
                                 <AppSidebar userRole={effectiveRole} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
