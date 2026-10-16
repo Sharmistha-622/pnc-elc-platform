@@ -5,8 +5,19 @@ import { randomUUID } from 'crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole, IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
-import { ASSIGNABLE_ROLES, type UserRole } from '@/lib/role-constants'
+import { normalizeRole, type UserRole } from '@/lib/role-constants'
 import { recordAuditEvent } from '@/lib/audit/service'
+import { canGrantRole, isRoleCode } from '@/lib/rbac/roles'
+
+const GRANT_REFUSALS: Record<string, string> = {
+  role_is_automatic:
+    'That role is assigned by the joiner lifecycle or the reporting line and cannot be set by hand.',
+  only_super_admin_may_grant: 'Only a Super Admin can grant this role.',
+  platform_admin_may_grant_platform_ops_only:
+    'Platform Admin can grant Platform Ops only, and can never grant access to sensitive data.',
+  owner_role_is_not_grantable: 'The owner role cannot be granted in the app.',
+  cannot_change_own_role: "You can't change your own role.",
+}
 
 export interface UpdateAllocationsInput {
   targetUserId: string
@@ -37,40 +48,42 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   } = input
 
   const caller = await getCurrentUserRole()
-  const isSuper = caller.role === 'Super Admin'
-  if (!isSuper && caller.role !== 'Admin') {
-    return { success: false, error: 'Unauthorized: only Admins and Super Admins can update allocations' }
-  }
-
-  if (!ASSIGNABLE_ROLES.includes(newRole)) {
-    return { success: false, error: 'Invalid role selected' }
-  }
 
   const cleanTargetEmail = targetEmail.trim().toLowerCase()
   const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
 
-  // Guard: Root Super Admin role cannot be demoted or changed
-  if (isImmutable && newRole !== 'Super Admin') {
+  if (!isRoleCode(newRole)) {
+    return { success: false, error: 'Invalid role selected' }
+  }
+
+  // One authority decides who may grant what. The caller's real role is used,
+  // never an emulated one, so impersonating a Super Admin cannot grant like one.
+  const decision = canGrantRole(caller.originalRole, newRole, {
+    isSelf: cleanTargetEmail === caller.email?.toLowerCase(),
+  })
+  if (!decision.ok) {
+    return { success: false, error: GRANT_REFUSALS[decision.reason] ?? 'Not allowed' }
+  }
+
+  if (isImmutable && newRole !== 'super_admin') {
     return {
       success: false,
       error: `${targetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
     }
   }
 
-  // Guard: Only Super Admin can modify or assign Admin/Super Admin roles
-  const touchesAdmin =
-    newRole === 'Super Admin' ||
-    newRole === 'Admin' ||
-    currentRole === 'Super Admin' ||
-    currentRole === 'Admin'
-
-  if (touchesAdmin && !isSuper) {
-    return { success: false, error: 'Only a Super Admin can assign or alter administrative roles' }
+  // Removing a sensitive role is as restricted as granting one.
+  const existingRole = normalizeRole(currentRole)
+  if (existingRole) {
+    const overCurrent = canGrantRole(caller.originalRole, existingRole, {})
+    if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic') {
+      return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
+    }
   }
 
   const normalizedCurrentTeam = currentTeam || 'None'
   const normalizedNewTeam = newTeam || 'None'
-  const normalizedCurrentRole = currentRole || 'Employee'
+  const normalizedCurrentRole = normalizeRole(currentRole) ?? 'employee'
 
   const roleChanged = normalizedCurrentRole !== newRole
   const teamChanged = normalizedCurrentTeam !== normalizedNewTeam

@@ -31,14 +31,14 @@ interface AddUserDialogProps {
 export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialogProps) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<UserRole>("Member");
+  const [role, setRole] = useState<UserRole>("employee");
   const [team, setTeam] = useState<UserTeam>("None");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setEmail("");
     setFullName("");
-    setRole("Member");
+    setRole("employee");
     setTeam("None");
   };
 
@@ -145,7 +145,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
-                  <SelectItem value="Member" className="rounded-lg text-xs">Member</SelectItem>
+                  <SelectItem value="employee" className="rounded-lg text-xs">Member</SelectItem>
                   <SelectItem value="Viewer" className="rounded-lg text-xs">Viewer</SelectItem>
                   <SelectItem value="Operations" className="rounded-lg text-xs">Operations</SelectItem>
                   <SelectItem value="Program" className="rounded-lg text-xs">Program</SelectItem>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { UserRole, ASSIGNABLE_ROLES, ASSIGNABLE_TEAMS } from "@/lib/role-constants";
+import { UserRole, ASSIGNABLE_TEAMS, assignableRoles, roleLabel } from "@/lib/role-constants";
 import { updateUserAllocations } from "@/lib/rbac/updateUserAllocations";
 import {
   Dialog,
@@ -41,6 +41,12 @@ interface EditUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserUpdated?: (updated: UserRow) => void;
+  /**
+   * The signed-in user's own role. The picker offers only what they may
+   * actually grant, so a Platform Admin is never shown Super Admin and the
+   * lifecycle roles are never offered to anyone. The server re-checks.
+   */
+  callerRole?: UserRole | null;
 }
 
 export function EditUserDialog({
@@ -48,15 +54,17 @@ export function EditUserDialog({
   open,
   onOpenChange,
   onUserUpdated,
+  callerRole = null,
 }: EditUserDialogProps) {
-  const [role, setRole] = useState<UserRole>("Employee");
+  const roleOptions = assignableRoles(callerRole);
+  const [role, setRole] = useState<UserRole>("employee");
   const [team, setTeam] = useState<string>("None");
   const [reason, setReason] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setRole((user.role as UserRole) || "Employee");
+      setRole((user.role as UserRole) || "employee");
       setTeam(user.team || "None");
       setReason("");
     }
@@ -65,7 +73,7 @@ export function EditUserDialog({
   if (!user) return null;
 
   const isImmutable = user.email?.toLowerCase() === "nitin@navgurukul.org";
-  const initialRole = (user.role as UserRole) || "Employee";
+  const initialRole = (user.role as UserRole) || "employee";
   const initialTeam = user.team || "None";
 
   const roleChanged = role !== initialRole;
@@ -204,9 +212,9 @@ export function EditUserDialog({
                     <SelectValue placeholder="Select system role" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
-                    {ASSIGNABLE_ROLES.map((r) => (
+                    {roleOptions.map((r) => (
                       <SelectItem key={r} value={r} className="rounded-lg text-xs">
-                        {r}
+                        {roleLabel(r)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -276,11 +284,11 @@ export function EditUserDialog({
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">Role:</span>
                       <Badge variant="outline" className="rounded-lg text-[10px] px-1.5 py-0 h-4">
-                        {initialRole}
+                        {roleLabel(initialRole)}
                       </Badge>
                       <ArrowRight className="h-3 w-3 text-muted-foreground" />
                       <Badge className="bg-indigo-600 text-white rounded-lg text-[10px] px-1.5 py-0 h-4 font-semibold">
-                        {role}
+                        {roleLabel(role)}
                       </Badge>
                     </div>
                   )}

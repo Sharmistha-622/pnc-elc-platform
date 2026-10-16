@@ -1,6 +1,6 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { UserRole } from '@/lib/role-constants'
+import { normalizeRole, type UserRole } from '@/lib/role-constants'
 
 export type UserRow = {
   id: string
@@ -26,9 +26,11 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
           id: u.id,
           email: u.email ?? '',
           name: (u.user_metadata?.full_name as string) ?? (u.user_metadata?.name as string) ?? '',
+          // Roles stored before RBAC v1 are display names; normalize so the
+          // directory never shows a role the rest of the app cannot read.
           role: (u.email?.toLowerCase() === 'nitin@navgurukul.org')
-            ? ('Super Admin' as UserRole)
-            : ((u.app_metadata?.role as UserRole | undefined) ?? null),
+            ? ('super_admin' as UserRole)
+            : normalizeRole(u.app_metadata?.role),
           team: (u.user_metadata?.team as string) ?? null,
           status: u.confirmed_at ? 'active' : 'invited',
           created_at: u.created_at,
@@ -69,7 +71,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
         id: 'usr-nitin',
         email: 'nitin@navgurukul.org',
         name: 'Nitin Sudarshan',
-        role: 'Super Admin',
+        role: 'super_admin',
         team: "CEO's Office",
         status: 'active',
       },
@@ -77,7 +79,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
         id: 'usr-sharmistha',
         email: 'sharmisthamazumdar24@navgurukul.org',
         name: 'Sharmistha Mazumdar',
-        role: 'Admin',
+        role: 'platform_admin',
         team: 'PnC',
         status: 'active',
       },
@@ -100,7 +102,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
         id: e.id,
         email: e.email,
         name: e.name,
-        role: 'Employee' as UserRole,
+        role: 'employee' as UserRole,
         team: e.team || 'None',
         status: e.status || 'active',
         created_at: e.created_at || null,

@@ -10,7 +10,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
-import type { UserRole } from "@/lib/role-constants"
+import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
 
 export default async function DashboardLayout({
     children,
@@ -79,7 +79,7 @@ export default async function DashboardLayout({
         }
     }
 
-    const effectiveRole: UserRole = role || "Employee"
+    const effectiveRole: UserRole = role || DEFAULT_ROLE
 
     const userData: User = {
         id: authUser.id,
@@ -87,7 +87,7 @@ export default async function DashboardLayout({
         email: profileEmail,
         avatar: profileAvatar,
         role: effectiveRole,
-        originalRole: originalRole || "Employee",
+        originalRole: originalRole || DEFAULT_ROLE,
         isEmulating: Boolean(isEmulating || rawDevUserOverride),
         team,
         employeeType,
@@ -95,7 +95,7 @@ export default async function DashboardLayout({
 
     // Super Admin is decided by the role on the session, never by what the
     // address happens to spell — "admin" appearing in an email is not a grant.
-    const isSuperAdmin = effectiveRole === "Super Admin" || originalRole === "Super Admin"
+    const isSuperAdmin = effectiveRole === "super_admin" || originalRole === "super_admin"
 
     return (
         <UserProvider user={userData}>
