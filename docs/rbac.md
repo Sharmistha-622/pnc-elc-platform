@@ -42,8 +42,9 @@ Two things are deliberately separate:
 | Platform Ops `platform_ops` | 6 | core | View | — | — | — | — | View (+ logs) | Platform Admin |
 | **Line** | | | | | | | | | |
 | Manager `manager` | 5 | core | Own team view | — | — | — | Own team edit (+ logs) | — | Auto |
-| **Lifecycle** | | | | | | | | | |
+| **Employee** | | | | | | | | | |
 | Employee `employee` | 3 | core | Own edit | Own view | Own view | Own view (via letters) | Own view (outcomes) | — | Auto |
+| **Onboarding** | | | | | | | | | |
 | Pre-joiner `pre_joiner` | 2 | core | Own edit | Own edit (insert-only) | Own edit (insert-only) | Own view (via letters) | — | — | Auto |
 | Candidate `candidate` | 1 | core | Own view | — | — | Own view (via letters) | — | — | Auto |
 
