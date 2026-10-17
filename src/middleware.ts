@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createMiddlewareSupabaseClient } from '@/lib/supabase/middleware'
 import { resolveRole } from '@/lib/rbac/resolveRole'
-import { canAccessRoute } from '@/lib/role-constants'
+import { canAccessRoute, isPortalOnlyRole } from '@/lib/role-constants'
 
 /**
  * Routes reachable without a signed-in session.
@@ -37,6 +37,19 @@ function isPublic(pathname: string): boolean {
   return false
 }
 
+/**
+ * Where to send a signed-in user who may not open the path they asked for.
+ *
+ * A candidate or pre-joiner has no dashboard at all, so the usual `/?denied=`
+ * redirect would hand them a path they are also refused — and `/login` sends a
+ * signed-in user straight back to `/`. Either way round that is a loop, so
+ * they get the portal notice instead.
+ */
+function deniedRedirect(role: Parameters<typeof canAccessRoute>[0], pathname: string, url: string) {
+  if (isPortalOnlyRole(role)) return NextResponse.redirect(new URL('/portal-notice', url))
+  return NextResponse.redirect(new URL('/?denied=' + encodeURIComponent(pathname), url))
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
 
@@ -61,6 +74,10 @@ export async function middleware(request: NextRequest) {
     // re-check `canAccessRoute` for itself rather than trusting this one gate.
     response.headers.set('x-pathname', pathname)
 
+    // The notice page is the one dashboard-adjacent screen a portal-only role
+    // is meant to reach, and sending them there again from there would loop.
+    if (pathname === '/portal-notice') return response
+
     if (!canAccessRoute(role, pathname)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
@@ -68,7 +85,7 @@ export async function middleware(request: NextRequest) {
           { status: 403 }
         )
       }
-      return NextResponse.redirect(new URL('/?denied=' + encodeURIComponent(pathname), request.url))
+      return deniedRedirect(role, pathname, request.url)
     }
     return response
   }

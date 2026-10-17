@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { checkSettingsTableExists } from '@/lib/settings/service'
+import { canEditPlatformConfig } from '@/lib/settings/access'
 import { PageBanner } from '@/components/shared/page-banner'
 import {
   Globe,
@@ -17,6 +18,7 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   UserMinus,
+  Eye,
 } from 'lucide-react'
 
 const settingsTabs = [
@@ -32,9 +34,11 @@ const settingsTabs = [
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [tablesExist, setTablesExist] = useState<boolean | null>(null)
+  const [canEdit, setCanEdit] = useState<boolean | null>(null)
 
   useEffect(() => {
     checkSettingsTableExists().then((exists) => setTablesExist(exists))
+    canEditPlatformConfig().then((allowed) => setCanEdit(allowed))
   }, [])
 
   return (
@@ -45,6 +49,23 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         description="Configure organizational defaults, confirmation rules, appraisal cycles, peer feedback boundaries, and document workflows."
         icon={<SlidersHorizontal className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
       />
+
+      {/* PnC Admin reaches these screens to read the rules their own process
+          runs on, but the matrix gives them `config: view`. The server actions
+          refuse the write either way; this is so the refusal is not a
+          surprise. */}
+      {canEdit === false && (
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground animate-in fade-in">
+          <Eye className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden="true" />
+          <div className="space-y-1">
+            <span className="block text-sm font-bold text-foreground">View-only access</span>
+            <p>
+              You can read every platform setting here, but not change one. Ask a Platform
+              Admin to apply the configuration you need.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Migration Notice Banner if tables are not yet created in Supabase */}
       {tablesExist === false && (

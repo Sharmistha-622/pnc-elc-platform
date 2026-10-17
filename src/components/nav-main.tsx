@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronRight, type LucideIcon, Lock } from "lucide-react"
+import { ChevronRight, Lock } from "lucide-react"
 import * as React from "react"
 
 import {
@@ -12,7 +12,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -21,151 +20,163 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
+import type { NavItem, NavLeaf } from "@/lib/navigation/sidebar-nav"
 
-export type NavItem = {
-  title: string
-  url: string
-  icon?: LucideIcon
+export type { NavItem, NavLeaf }
+
+/**
+ * A rendered item, which is a `NavItem` plus the state the sidebar worked out
+ * for it: whether it is the current screen, and whether the current screen is
+ * one of its children.
+ */
+export type RenderedItem = NavItem & {
+  isActive?: boolean
+  /** The current screen is a child of this item, not this item itself. */
+  isOnPath?: boolean
+  disabled?: boolean
+  tooltipOverride?: string
+  items?: RenderedLeaf[]
+}
+
+export type RenderedLeaf = NavLeaf & {
   isActive?: boolean
   disabled?: boolean
   tooltipOverride?: string
-  items?: NavItem[]
 }
 
-function NavItem({ 
-  item, 
-  level = 0,
-  isOpen: controlledIsOpen,
-  onOpenChange: controlledOnOpenChange
-}: { 
-  item: NavItem, 
-  level?: number,
-  isOpen?: boolean,
-  onOpenChange?: (open: boolean) => void 
+function SubItem({ item }: { item: RenderedLeaf }) {
+  const { setOpenMobile, isMobile } = useSidebar()
+
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild={!item.disabled} isActive={item.isActive}>
+        {item.disabled ? (
+          <div className="flex items-center gap-2 opacity-50 grayscale">
+            <item.icon />
+            <span>{item.title}</span>
+            <Lock className="ml-auto h-3 w-3" />
+          </div>
+        ) : (
+          <Link
+            href={item.url}
+            onClick={() => {
+              if (isMobile) setOpenMobile(false)
+            }}
+          >
+            <item.icon />
+            <span>{item.title}</span>
+          </Link>
+        )}
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  )
+}
+
+function TopItem({
+  item,
+  isOpen,
+  onOpenChange,
+}: {
+  item: RenderedItem
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
   const hasSubItems = !!item.items?.length
-  
-  const [localIsOpen, setLocalIsOpen] = React.useState(!!item.isActive)
-
-  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : localIsOpen;
-  const setIsOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setLocalIsOpen;
 
   if (!hasSubItems) {
-    const Component = level === 0 ? SidebarMenuButton : SidebarMenuSubButton
-    const ItemWrapper = level === 0 ? SidebarMenuItem : SidebarMenuSubItem
-
     return (
-      <ItemWrapper key={item.title}>
-        <Component
+      <SidebarMenuItem>
+        <SidebarMenuButton
           asChild={!item.disabled}
           tooltip={item.tooltipOverride || item.title}
           isActive={item.isActive}
-          disabled={item.disabled}
-          className={item.disabled ? "opacity-50 cursor-not-allowed" : ""}
+          className={item.disabled ? "cursor-not-allowed opacity-50" : undefined}
         >
           {item.disabled ? (
             <div className="flex items-center gap-2 px-2 py-1.5 grayscale">
-              {item.icon && <item.icon />}
+              <item.icon />
               <span>{item.title}</span>
-              <div className="ml-auto">
-                <Lock className="w-3 h-3" />
-              </div>
+              <Lock className="ml-auto h-3 w-3" />
             </div>
           ) : (
-            <Link 
+            <Link
               href={item.url}
               onClick={() => {
                 if (isMobile) setOpenMobile(false)
               }}
             >
-              {item.icon && <item.icon />}
+              <item.icon />
               <span>{item.title}</span>
             </Link>
           )}
-        </Component>
-      </ItemWrapper>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     )
   }
 
-  if (level === 0) {
-    return (
-      <Collapsible
-        key={item.title}
-        asChild
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        className="group/collapsible"
-      >
-        <SidebarMenuItem>
-          <CollapsibleTrigger asChild>
-            <SidebarMenuButton tooltip={item.tooltipOverride || item.title} isActive={item.isActive}>
-              {item.icon && <item.icon />}
-              <span>{item.title}</span>
-              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-            </SidebarMenuButton>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <SidebarMenuSub>
-              {item.items?.map((subItem) => (
-                <NavItem key={subItem.title} item={subItem} level={level + 1} />
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        </SidebarMenuItem>
-      </Collapsible>
-    )
-  }
-
-  // Nested levels (e.g. level 1 submenu containing level 2 items)
   return (
-    <Collapsible
-      key={item.title}
-      asChild
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      className="group/collapsible-sub"
-    >
-      <SidebarMenuSubItem>
+    <Collapsible asChild open={isOpen} onOpenChange={onOpenChange} className="group/collapsible">
+      <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuSubButton isActive={item.isActive} className="justify-between">
+          <SidebarMenuButton
+            tooltip={item.tooltipOverride || item.title}
+            // A parent is never shown as the selected screen — one of its
+            // children is. Painting the active fill on both read as two
+            // separate selections; the lighter on-path treatment says "the
+            // thing you are looking at lives in here" without competing.
+            isActive={item.isActive}
+            className={cn(
+              !item.isActive && item.isOnPath && "font-medium text-sidebar-accent-foreground"
+            )}
+          >
+            <item.icon />
             <span>{item.title}</span>
-            <ChevronRight className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/collapsible-sub:rotate-90" />
-          </SidebarMenuSubButton>
+            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub className="ml-2 border-l pl-2 mt-1">
+          <SidebarMenuSub>
             {item.items?.map((subItem) => (
-              <NavItem key={subItem.title} item={subItem} level={level + 1} />
+              <SubItem key={subItem.title} item={subItem} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>
-      </SidebarMenuSubItem>
+      </SidebarMenuItem>
     </Collapsible>
   )
 }
 
+/**
+ * One section of the sidebar.
+ *
+ * Open/closed state is owned by the caller rather than by each item, so that
+ * only one parent stands open across the whole sidebar. Keeping it here would
+ * make it one-open-per-section, and with six sections that is a column long
+ * enough to scroll.
+ */
 export function NavMain({
   items,
   label,
+  openItem,
+  onOpenItemChange,
 }: {
-  items: NavItem[]
+  items: RenderedItem[]
   label?: string
+  openItem: string | null
+  onOpenItemChange: (title: string | null) => void
 }) {
-  const [openItem, setOpenItem] = React.useState<string | null>(
-    items.find((item) => item.isActive || item.items?.some(sub => sub.isActive))?.title || null
-  )
-
   return (
     <SidebarGroup>
       {label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
       <SidebarMenu>
         {items.map((item) => (
-          <NavItem 
-            key={item.title} 
-            item={item} 
+          <TopItem
+            key={item.title}
+            item={item}
             isOpen={openItem === item.title}
-            onOpenChange={(isOpen) => setOpenItem(isOpen ? item.title : null)}
+            onOpenChange={(open) => onOpenItemChange(open ? item.title : null)}
           />
         ))}
       </SidebarMenu>

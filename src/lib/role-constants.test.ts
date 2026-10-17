@@ -5,10 +5,18 @@ import {
   roleLabel,
   assignableRoles,
   canAccessRoute,
+  isPortalOnlyRole,
   FEATURE_ACCESS,
   DEFAULT_ROLE,
 } from './role-constants'
-import { ROLE_CODES, ROLES, isSensitiveRole, canReach, type RoleCode } from './rbac/roles'
+import {
+  ROLE_CODES,
+  ROLES,
+  isSensitiveRole,
+  canReach,
+  canWrite,
+  type RoleCode,
+} from './rbac/roles'
 
 describe('normalizeRole', () => {
   it('passes a v1 code through', () => {
@@ -108,12 +116,70 @@ describe('canAccessRoute', () => {
     }
   })
 
-  // The letter screens live under /manage but belong to onboarding; gating
-  // them as "manage users" would lock P&C out of their own offer letters.
-  it('keeps the letter screens with onboarding, not manage-users', () => {
+  // The letter screens live under /manage but are P&C's, not account
+  // administration; gating them as "manage users" would lock P&C out of their
+  // own offer letters.
+  it('keeps the letter screens out of manage-users', () => {
     expect(canAccessRoute('pnc_admin', '/manage/letter-templates')).toBe(true)
     expect(canAccessRoute('pnc_ops', '/manage/letters')).toBe(true)
     expect(canAccessRoute('pnc_admin', '/manage/users')).toBe(false)
+  })
+
+  // They used to be gated on `onboarding`, which lists `manager` — so every
+  // line manager could open the offer-letter editor and the signing
+  // authorities. Running the pipeline is not the same as drafting the letters.
+  it('keeps a manager out of the letter and signatory screens', () => {
+    expect(canAccessRoute('manager', '/onboarding')).toBe(true)
+    for (const url of ['/manage/letter-templates', '/manage/letters', '/manage/signatories']) {
+      expect(canAccessRoute('manager', url), url).toBe(false)
+    }
+  })
+
+  // Each of these was unmapped, so `canAccessRoute` fell through to "no match
+  // means allow" and handed them to every signed-in user. /offboarding was the
+  // sharp one: it loads every exit case in the organisation.
+  it('gates the screens that used to fall through to everyone', () => {
+    for (const url of ['/offboarding', '/reports', '/audit', '/my-team']) {
+      expect(canAccessRoute('employee', url), url).toBe(false)
+    }
+    expect(canAccessRoute('pnc_admin', '/offboarding')).toBe(true)
+    expect(canAccessRoute('exec_view', '/reports')).toBe(true)
+    expect(canAccessRoute('platform_ops', '/audit')).toBe(true)
+    expect(canAccessRoute('manager', '/my-team')).toBe(true)
+  })
+
+  // Every staff role is also somebody's employee.
+  it('gives every staff role its own profile and forms', () => {
+    for (const role of FEATURE_ACCESS.dashboard) {
+      expect(canAccessRoute(role, '/profile'), role).toBe(true)
+      expect(canAccessRoute(role, '/my-forms'), role).toBe(true)
+    }
+  })
+
+  // A nominated peer is usually an ordinary employee, so peer feedback cannot
+  // sit behind `confirmations`.
+  it('lets an ordinary employee open a peer feedback request', () => {
+    expect(canAccessRoute('employee', '/feedback/abc123')).toBe(true)
+    expect(canAccessRoute('employee', '/confirmations')).toBe(false)
+  })
+
+  it('opens platform settings to PnC Admin, who owns the rules in them', () => {
+    expect(canAccessRoute('pnc_admin', '/manage/settings/confirmation')).toBe(true)
+    expect(canAccessRoute('pnc_admin', '/manage/emails')).toBe(true)
+    // Reaching the screen is not editing it — `settings/access.ts` holds that
+    // line, from `config: view` in the matrix.
+    expect(canWrite('pnc_admin', 'config')).toBe(false)
+    expect(canWrite('platform_admin', 'config')).toBe(true)
+  })
+
+  it('refuses the dashboard itself to a portal-only role', () => {
+    for (const role of ['candidate', 'pre_joiner'] as RoleCode[]) {
+      expect(canAccessRoute(role, '/'), role).toBe(false)
+      expect(isPortalOnlyRole(role), role).toBe(true)
+    }
+    expect(canAccessRoute('employee', '/')).toBe(true)
+    expect(isPortalOnlyRole('employee')).toBe(false)
+    expect(isPortalOnlyRole(null)).toBe(false)
   })
 
   it('gates an API route the same as the screen it serves', () => {
@@ -124,8 +190,11 @@ describe('canAccessRoute', () => {
     }
   })
 
-  it('allows an unmapped route to any signed-in role', () => {
-    expect(canAccessRoute(DEFAULT_ROLE, '/profile')).toBe(true)
+  // This is the fail-open branch, and it is why every dashboard route has to
+  // appear in ROUTE_FEATURE. Kept as a test so the behaviour is deliberate
+  // rather than discovered again later.
+  it('still allows a route nobody has mapped', () => {
+    expect(canAccessRoute(DEFAULT_ROLE, '/some-screen-nobody-registered')).toBe(true)
   })
 })
 
