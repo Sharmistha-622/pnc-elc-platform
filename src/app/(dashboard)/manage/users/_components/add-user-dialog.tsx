@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { assignableRoles, roleLabel, UserRole, UserTeam } from "@/lib/role-constants";
+import { assignableRoles, roleLabel, UserRole } from "@/lib/role-constants";
+import type { Department } from "@/lib/departments/types";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ interface AddUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserAdded?: (user: any) => void;
+  departments?: Department[];
   /**
    * The signed-in user's own role. The picker offers only what they may
    * actually grant; the server checks again regardless.
@@ -33,15 +35,35 @@ interface AddUserDialogProps {
   callerRole?: UserRole | null;
 }
 
-export function AddUserDialog({ open, onOpenChange, onUserAdded, callerRole = null }: AddUserDialogProps) {
+export function AddUserDialog({
+  open,
+  onOpenChange,
+  onUserAdded,
+  departments = [],
+  callerRole = null,
+}: AddUserDialogProps) {
   // Lifecycle roles are absent on purpose: a candidate, pre-joiner or employee
   // is created by the joiner flow, never by someone picking from a list here.
   const roleOptions = assignableRoles(callerRole);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<UserRole>("employee");
-  const [team, setTeam] = useState<UserTeam>("None");
+  const [team, setTeam] = useState<string>("None");
+  const [deptList, setDeptList] = useState<Department[]>(departments);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      setDeptList(departments);
+    } else if (open) {
+      fetch("/api/departments?includeArchived=false")
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success && res.data) setDeptList(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [departments, open]);
 
   const resetForm = () => {
     setEmail("");
@@ -168,17 +190,19 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded, callerRole = nu
                 <Users className="h-3 w-3 text-muted-foreground" />
                 Assign Team
               </label>
-              <Select value={team} onValueChange={(val: UserTeam) => setTeam(val)} disabled={isSubmitting}>
+              <Select value={team} onValueChange={(val: string) => setTeam(val)} disabled={isSubmitting}>
                 <SelectTrigger id="new-team-select" className="w-full h-8 rounded-lg text-xs">
-                  <SelectValue placeholder="Select team" />
+                  <SelectValue placeholder="Select team / department" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
-                  <SelectItem value="None" className="rounded-lg text-xs">No Team</SelectItem>
-                  <SelectItem value="Engineering" className="rounded-lg text-xs">Engineering</SelectItem>
-                  <SelectItem value="PnC" className="rounded-lg text-xs">PnC</SelectItem>
-                  <SelectItem value="Operations" className="rounded-lg text-xs">Operations</SelectItem>
-                  <SelectItem value="Design" className="rounded-lg text-xs">Design</SelectItem>
-                  <SelectItem value="Finance" className="rounded-lg text-xs">Finance</SelectItem>
+                  <SelectItem value="None" className="rounded-lg text-xs">No Team / Department</SelectItem>
+                  {deptList
+                    .filter((d) => !d.is_archived && d.name?.trim())
+                    .map((d) => (
+                      <SelectItem key={d.id || d.name} value={d.name.trim()} className="rounded-lg text-xs">
+                        {d.name.trim()}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

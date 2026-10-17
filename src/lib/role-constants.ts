@@ -25,7 +25,7 @@ export type { RoleCode };
  */
 export type UserRole = RoleCode;
 
-export type UserTeam = "Engineering" | "Operations" | "Design" | "Finance" | "PnC" | "None";
+export type UserTeam = string;
 
 /** Display name for a role, from the single source of truth. */
 export function roleLabel(role: UserRole | null | undefined): string {
@@ -80,6 +80,10 @@ export function assignableRoles(actor: UserRole | null): UserRole[] {
   return grantableRoles(actor);
 }
 
+/**
+ * @deprecated Prefer dynamic departments from `/api/departments` or `getDepartments()`.
+ * Kept as static offline fallback.
+ */
 export const ASSIGNABLE_TEAMS = [
   "CEO's Office",
   "Engineering",

@@ -144,21 +144,35 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
     const supabase = await createServerSupabaseClient()
 
     let teamId: string | null = null
+    let departmentId: string | null = null
     if (normalizedNewTeam !== 'None') {
-      const { data: teamRecord } = await supabase
-        .from('teams')
-        .select('id')
-        .ilike('name', normalizedNewTeam.trim())
-        .maybeSingle()
-      if (teamRecord) teamId = teamRecord.id
+      try {
+        const { data: deptRecord } = await supabase
+          .from('departments')
+          .select('id')
+          .ilike('name', normalizedNewTeam.trim())
+          .maybeSingle()
+        if (deptRecord) departmentId = deptRecord.id
+      } catch {}
+
+      try {
+        const { data: teamRecord } = await supabase
+          .from('teams')
+          .select('id')
+          .ilike('name', normalizedNewTeam.trim())
+          .maybeSingle()
+        if (teamRecord) teamId = teamRecord.id
+      } catch {}
     }
 
     const cleanTeamValue = normalizedNewTeam === 'None' ? null : normalizedNewTeam
     const updatePayload: Record<string, any> = {
       team: cleanTeamValue,
+      department: cleanTeamValue,
       updated_at: new Date().toISOString(),
     }
     if (teamId) updatePayload.team_id = teamId
+    if (departmentId) updatePayload.department_id = departmentId
 
     await supabase
       .from('employees')
