@@ -41,6 +41,7 @@ import {
   MoreVertical,
   Edit3,
   History,
+  Compass,
 } from "lucide-react";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import {
@@ -53,9 +54,11 @@ import { AddUserDialog } from "./_components/add-user-dialog";
 import { EditUserDialog } from "./_components/edit-user-dialog";
 import { UserAuditDialog } from "./_components/user-audit-dialog";
 import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
+import type { Department } from "@/lib/departments/types";
 
 interface UsersRolesTableProps {
   initialUsers: UserRow[];
+  initialDepartments?: Department[];
   isConfigured?: boolean;
   /** The signed-in user's real role, used to scope the role picker. */
   callerRole?: UserRole | null;
@@ -70,7 +73,8 @@ const GROUP_ICONS: Record<RoleGroup, React.ElementType> = {
   leadership: Shield,
   platform: SlidersHorizontal,
   line: Briefcase,
-  lifecycle: User,
+  employee: User,
+  onboarding: Compass,
 };
 
 const GROUP_LABELS: Record<RoleGroup, string> = {
@@ -80,7 +84,8 @@ const GROUP_LABELS: Record<RoleGroup, string> = {
   leadership: "Leadership",
   platform: "Platform",
   line: "Line",
-  lifecycle: "Lifecycle",
+  employee: "Employee",
+  onboarding: "Onboarding",
 };
 
 const ROLE_TABS: { id: string; label: string; icon: React.ElementType }[] = [
@@ -94,10 +99,12 @@ const ROLE_TABS: { id: string; label: string; icon: React.ElementType }[] = [
 
 export function UsersRolesTable({
   initialUsers,
+  initialDepartments = [],
   isConfigured = true,
   callerRole = null,
 }: UsersRolesTableProps) {
   const [users, setUsers] = useState<UserRow[]>(initialUsers || []);
+  const [departments, setDepartments] = useState<Department[]>(initialDepartments);
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [teamFilter, setTeamFilter] = useState("ALL");
@@ -107,19 +114,35 @@ export function UsersRolesTable({
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [auditingUser, setAuditingUser] = useState<UserRow | null>(null);
 
-  // Extract unique teams from users list
+  React.useEffect(() => {
+    if (!initialDepartments || initialDepartments.length === 0) {
+      fetch("/api/departments?includeArchived=false")
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success && res.data) setDepartments(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [initialDepartments]);
+
+  // Extract unique departments & teams from master table + users list
   const availableTeams = useMemo(() => {
     const set = new Set<string>();
+    departments.forEach((d) => {
+      if (d.name && !d.is_archived && d.name.trim()) {
+        set.add(d.name.trim());
+      }
+    });
     users.forEach((u) => {
       if (u.team && u.team !== "None" && u.team.trim()) {
         set.add(u.team.trim());
       }
     });
     return Array.from(set).sort();
-  }, [users]);
+  }, [departments, users]);
 
-  // Tabs filter by group, so a user with no role still lands under Lifecycle
-  // alongside the employees they are indistinguishable from.
+  // Tabs filter by group, so a user with no role still lands under Employee
+  // alongside the staff members they are indistinguishable from.
   const userMatchesRoleTab = (user: UserRow, tabId: string): boolean => {
     if (tabId === "ALL") return true;
     const role = normalizeRole(user.role) ?? DEFAULT_ROLE;
@@ -530,6 +553,7 @@ export function UsersRolesTable({
       <EditUserDialog
         callerRole={callerRole}
         user={editingUser}
+        departments={departments}
         open={Boolean(editingUser)}
         onOpenChange={(open) => {
           if (!open) setEditingUser(null);
@@ -553,6 +577,7 @@ export function UsersRolesTable({
       {/* Add User Dialog */}
       <AddUserDialog
         callerRole={callerRole}
+        departments={departments}
         open={isAddUserOpen}
         onOpenChange={setIsAddUserOpen}
         onUserAdded={handleUserAdded}
