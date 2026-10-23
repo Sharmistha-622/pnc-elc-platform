@@ -54,9 +54,12 @@ export function cleanTitle(title = '') {
  * Not one regex: JavaScript has no \Z, so an "everything up to the next
  * heading or the end" pattern silently matches nothing when the section runs
  * to the end of the body — which is the common case.
+ *
+ * Split on CRLF too: a description edited in GitHub's web editor arrives with
+ * `\r\n`, and the stray `\r` stops the bullet pattern matching at all.
  */
 export function changesFromBody(body = '') {
-  const lines = stripComments(body).split('\n')
+  const lines = stripComments(body).split(/\r\n?|\n/)
   const start = lines.findIndex((l) => /^##+\s*changelog\s*$/i.test(l.trim()))
   if (start === -1) return []
 

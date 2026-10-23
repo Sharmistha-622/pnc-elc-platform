@@ -71,6 +71,12 @@ describe('changesFromBody', () => {
     expect(changesFromBody('## Changelog\n- Fixes: at the end.')).toEqual(['Fixes: at the end.'])
   })
 
+  // GitHub's web editor saves descriptions with CRLF line endings.
+  it('reads a body with CRLF line endings', () => {
+    const body = section('- Fixes: one thing.\n- Security: another.').replace(/\n/g, '\r\n')
+    expect(changesFromBody(body)).toEqual(['Fixes: one thing.', 'Security: another.'])
+  })
+
   it('stops at the next heading', () => {
     const body = '## Changelog\n- Fixes: kept.\n\n## Checks\n- Fixes: ignored.'
     expect(changesFromBody(body)).toEqual(['Fixes: kept.'])

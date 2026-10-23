@@ -19,6 +19,8 @@ on:
 
 permissions:
   contents: write
+  # For the failure comment at the end. Without it that step gets a 403.
+  pull-requests: write
 
 jobs:
   record:
@@ -47,10 +49,17 @@ jobs:
 
       - name: Add it
         if: steps.entry.outputs.skip != 'true'
+        # The title goes through the environment, not into the script text. A
+        # PR title is anyone's to write: interpolated, a quote truncates it, a
+        # backtick runs it, and this job holds a token that can push to main.
+        # changeArgs is already shell-quoted by pr-to-changelog.mjs.
+        env:
+          ENTRY_TYPE: ${{ steps.entry.outputs.type }}
+          ENTRY_TITLE: ${{ steps.entry.outputs.title }}
         run: |
           node scripts/changelog.mjs add \
-            --type "${{ steps.entry.outputs.type }}" \
-            --title "${{ steps.entry.outputs.title }}" \
+            --type "$ENTRY_TYPE" \
+            --title "$ENTRY_TITLE" \
             ${{ steps.entry.outputs.changeArgs }}
 
       - name: Commit
