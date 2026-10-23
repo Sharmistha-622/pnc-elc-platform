@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { auditOffboarding, auditAccess, auditLetters } from '@/lib/audit/events';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { platformConfigRefusal } from '@/lib/settings/access';
 import {
   ExitType,
   OffboardingStatus,
@@ -2220,6 +2221,12 @@ export async function getOffboardingSettings(): Promise<OffboardingSettings> {
 export async function updateOffboardingSettings(
   settings: Partial<OffboardingSettings>
 ): Promise<{ success: boolean; error?: string }> {
+  // This is the Offboarding tab of /manage/settings, which PnC Admin reaches
+  // read-only, so it answers to the same guard as the writes in
+  // settings/service.ts.
+  const refused = await platformConfigRefusal();
+  if (refused) return refused;
+
   MEMORY_SETTINGS = { ...MEMORY_SETTINGS, ...settings, updated_at: new Date().toISOString() };
 
   try {
