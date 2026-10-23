@@ -94,13 +94,54 @@ export const ASSIGNABLE_TEAMS = [
   "None",
 ] as const;
 
+
 export type Feature =
+  | "dashboard"
+  | "self"
+  | "myTeam"
   | "employees"
   | "onboarding"
+  | "letters"
   | "confirmations"
   | "appraisals"
+  | "offboarding"
+  | "reports"
   | "dataManagement"
+  | "platformConfig"
   | "manageUsers";
+
+/**
+ * Everyone who belongs in the signed-in shell at all.
+ *
+ * `candidate` and `pre_joiner` are deliberately absent from every list below.
+ * They reach the platform through the token portal at `/onboarding/[token]`,
+ * never the dashboard — `role-constants.test.ts` asserts that no feature ever
+ * names them, and `middleware.ts` sends them to `/portal-notice` if they
+ * arrive signed in.
+ */
+const STAFF: UserRole[] = [
+  "super_admin",
+  "pnc_admin",
+  "pnc_ops",
+  "fin_admin",
+  "fin_ops",
+  "exec_view",
+  "platform_admin",
+  "platform_ops",
+  "manager",
+  "employee",
+];
+
+/**
+ * Staff who can hold direct reports.
+ *
+ * Every staff role is also somebody's employee — a Platform Admin has a
+ * profile, a manager and a payslip like anyone else — so `self` is the whole
+ * of `STAFF`. Only `employee` drops out here: the reporting line grants
+ * `manager` automatically (`grantedBy: 'auto'`), so by the time someone has a
+ * team to look at they already hold the role that shows it.
+ */
+const STAFF_WITH_REPORTS: UserRole[] = STAFF.filter((r) => r !== "employee");
 
 /**
  * Which roles reach which feature.
@@ -111,12 +152,39 @@ export type Feature =
  * without seeing anyone's data.
  */
 export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
+  // The shell itself. Separating it from the screens inside is what lets a
+  // portal-only role be refused the dashboard without being refused a session.
+  dashboard: STAFF,
+  // Own profile, own assigned forms, the changelog. Scoped by the data layer
+  // (`getMyProfileData`, `getMyForms`), not by the route.
+  self: STAFF,
+  myTeam: STAFF_WITH_REPORTS,
   employees: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "fin_ops", "exec_view", "manager"],
   onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "manager"],
+  // Split out of `onboarding` deliberately. The letter, signatory and template
+  // screens were gated on it, and `onboarding` lists `manager` — so every line
+  // manager could open the offer-letter editor and the signing authorities.
+  // Drafting letters is P&C and Finance work; running the pipeline is not.
+  letters: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin"],
   confirmations: ["super_admin", "pnc_admin", "pnc_ops", "exec_view", "manager"],
   appraisals: ["super_admin", "pnc_admin", "fin_admin", "exec_view", "manager"],
+  // Fin Admin is here for full-and-final settlement. `manager` is NOT: the
+  // screen loads every case in the organisation (`getAllOffboardingCases`),
+  // with no team filter to scope it to their own reports.
+  offboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin"],
+  // Org-wide aggregates: full headcount, every manager decision, email
+  // delivery logs. Exec View is the role this screen exists for. PnC Ops is
+  // out because the confirmation rows carry decisions, and their access to
+  // performance is `status_only`.
+  reports: ["super_admin", "pnc_admin", "fin_admin", "exec_view"],
   // Templates and automation: the platform roles' job, and nothing sensitive.
   dataManagement: ["super_admin", "platform_admin", "platform_ops", "pnc_admin"],
+  // Confirmation windows, appraisal cycles and peer-feedback rules are P&C's
+  // own process, so PnC Admin reaches the screen. They reach it READ-ONLY:
+  // `ROLES.pnc_admin.access.config` is `view`, and the settings server actions
+  // enforce that with `canWrite(role, 'config')`. Route access is not edit
+  // access.
+  platformConfig: ["super_admin", "platform_admin", "pnc_admin"],
   // Granting roles is Super Admin's alone; Platform Admin reaches the screen
   // to manage core accounts, and `canGrantRole` still refuses it everything
   // but Platform Ops.
@@ -127,28 +195,66 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
  * Route prefix to feature. Matched longest-prefix-first, so a specific entry
  * always beats the general one it sits under.
  *
+ * Every dashboard route is named here. A route left out falls through to the
+ * "no match means allow" branch in `canAccessRoute`, which is how `/audit`,
+ * `/reports`, `/offboarding`, `/my-team`, `/my-forms` and `/profile` were
+ * reachable by every signed-in user, `candidate` included.
+ *
  * The letter and onboarding screens live under `/manage/` for navigation
- * reasons but belong to the onboarding feature: P&C draft the offer letters,
- * so gating them as "manage users" would lock out the people who use them.
+ * reasons but belong to the onboarding side of the house: P&C draft the offer
+ * letters, so gating them as "manage users" would lock out the people who use
+ * them.
  */
 const ROUTE_FEATURE: [string, Feature][] = [
+  // The shell. "/" matches only itself — every deeper path has a longer entry
+  // or none, so this never shadows anything.
+  ["/", "dashboard"],
+
+  // Self-scoped screens. Reachable by all staff; the query decides what is in
+  // them, not the gate.
+  ["/profile", "self"],
+  ["/my-forms", "self"],
+  ["/changelog", "self"],
+  // A nominated peer is usually an ordinary employee, so this cannot sit
+  // behind `confirmations`, which excludes them.
+  ["/feedback", "self"],
+
+  ["/my-team", "myTeam"],
+
   ["/employees", "employees"],
   // API routes carry the same feature gate as the screens they serve. Without
   // these, an authenticated Viewer was blocked from /employees but could still
   // read /api/employees directly.
   ["/api/employees", "employees"],
+
+  ["/onboarding", "onboarding"],
   ["/api/onboarding", "onboarding"],
-  ["/api/candidate-letters", "onboarding"],
-  ["/api/letter-templates", "onboarding"],
-  ["/api/audit", "dataManagement"],
+  ["/manage/onboarding", "onboarding"],
+
+  ["/manage/letter-templates", "letters"],
+  ["/manage/letters", "letters"],
+  ["/manage/signatories", "letters"],
+  ["/api/candidate-letters", "letters"],
+  ["/api/letter-templates", "letters"],
+
   ["/confirmations", "confirmations"],
   ["/appraisals", "appraisals"],
+  ["/offboarding", "offboarding"],
+  ["/reports", "reports"],
+
+  // The screen is gated the same as the API that feeds it.
+  ["/audit", "dataManagement"],
+  ["/api/audit", "dataManagement"],
   ["/data-management", "dataManagement"],
-  ["/onboarding", "onboarding"],
-  ["/manage/onboarding", "onboarding"],
-  ["/manage/letter-templates", "onboarding"],
-  ["/manage/letters", "onboarding"],
-  ["/manage/signatories", "onboarding"],
+  // A bare redirect to /data-management. Gated like its destination, or the
+  // old link would deny the very people who can follow it.
+  ["/manage/data-management", "dataManagement"],
+
+  ["/manage/settings", "platformConfig"],
+  ["/manage/emails", "platformConfig"],
+
+  // The shadcn component gallery. Not linked from the nav; platform-only.
+  ["/components", "manageUsers"],
   ["/manage", "manageUsers"],
 ];
 
@@ -160,4 +266,16 @@ export function canAccessRoute(role: UserRole | null | undefined, url: string): 
   if (matches.length === 0) return true;
   const [, feature] = matches.reduce((best, cur) => (cur[0].length > best[0].length ? cur : best));
   return FEATURE_ACCESS[feature].includes(role);
+}
+
+/**
+ * True when the role has no business in the signed-in shell at all.
+ *
+ * A candidate or pre-joiner can hold a Supabase session — they sign in to the
+ * token portal — so refusing them `/` is not enough on its own: the ordinary
+ * denial path redirects to `/`, which would loop. `middleware.ts` sends them
+ * to `/portal-notice` instead.
+ */
+export function isPortalOnlyRole(role: UserRole | null | undefined): boolean {
+  return !!role && !FEATURE_ACCESS.dashboard.includes(role);
 }

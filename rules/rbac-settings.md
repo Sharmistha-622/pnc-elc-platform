@@ -18,9 +18,12 @@ To register one:
 
 1. Open `src/lib/role-constants.ts`.
 2. Add the feature to the `Feature` union — e.g. `"onboarding"`.
-3. Add its entry to `FEATURE_ACCESS` listing every role allowed in:
-   `onboarding: ["Super Admin", "Admin", "PnC", "Manager"],`
+3. Add its entry to `FEATURE_ACCESS` listing every role code allowed in:
+   `onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "manager"],`
+   Role **codes**, not display names — `roleLabel()` turns a code into a label.
 4. Map its route prefix in `ROUTE_FEATURE`: `["/onboarding", "onboarding"],`
+   Map the API routes that serve it too, or the screen is gated and its data
+   is not.
 5. Gate the route group with a `layout.tsx` that awaits `requireFeature`:
 
    ```tsx
@@ -32,8 +35,56 @@ To register one:
    }
    ```
 
+6. Add it to the sidebar in `src/lib/navigation/sidebar-nav.ts` if it has a
+   screen. `visibleSections()` prunes against the same `canAccessRoute`, so a
+   registered feature needs no extra wiring in the component.
+
 Adding the feature to `Feature` without adding it to `FEATURE_ACCESS` is a type
 error, which is deliberate — the matrix cannot silently fall out of date.
+
+### Why an unregistered route is the dangerous case
+
+`canAccessRoute` returns `true` when no prefix matches. That is a deliberate
+fail-open for genuinely public-to-staff screens, and it is also how
+`/offboarding`, `/reports`, `/audit`, `/my-team`, `/my-forms` and `/profile`
+were reachable by every signed-in user, candidates included, until they were
+registered. `src/lib/navigation/sidebar-nav.test.ts` now fails if a nav item
+points at a route no feature claims.
+
+## Navigation
+
+The sidebar is data, not markup: `src/lib/navigation/sidebar-nav.ts` holds
+`NAV_SECTIONS`, and `src/components/app-sidebar.tsx` draws what
+`visibleSections(role)` returns.
+
+- **Two levels, never three.** `NavLeaf` has no `items`, so a sub-item cannot
+  carry children — a third level is a type error. Anything that wants more
+  depth belongs in in-page tabs, the way `/manage/settings` already does it.
+- **Pruning is bottom-up**: children, then items, then whole sections, so a
+  group whose every screen is out of reach takes its label and separator with
+  it rather than heading an empty space.
+- **Hiding a link is not access control.** `requireFeature` in each route
+  group's `layout.tsx` and the check in `middleware.ts` are what enforce it.
+
+## Portal-only roles
+
+`candidate` and `pre_joiner` appear in no `FEATURE_ACCESS` list at all. They
+reach the platform through the token portal at `/onboarding/[token]` and have
+no dashboard. Because they can still hold a session, the ordinary denial path
+(`redirect('/')`) would loop, so `middleware.ts` sends them to
+`/portal-notice` instead. `isPortalOnlyRole()` is the single test for this.
+
+## Route access is not write access
+
+`platformConfig` opens `/manage/settings` and `/manage/emails` to PnC Admin,
+whose own process the rules in them describe. The matrix gives that role
+`config: view`, and `src/lib/settings/access.ts` is where that holds: every
+write in `settings/service.ts` calls `assertCanEditPlatformConfig()` first.
+That file carries `'use server'`, so each exported write is a server action the
+browser can call directly — a read-only form is presentation, not a control.
+
+Emulation narrows, never widens: the guard requires both the effective and the
+original role to be able to write.
 
 ## How the engine works
 
@@ -44,8 +95,9 @@ error, which is deliberate — the matrix cannot silently fall out of date.
   `/` when the role is not in that feature's list.
 - `canAccessRoute(role, url)` in `src/lib/role-constants.ts` answers the same
   question for navigation, so the sidebar hides what the user cannot open.
-- **Fail-safe default:** a user with no role is treated as `DEFAULT_ROLE`
-  (`Employee`), which appears in no feature list by default.
+- **Fail-safe default:** an authenticated user with no role of their own is
+  treated as `DEFAULT_ROLE` (`employee`). An anonymous caller resolves to
+  `null`, which every check denies outright.
 - `ROLE_HIERARCHY` ranks roles numerically. It governs impersonation
   (`canImpersonate`) only — it is **not** a privilege ladder: a higher rank does
   not implicitly grant a lower-ranked role's features. Feature access is decided
@@ -56,7 +108,7 @@ error, which is deliberate — the matrix cannot silently fall out of date.
 - Roles are assigned at `/manage/roles` and `/manage/users`, which are
   themselves gated behind the `manageUsers` feature.
 - `setUserRole()` (`src/lib/rbac/setUserRole.ts`) enforces the rules that the UI
-  must not be trusted to enforce: only `Admin`/`Super Admin` may assign at all,
+  must not be trusted to enforce: only `platform_admin`/`super_admin` may assign at all,
   only a `Super Admin` may grant or modify an admin role, a user may never
   change their own role, and the role must appear in `ASSIGNABLE_ROLES`.
 - Writing a role uses the service-role client, so it is server-only — never

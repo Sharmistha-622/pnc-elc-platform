@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { assertCanEditPlatformConfig } from './access'
 import { sendEmail, pingEmailProvider, type EmailPingResult } from '@/lib/email/sendEmail'
 import {
   type GeneralSetting,
@@ -286,6 +287,7 @@ export { pingEmailProvider, type EmailPingResult }
 export async function resendEmailDeliveryLog(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  await assertCanEditPlatformConfig()
   try {
     const supabase = await createServerSupabaseClient()
     const { error } = await supabase
@@ -340,6 +342,7 @@ export async function updateEmailTemplate(
   updates: Partial<Pick<EmailTemplate, 'subject' | 'body_text' | 'is_active' | 'cadence'>>,
   changedBy: string = 'system'
 ): Promise<{ success: boolean; data?: EmailTemplate; error?: string }> {
+  await assertCanEditPlatformConfig()
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
@@ -428,6 +431,7 @@ export async function updateEmailProviderConfig(
   updates: Partial<EmailProviderConfig>,
   changedBy: string = 'system'
 ): Promise<{ success: boolean; data?: EmailProviderConfig; error?: string }> {
+  await assertCanEditPlatformConfig()
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
@@ -453,6 +457,7 @@ export async function sendTestEmailVerification(
   recipientEmail: string,
   provider: EmailProviderType
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  await assertCanEditPlatformConfig()
   try {
     const supabase = await createServerSupabaseClient()
     const newLogId = `log-test-${Date.now()}`
@@ -598,6 +603,7 @@ async function logSettingsChange(
 const READONLY_GENERAL_SETTINGS = ['organization_name', 'organization_email_domain']
 
 export async function updateGeneralSetting(key: string, value: string, changedBy: string = 'system') {
+  await assertCanEditPlatformConfig()
   if (READONLY_GENERAL_SETTINGS.includes(key)) {
     return { success: false, error: 'This organization setting is fixed and cannot be modified.' }
   }
@@ -635,6 +641,7 @@ export async function updateConfirmationRule(
   updates: Partial<Pick<ConfirmationRule, 'enabled' | 'trigger_basis' | 'offset_value' | 'offset_unit' | 'description'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -673,6 +680,7 @@ export async function updateAppraisalRule(
   updates: Partial<Pick<AppraisalRule, 'eligible' | 'reference_basis' | 'offset_value' | 'offset_unit' | 'description'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -711,6 +719,7 @@ export async function updateAppraisalCycle(
   updates: Partial<Pick<AppraisalCycle, 'display_name' | 'cycle_month' | 'cohort_start_month' | 'cohort_end_month' | 'is_active'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -748,6 +757,7 @@ export async function updatePeerFeedbackSettings(
   updates: Partial<Pick<PeerFeedbackSettings, 'minimum_peers' | 'maximum_peers' | 'default_peers' | 'red_flag_response_threshold'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const min = updates.minimum_peers
@@ -800,6 +810,7 @@ export async function updatePeerFeedbackSettings(
 }
 
 export async function addRedFlagKeyword(keyword: string, changedBy: string = 'system') {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
   const normalized = keyword.trim().toLowerCase()
   if (!normalized) return { success: false, error: 'Keyword cannot be empty' }
@@ -825,6 +836,7 @@ export async function addRedFlagKeyword(keyword: string, changedBy: string = 'sy
 }
 
 export async function toggleRedFlagKeyword(id: string, isActive: boolean, changedBy: string = 'system') {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -859,6 +871,7 @@ export async function toggleRedFlagKeyword(id: string, isActive: boolean, change
 }
 
 export async function deleteRedFlagKeyword(id: string, changedBy: string = 'system') {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -887,6 +900,7 @@ export async function updateNotificationSettings(
   updates: Partial<Omit<NotificationSettings, 'id' | 'updated_at'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -930,6 +944,7 @@ export async function updateDocumentType(
   updates: Partial<Pick<DocumentType, 'display_name' | 'is_required' | 'is_active' | 'sort_order'>>,
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   const { data: existing } = await supabase
@@ -967,6 +982,7 @@ export async function addDocumentType(
   docType: { name: string; display_name: string; destination: string; is_required: boolean },
   changedBy: string = 'system'
 ) {
+  await assertCanEditPlatformConfig()
   const supabase = await createServerSupabaseClient()
 
   if (!['team_member', 'verification_docs'].includes(docType.destination)) {
