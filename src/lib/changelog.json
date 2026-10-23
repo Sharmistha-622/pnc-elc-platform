@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.00.01",
+    "date": "2026-10-23",
+    "title": "Segment the sidenav into role-aware groups, and close the gates behin…",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Segment the sidenav into role-aware groups, and close the gates behin…"
+      }
+    ]
+  },
+  {
     "version": "2.00.00",
     "date": "2026-10-23",
     "title": "Stop the PR template breaking the changelog workflow",
