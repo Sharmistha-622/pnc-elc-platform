@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.00.03",
+    "date": "2026-10-23",
+    "title": "Finish the sidebar and settings gating from #46",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "PnC Admin now sees a view-only message when saving platform settings, instead of an error page."
+      },
+      {
+        "category": "Security",
+        "description": "The Offboarding settings tab no longer saves changes for PnC Admin, whose access to platform settings is view-only."
+      },
+      {
+        "category": "Fixes",
+        "description": "The portal notice lets a candidate sign out, and lets a Super Admin viewing as a candidate return to their own role, instead of sending both back to the same page."
+      },
+      {
+        "category": "Fixes",
+        "description": "A sidebar group no longer highlights alongside the screen selected inside it."
+      }
+    ]
+  },
+  {
     "version": "2.00.02",
     "date": "2026-10-23",
     "title": "Finish the sidebar and settings gating from #46",
