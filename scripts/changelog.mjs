@@ -156,16 +156,25 @@ function add() {
   console.log(version)
 }
 
-const command = process.argv[2]
-try {
-  if (command === 'check') check()
-  else if (command === 'add') add()
-  else if (command === 'next') console.log(bump(read()[0]?.version ?? '0.00.00', arg('type', 'patch')))
-  else {
-    console.error('Usage: changelog.mjs <check|next|add> [options]')
+/** The newest recorded version, which the next entry bumps from. */
+export function currentVersion() {
+  return read()[0]?.version ?? '0.00.00'
+}
+
+// Only act when run as a script, so `bump` and `currentVersion` can be
+// imported — the pull request check uses them to preview the next version.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const command = process.argv[2]
+  try {
+    if (command === 'check') check()
+    else if (command === 'add') add()
+    else if (command === 'next') console.log(bump(currentVersion(), arg('type', 'patch')))
+    else {
+      console.error('Usage: changelog.mjs <check|next|add> [options]')
+      process.exit(1)
+    }
+  } catch (err) {
+    console.error(err.message)
     process.exit(1)
   }
-} catch (err) {
-  console.error(err.message)
-  process.exit(1)
 }

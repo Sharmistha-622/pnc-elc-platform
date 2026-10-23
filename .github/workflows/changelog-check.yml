@@ -1,0 +1,94 @@
+name: Changelog check
+
+# Shows on every pull request into main, before anything merges, the exact
+# version and release note the Changelog workflow will record once it does,
+# and fails on the mistakes that have put wrong notes on main:
+#
+#   - a title with no conventional-commit type, or one GitHub cut off with "…"
+#     (#46 was named after a truncated commit subject, and filed as a fix);
+#   - a Changelog bullet in a category that does not exist, which the
+#     recorder would drop without a word;
+#   - an edit to src/lib/changelog.json, which only the recorder writes,
+#     unless the pull request is labelled `changelog-edit`.
+#
+# A major release is flagged without failing, so a 2.00.00 is a decision and
+# not a surprise. The note itself comes from the same script the recorder
+# runs, so the preview cannot drift from what main gets.
+#
+# Make "Changelog check / preview" a required status check on main. Until it
+# is, a red result here is advice: it cannot stop the merge button.
+
+on:
+  pull_request:
+    branches: [main]
+    # `edited` re-runs it when the title or description changes, and the
+    # labels change the bump or opt out of the note altogether.
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: changelog-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      # The default ref is this branch merged into main, so HEAD^1 is main and
+      # the version below is the one merging right now would produce.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Preview the release note
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if git diff --quiet HEAD^1 HEAD -- src/lib/changelog.json; then
+            export CHANGELOG_EDITED=false
+          else
+            export CHANGELOG_EDITED=true
+          fi
+          status=0
+          node .github/scripts/pr-to-changelog.mjs --check > preview.md || status=$?
+          cat preview.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      # One comment, edited in place on every run rather than a new one each
+      # time. A fork's token cannot write, so this is best-effort; the job
+      # summary and the check result carry the same thing either way.
+      - name: Post it on the pull request
+        if: always() && hashFiles('preview.md') != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const marker = '<!-- changelog-preview -->'
+            const body = fs.readFileSync('preview.md', 'utf8')
+            if (!body.startsWith(marker)) return
+
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            })
+            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.startsWith(marker))
+
+            if (!existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            } else if (existing.body !== body) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            }
