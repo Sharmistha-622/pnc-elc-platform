@@ -570,7 +570,7 @@ export function EmailsView({
         setTemplates((prev) =>
           prev.map((t) => (t.id === id ? { ...t, is_active: currentState } : t))
         )
-        toast.error('Failed to update template status')
+        toast.error(res.error || 'Failed to update template status')
         return
       }
       toast.success(`${actionName} is now ${nextState ? 'enabled' : 'paused'}`)

@@ -5,9 +5,11 @@ import { PageBanner } from "@/components/shared/page-banner";
 import { TrendingUp, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppraisalsClient } from "./appraisals-client";
+import { getCurrentUserRole } from "@/lib/rbac/getCurrentUserRole";
+import { canAccessRoute } from "@/lib/role-constants";
 
 export default async function AppraisalsPage() {
-  const entries = await getAppraisalCohortView();
+  const [entries, { role }] = await Promise.all([getAppraisalCohortView(), getCurrentUserRole()]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
@@ -16,7 +18,10 @@ export default async function AppraisalsPage() {
         title="Appraisal Cohorts"
         description="Bi-annual employee evaluation cohorts categorized by reference eligibility dates and review cycles."
         icon={<TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+        // The report lives in /reports, which a manager reaches /appraisals
+        // without being able to open.
         actions={
+          canAccessRoute(role, "/reports") && (
           <Link href="/reports?tab=appraisals">
             <Button
               size="sm"
@@ -26,6 +31,7 @@ export default async function AppraisalsPage() {
               Appraisal Report
             </Button>
           </Link>
+          )
         }
       />
 
