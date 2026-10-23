@@ -79,9 +79,15 @@ no dashboard. Because they can still hold a session, the ordinary denial path
 `platformConfig` opens `/manage/settings` and `/manage/emails` to PnC Admin,
 whose own process the rules in them describe. The matrix gives that role
 `config: view`, and `src/lib/settings/access.ts` is where that holds: every
-write in `settings/service.ts` calls `assertCanEditPlatformConfig()` first.
-That file carries `'use server'`, so each exported write is a server action the
+write in `settings/service.ts`, and `updateOffboardingSettings` behind the
+Offboarding tab, returns `platformConfigRefusal()` first when it is non-null.
+Those files carry `'use server'`, so each exported write is a server action the
 browser can call directly — a read-only form is presentation, not a control.
+A settings write added anywhere else needs the same two lines.
+
+The refusal is returned as `{ success: false, error }`, not thrown: the forms
+call these inside `startTransition`, where a throw reaches the error boundary
+and replaces the page.
 
 Emulation narrows, never widens: the guard requires both the effective and the
 original role to be able to write.

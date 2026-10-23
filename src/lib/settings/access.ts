@@ -22,16 +22,22 @@ export async function canEditPlatformConfig(): Promise<boolean> {
 }
 
 /**
- * Refuse a settings write the role is not entitled to make.
+ * The refusal for a settings write the role is not entitled to make, or null
+ * when it may go ahead.
  *
  * `settings/service.ts` carries `'use server'`, so every write in it is a
  * server action the browser can call directly. Rendering a form read-only is
  * presentation; this is the control.
+ *
+ * Returned rather than thrown. Every settings form already renders a
+ * `{ success: false, error }`, but they call these inside `startTransition`,
+ * and under React 19 a throw there goes to the error boundary — so a PnC Admin
+ * pressing Save got the application error page instead of this message.
  */
-export async function assertCanEditPlatformConfig(): Promise<void> {
-  if (!(await canEditPlatformConfig())) {
-    throw new Error(
-      'You have view-only access to platform settings. Ask a Platform Admin to make this change.'
-    )
+export async function platformConfigRefusal(): Promise<{ success: false; error: string } | null> {
+  if (await canEditPlatformConfig()) return null
+  return {
+    success: false,
+    error: 'You have view-only access to platform settings. Ask a Platform Admin to make this change.',
   }
 }
