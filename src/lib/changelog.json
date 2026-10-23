@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.00.00",
+    "date": "2026-10-23",
+    "title": "Stop the PR template breaking the changelog workflow",
+    "type": "major",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Stop the PR template breaking the changelog workflow"
+      }
+    ]
+  },
+  {
     "version": "1.05.03",
     "date": "2026-10-16",
     "title": "Render RBAC v1 roles on the Users & Roles screen",
