@@ -1,5 +1,25 @@
 [
   {
+    "version": "1.05.02",
+    "date": "2026-10-17",
+    "title": "Separate Employee & Onboarding role groups and sync dynamic departments",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Separated the base lifecycle roles into dedicated 'employee' (active staff) and 'onboarding' (pre-joiner & candidate) groups and tabs in User Management."
+      },
+      {
+        "category": "Improvements",
+        "description": "Replaced hardcoded ASSIGNABLE_TEAMS with dynamic departments fetched from the master departments table across Add User and Edit User modals."
+      },
+      {
+        "category": "Fixes",
+        "description": "Updated updateUserAllocations to query public.departments and sync both department and team columns on employees."
+      }
+    ]
+  },
+  {
     "version": "1.05.01",
     "date": "2026-10-16",
     "title": "Fix pre-shell blank screen and align dashboard loader centering with NGConnect",

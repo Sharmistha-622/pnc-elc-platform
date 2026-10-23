@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Renders the data-access matrix from the role definitions.
  *
@@ -29,7 +28,8 @@ const GROUP_LABELS = {
   leadership: 'Leadership',
   platform: 'Platform',
   line: 'Line',
-  lifecycle: 'Lifecycle',
+  employee: 'Employee',
+  onboarding: 'Onboarding',
 }
 
 const RESOURCE_LABELS = {
@@ -103,7 +103,7 @@ export function writeMatrix(table) {
 }
 
 export function readMatrixFromDoc() {
-  const doc = fs.readFileSync(DOC, 'utf8')
+  const doc = fs.readFileSync(DOC, 'utf8').replace(/\r\n/g, '\n')
   const start = doc.indexOf(START)
   const end = doc.indexOf(END)
   if (start === -1 || end === -1) throw new Error(`Markers missing from ${DOC}`)
