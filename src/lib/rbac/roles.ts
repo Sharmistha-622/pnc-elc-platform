@@ -42,7 +42,8 @@ export type RoleGroup =
   | 'leadership'
   | 'platform'
   | 'line'
-  | 'lifecycle'
+  | 'employee'
+  | 'onboarding'
 
 /** Where a role can sign in. The vault is a separate project with its own login. */
 export type LoginSurface = 'core' | 'core+vault'
@@ -263,7 +264,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
   employee: {
     code: 'employee',
     label: 'Employee',
-    group: 'lifecycle',
+    group: 'employee',
     rank: 3,
     login: 'core',
     grantedBy: 'auto',
@@ -281,7 +282,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
   pre_joiner: {
     code: 'pre_joiner',
     label: 'Pre-joiner',
-    group: 'lifecycle',
+    group: 'onboarding',
     rank: 2,
     login: 'core',
     grantedBy: 'auto',
@@ -299,7 +300,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
   candidate: {
     code: 'candidate',
     label: 'Candidate',
-    group: 'lifecycle',
+    group: 'onboarding',
     rank: 1,
     login: 'core',
     grantedBy: 'auto',

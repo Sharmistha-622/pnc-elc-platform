@@ -22,7 +22,8 @@ const GROUP_STYLES: Record<RoleGroup, string> = {
   leadership: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300',
   platform: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
   line: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
-  lifecycle: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300',
+  employee: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300',
+  onboarding: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
 };
 
 export function RoleBadge({

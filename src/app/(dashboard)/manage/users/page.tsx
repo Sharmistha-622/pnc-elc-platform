@@ -1,6 +1,7 @@
 import React from "react";
 import { requireFeature } from "@/lib/rbac/requireFeature";
 import { listUsersWithRoles } from "@/lib/rbac/listUsersWithRoles";
+import { getDepartments } from "@/lib/departments/service";
 import { UsersRolesTable } from "./users-roles-table";
 import { PageBanner } from "@/components/shared/page-banner";
 import { Users } from "lucide-react";
@@ -8,7 +9,10 @@ import { Users } from "lucide-react";
 export default async function ManageUsersPage() {
   const caller = await requireFeature("manageUsers");
   const isConfigured = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const users = await listUsersWithRoles();
+  const [users, departments] = await Promise.all([
+    listUsersWithRoles(),
+    getDepartments(false),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
@@ -20,6 +24,7 @@ export default async function ManageUsersPage() {
 
       <UsersRolesTable
         initialUsers={users}
+        initialDepartments={departments}
         isConfigured={isConfigured}
         callerRole={caller.originalRole}
       />

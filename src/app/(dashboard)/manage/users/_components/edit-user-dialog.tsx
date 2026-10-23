@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { UserRole, ASSIGNABLE_TEAMS, assignableRoles, roleLabel } from "@/lib/role-constants";
+import { UserRole, assignableRoles, roleLabel } from "@/lib/role-constants";
 import { updateUserAllocations } from "@/lib/rbac/updateUserAllocations";
 import {
   Dialog,
@@ -35,12 +35,14 @@ import {
   Save,
 } from "lucide-react";
 import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
+import type { Department } from "@/lib/departments/types";
 
 interface EditUserDialogProps {
   user: UserRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserUpdated?: (updated: UserRow) => void;
+  departments?: Department[];
   /**
    * The signed-in user's own role. The picker offers only what they may
    * actually grant, so a Platform Admin is never shown Super Admin and the
@@ -54,13 +56,28 @@ export function EditUserDialog({
   open,
   onOpenChange,
   onUserUpdated,
+  departments = [],
   callerRole = null,
 }: EditUserDialogProps) {
   const roleOptions = assignableRoles(callerRole);
   const [role, setRole] = useState<UserRole>("employee");
   const [team, setTeam] = useState<string>("None");
+  const [deptList, setDeptList] = useState<Department[]>(departments);
   const [reason, setReason] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      setDeptList(departments);
+    } else if (open) {
+      fetch("/api/departments?includeArchived=false")
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success && res.data) setDeptList(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [departments, open]);
 
   useEffect(() => {
     if (user) {
@@ -79,6 +96,17 @@ export function EditUserDialog({
   const roleChanged = role !== initialRole;
   const teamChanged = team !== initialTeam;
   const hasChanges = roleChanged || teamChanged;
+
+  const selectableTeams = React.useMemo(() => {
+    const names = new Set<string>();
+    deptList.forEach((d) => {
+      if (d.name && !d.is_archived && d.name.trim()) names.add(d.name.trim());
+    });
+    if (initialTeam && initialTeam !== "None" && initialTeam.trim()) {
+      names.add(initialTeam.trim());
+    }
+    return Array.from(names).sort();
+  }, [deptList, initialTeam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,9 +271,12 @@ export function EditUserDialog({
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
-                  {ASSIGNABLE_TEAMS.map((t) => (
+                  <SelectItem value="None" className="rounded-lg text-xs">
+                    None (Unassigned)
+                  </SelectItem>
+                  {selectableTeams.map((t) => (
                     <SelectItem key={t} value={t} className="rounded-lg text-xs">
-                      {t === "None" ? "None (Unassigned)" : t}
+                      {t}
                     </SelectItem>
                   ))}
                 </SelectContent>
