@@ -32,6 +32,8 @@ import {
   Check,
 } from 'lucide-react';
 import { PageBanner } from '@/components/shared/page-banner';
+import { useUserContext } from '@/contexts/user-context';
+import { canAccessRoute } from '@/lib/role-constants';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +94,8 @@ import { toast } from 'sonner';
 
 function EmployeeOnboardingContent() {
   const searchParams = useSearchParams();
+  // PnC Ops and managers run this screen but cannot open /audit.
+  const canOpenAudit = canAccessRoute(useUserContext()?.role, '/audit');
   const initialTab = searchParams.get('tab') || 'all';
 
   const [dataList, setDataList] = useState<FullOnboardingData[]>([]);
@@ -620,6 +624,7 @@ function EmployeeOnboardingContent() {
                                     </Link>
                                   </DropdownMenuItem>
 
+                                  {canOpenAudit && (
                                   <DropdownMenuItem asChild className="text-xs cursor-pointer">
                                     <Link
                                       href={`/audit?employee_email=${encodeURIComponent(r.personal_email)}`}
@@ -628,6 +633,7 @@ function EmployeeOnboardingContent() {
                                       <span>View Audit Trail</span>
                                     </Link>
                                   </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>

@@ -133,17 +133,6 @@ const STAFF: UserRole[] = [
 ];
 
 /**
- * Staff who can hold direct reports.
- *
- * Every staff role is also somebody's employee — a Platform Admin has a
- * profile, a manager and a payslip like anyone else — so `self` is the whole
- * of `STAFF`. Only `employee` drops out here: the reporting line grants
- * `manager` automatically (`grantedBy: 'auto'`), so by the time someone has a
- * team to look at they already hold the role that shows it.
- */
-const STAFF_WITH_REPORTS: UserRole[] = STAFF.filter((r) => r !== "employee");
-
-/**
  * Which roles reach which feature.
  *
  * Derived from the matrix rather than invented: PnC Ops runs the pipeline
@@ -158,7 +147,13 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // Own profile, own assigned forms, the changelog. Scoped by the data layer
   // (`getMyProfileData`, `getMyForms`), not by the route.
   self: STAFF,
-  myTeam: STAFF_WITH_REPORTS,
+  // All staff, `employee` included. `manager` is meant to follow from the
+  // reporting line, but nothing assigns it yet (`deriveRole` in
+  // rbac/lifecycle.ts is never called, and it cannot be granted by hand), so
+  // most line managers are stored as `employee`. The page lists only the
+  // viewer's own reportees (`getMyProfileData`), so someone with none sees an
+  // empty team, not anyone else's.
+  myTeam: STAFF,
   employees: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "fin_ops", "exec_view", "manager"],
   onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "manager"],
   // Split out of `onboarding` deliberately. The letter, signatory and template

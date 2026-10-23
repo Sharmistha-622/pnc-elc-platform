@@ -16,9 +16,12 @@ import Link from "next/link";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUserRole } from "@/lib/rbac/getCurrentUserRole";
+import { canAccessRoute, DEFAULT_ROLE } from "@/lib/role-constants";
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
+  const { role } = await getCurrentUserRole();
   const [{ count: employeeCount }, { count: onboardingCount }] = await Promise.all([
     supabase.from("employees").select("*", { count: "exact", head: true }),
     supabase.from("onboarding_records").select("*", { count: "exact", head: true }),
@@ -138,7 +141,9 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {coreModules.map((item) => {
+          {/* Only the workflows this role can open: a card for a refused
+              route just bounces back here with nothing said. */}
+          {coreModules.filter((item) => canAccessRoute(role ?? DEFAULT_ROLE, item.href)).map((item) => {
             const Icon = item.icon;
             return (
               <Link key={item.title} href={item.href} className="group block">
