@@ -1,5 +1,29 @@
 [
   {
+    "version": "1.05.03",
+    "date": "2026-10-16",
+    "title": "Render RBAC v1 roles on the Users & Roles screen",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "The Users & Roles screen rendered a generic badge for every user: getRoleBadge switched on the previous role names and typechecked only because its parameter was a plain string, so every case fell through after the codes changed."
+      },
+      {
+        "category": "Fixes",
+        "description": "auth/callback rewrote the immutable owner's role to the old display name on every sign-in, undoing the RBAC v1 migration for that account each time."
+      },
+      {
+        "category": "Security",
+        "description": "Bulk upload accepted any role string from a CSV; rows asking for a role the signed-in user could not grant by hand are now rejected, and it no longer claims to have created accounts it did not create."
+      },
+      {
+        "category": "Improvements",
+        "description": "Role labels and colours now come from the role definitions via a shared badge, which also marks the five roles that can sign in to the vault."
+      }
+    ]
+  },
+  {
     "version": "1.05.02",
     "date": "2026-10-17",
     "title": "Separate Employee & Onboarding role groups and sync dynamic departments",
