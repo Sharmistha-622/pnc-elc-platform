@@ -126,10 +126,9 @@ function TopItem({
             // children is. Painting the active fill on both read as two
             // separate selections; the lighter on-path treatment says "the
             // thing you are looking at lives in here" without competing.
-            isActive={item.isActive}
-            className={cn(
-              !item.isActive && item.isOnPath && "font-medium text-sidebar-accent-foreground"
-            )}
+            // `item.isActive` is true here whenever a child is (a parent's url
+            // prefixes its children's), so it must not reach `isActive`.
+            className={cn(item.isOnPath && "font-medium text-sidebar-accent-foreground")}
           >
             <item.icon />
             <span>{item.title}</span>

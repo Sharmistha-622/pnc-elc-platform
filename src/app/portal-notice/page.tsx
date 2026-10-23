@@ -1,9 +1,35 @@
-import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { MailCheck } from 'lucide-react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
-import { isPortalOnlyRole } from '@/lib/role-constants'
+import { isPortalOnlyRole, roleLabel } from '@/lib/role-constants'
+
+/**
+ * The way out for someone actually signed in as a candidate. A link to /login
+ * is not one: /login sends a signed-in visitor to `/`, and middleware sends
+ * them back here.
+ */
+async function signOut() {
+  'use server'
+  const supabase = await createServerSupabaseClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}
+
+/**
+ * The way out for a Super Admin viewing the app as a candidate. The role
+ * switcher lives in the dashboard header, which this role never sees, so
+ * without this the override cookie holds them here until it expires.
+ */
+async function stopEmulating() {
+  'use server'
+  ;(await cookies()).delete('dev-role-override')
+  redirect('/')
+}
+
+const buttonClass =
+  'inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted'
 
 /**
  * Where a candidate or pre-joiner lands if they reach the app outside their
@@ -25,7 +51,7 @@ export default async function PortalNoticePage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { role } = await getCurrentUserRole()
+  const { role, originalRole, isEmulating } = await getCurrentUserRole()
   if (!isPortalOnlyRole(role)) redirect('/')
 
   return (
@@ -48,12 +74,19 @@ export default async function PortalNoticePage() {
           </a>{' '}
           and we will send it again.
         </p>
-        <Link
-          href="/login"
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
-        >
-          Back to sign in
-        </Link>
+        {isEmulating ? (
+          <form action={stopEmulating}>
+            <button type="submit" className={buttonClass}>
+              Return to {roleLabel(originalRole)}
+            </button>
+          </form>
+        ) : (
+          <form action={signOut}>
+            <button type="submit" className={buttonClass}>
+              Sign out
+            </button>
+          </form>
+        )}
       </div>
     </main>
   )
