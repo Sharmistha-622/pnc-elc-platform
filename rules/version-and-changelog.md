@@ -37,20 +37,23 @@ such as developer tooling.
 
 From the PR title's conventional-commit prefix. The title must have one —
 `fix`, `feat`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`,
-`style` or `revert` — and the check fails without it:
+`style` or `revert` — and the check fails without it. The one exception is
+the `Revert "…"` title GitHub's Revert button gives, which records a patch:
 
 | Title | Bump |
 |---|---|
 | `feat: …` | minor |
-| `feat!: …`, or a line in the description beginning `BREAKING CHANGE:` | major |
+| `feat!: …`, or a `BREAKING CHANGE: …` footer in the description | major |
 | anything else (`fix:`, `chore:`, `docs:` …) | patch |
 
 A `release:major`, `release:minor` or `release:patch` label overrides it.
 
-The footer counts only at the start of a line, outside HTML comments and
-code blocks, as Conventional Commits defines it. Mentioning the words in a
-sentence does nothing; #44 did exactly that while explaining this bug, and
-released as 2.00.00.
+The footer counts only as a footer, the way Conventional Commits defines
+one: `BREAKING CHANGE: ` at the start of a paragraph or straight after
+another trailer, outside HTML comments and code. Mentioning the words in a
+sentence does nothing, even where a wrapped line happens to break before
+them; #44 did exactly that while explaining this bug, and released as
+2.00.00.
 
 ## Checked before merge
 
@@ -63,7 +66,10 @@ exact version and note merging would record. It fails when:
   (GitHub names a pull request after a long commit subject by cutting it off,
   which is how #46 recorded a truncated title filed as a fix);
 - a bullet under `## Changelog` does not start with a known category, which
-  the recorder would otherwise drop without a word;
+  the recorder would otherwise drop without a word. The section ends at the
+  next heading of any level, a rule, a `<details>` block, or a line that is
+  only bold text, so a "**Test plan**" list after it is not read as notes. A
+  bullet wrapped onto the next line is read whole;
 - `src/lib/changelog.json` is in the diff. To correct an existing entry on
   purpose, add the `changelog-edit` label (and usually `no-changelog`, since
   a correction needs no note of its own);
@@ -72,9 +78,32 @@ exact version and note merging would record. It fails when:
 A major release is called out without failing, so it is a decision rather
 than a surprise.
 
-**Make "Changelog check / preview" a required status check on `main`**
-(Settings → Branches). Until it is, a red check is advice: it cannot stop the
-merge button.
+It does not run on a closed pull request: the note was recorded at merge, so
+a preview built from a later edit would describe a note `main` does not have.
+To correct a recorded note, edit `changelog.json` in a pull request labelled
+`changelog-edit`.
+
+### Making the check required
+
+Until **Changelog preview** is a required status check on `main`, a red
+result is advice: it cannot stop the merge button. But required checks apply
+to direct pushes too, including the Changelog workflow's own push of the
+entry, which never carries this check — and `GITHUB_TOKEN` cannot bypass
+them. Require it with no way through and every merge ends in "No changelog
+entry was recorded".
+
+So set up one of these first:
+
+- **A ruleset with a GitHub App on its bypass list** (Settings → Rules →
+  Rulesets): require *Changelog preview* on `main`, add the app to the bypass
+  list, and in `changelog.yml` check out with a token minted by
+  `actions/create-github-app-token` instead of `secrets.GITHUB_TOKEN`.
+- **Classic branch protection, with admins allowed to bypass**: check out
+  with a secret holding the repository owner's token instead of
+  `secrets.GITHUB_TOKEN`.
+
+Classic protection has no bypass list for a repository owned by a user
+account, and deploy keys cannot be on a ruleset's bypass list on github.com.
 
 ## After merge
 

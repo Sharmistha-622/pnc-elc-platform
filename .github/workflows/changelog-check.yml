@@ -15,8 +15,12 @@ name: Changelog check
 # not a surprise. The note itself comes from the same script the recorder
 # runs, so the preview cannot drift from what main gets.
 #
-# Make "Changelog check / preview" a required status check on main. Until it
-# is, a red result here is advice: it cannot stop the merge button.
+# Until it is a required status check, a red result here is advice: it cannot
+# stop the merge button. But do not require it on main until the Changelog
+# workflow can get past it — see "Making the check required" in
+# rules/version-and-changelog.md. Required checks also apply to the
+# recorder's own push to main, which never carries this check, and
+# GITHUB_TOKEN cannot bypass them, so every merge would stop recording.
 
 on:
   pull_request:
@@ -35,6 +39,13 @@ concurrency:
 
 jobs:
   preview:
+    # The context to pick when requiring it; `preview` alone is too generic
+    # to find, and two jobs with one name make a required check ambiguous.
+    name: Changelog preview
+    # `edited` and the label events fire on a merged pull request too. Its
+    # note was recorded at merge, so a preview built from an edit made
+    # afterwards would describe a note main does not have.
+    if: github.event.pull_request.state == 'open'
     runs-on: ubuntu-latest
     steps:
       # The default ref is this branch merged into main, so HEAD^1 is main and
@@ -67,7 +78,7 @@ jobs:
       # time. A fork's token cannot write, so this is best-effort; the job
       # summary and the check result carry the same thing either way.
       - name: Post it on the pull request
-        if: always() && hashFiles('preview.md') != ''
+        if: ${{ !cancelled() && hashFiles('preview.md') != '' }}
         continue-on-error: true
         uses: actions/github-script@v7
         with:

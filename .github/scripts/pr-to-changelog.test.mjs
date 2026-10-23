@@ -11,6 +11,7 @@ import {
   preview,
   prose,
   PREVIEW_MARKER,
+  parseChangelog,
 } from './pr-to-changelog.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -299,5 +300,77 @@ describe('preview', () => {
     const { markdown, ok } = preview({ title: 'chore: tooling', labels: ['no-changelog'] })
     expect(ok).toBe(true)
     expect(markdown).toContain('records no release note')
+  })
+})
+
+// From the review of the check itself: inputs that would still have recorded
+// a wrong note.
+describe('what counts as prose', () => {
+  it('does not let a comment opener quoted in a code block swallow the section', () => {
+    // The `-->` that closes the template's own comment further down is what
+    // the quoted opener used to run to, taking the heading with it.
+    const body = 'The template diff:\n\n```diff\n+<!-- new rule\n```\n\n## Changelog\n\n<!-- Bullets here… -->\n\n- Improvements: kept.\n'
+    expect(changesFromBody(body)).toEqual(['Improvements: kept.'])
+  })
+
+  it('does not let a comment opener in inline code swallow the section', () => {
+    const body = 'Strips `<!--` comments.\n\n## Changelog\n\n- Fixes: kept.\n\n<!-- a real comment -->\n'
+    expect(changesFromBody(body)).toEqual(['Fixes: kept.'])
+  })
+
+  it('reads inline triple-backtick code at a line start as code, not a fence', () => {
+    const body = '```npm test``` passes now.\n\n## Changelog\n\n- Fixes: kept.'
+    expect(changesFromBody(body)).toEqual(['Fixes: kept.'])
+  })
+})
+
+describe('the breaking-change footer, as a footer', () => {
+  it('ignores the words where a wrapped sentence happens to break before them', () => {
+    const body = 'bumpType used to match the words anywhere, so a description that said\nBREAKING CHANGE: in passing released a major version.'
+    expect(bumpType({ title: 'fix(ci): x', body })).toBe('patch')
+  })
+
+  it('counts it after another trailer', () => {
+    expect(bumpType({ title: 'fix: x', body: 'Intro.\n\nRefs: #12\nBREAKING CHANGE: moved' })).toBe('major')
+  })
+})
+
+describe('where the Changelog section ends', () => {
+  for (const [name, divider] of [
+    ['a bold pseudo-heading', '**Test plan**'],
+    ['a level-one heading', '# Notes'],
+    ['a rule', '---'],
+    ['a details block', '<details><summary>Logs</summary>'],
+  ]) {
+    it(`stops at ${name}`, () => {
+      const body = `## Changelog\n\n- Fixes: kept.\n\n${divider}\n\n- ran npm test`
+      expect(parseChangelog(body)).toEqual({ changes: ['Fixes: kept.'], problems: [] })
+    })
+  }
+})
+
+describe('wrapped bullets', () => {
+  it('joins an indented continuation back on', () => {
+    const body = '## Changelog\n\n- Fixes: a pull request whose description\n  mentions the words no longer releases a major.\n- Security: two.'
+    expect(changesFromBody(body)).toEqual([
+      'Fixes: a pull request whose description mentions the words no longer releases a major.',
+      'Security: two.',
+    ])
+  })
+
+  it('joins a lazy continuation, as GitHub renders it', () => {
+    expect(changesFromBody('## Changelog\n- Fixes: one\nstill one.')).toEqual(['Fixes: one still one.'])
+  })
+
+  it('stops at a blank line', () => {
+    expect(changesFromBody('## Changelog\n- Fixes: one.\n\nA paragraph after the list.')).toEqual(['Fixes: one.'])
+  })
+})
+
+describe("GitHub's Revert button", () => {
+  it('passes the check and records a patch under the title it gave', () => {
+    const pr = { title: 'Revert "feat(nav): group the sidebar"', body: 'Reverts Sharmistha-622/pnc-elc-platform#46' }
+    expect(lintPullRequest(pr).errors).toEqual([])
+    expect(buildOutputs(pr)).toMatchObject({ type: 'patch', title: 'Revert "feat(nav): group the sidebar"' })
   })
 })

@@ -14,7 +14,8 @@ name: Changelog
 # Requires contents: write. If main is a protected branch, this workflow's
 # push will be rejected unless the app or a PAT is allowed to bypass the
 # protection — set that up, or the job will fail loudly rather than silently
-# skipping the note.
+# skipping the note. Requiring the Changelog check on main is exactly that
+# case; rules/version-and-changelog.md says how to let this push through.
 
 on:
   pull_request:
@@ -56,14 +57,27 @@ jobs:
       # second still recorded the fix a second time. A pull request that only
       # corrects changelog.json lands here too, rather than adding a note
       # about itself.
+      #
+      # "Before" is main as it was before the pull request landed. For a merge
+      # commit that is its first parent. A rebase merge leaves the PR's
+      # commits on main one by one and names the last, so there it is that
+      # many commits back; a squash with several commits then reaches further
+      # than it needs to, which can only make the merge look changed — never
+      # skip one that was not a no-op.
       - name: Check the merge changed something
         id: changed
         if: steps.entry.outputs.skip != 'true'
         env:
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if git diff --quiet "$MERGE_SHA^1" "$MERGE_SHA" -- . ':(exclude)src/lib/changelog.json'; then
+          if git rev-parse --quiet --verify "$MERGE_SHA^2" > /dev/null; then
+            before="$MERGE_SHA^1"
+          else
+            before="$MERGE_SHA~$PR_COMMITS"
+          fi
+          if git diff --quiet "$before" "$MERGE_SHA" -- . ':(exclude)src/lib/changelog.json'; then
             echo "::notice::#$PR_NUMBER changed nothing main did not already have, so it records no entry."
             echo "record=false" >> "$GITHUB_OUTPUT"
           else
@@ -118,8 +132,19 @@ jobs:
               exit 0
             fi
 
-            echo "main moved while recording (attempt $attempt of 5); trying again on the new main."
-            sleep $((attempt * 5))
+            # Only a push that lost to a newer main is worth another try. If
+            # main is still where this attempt started, the refusal was
+            # something else — a protected branch, a read-only token — and
+            # trying again cannot help.
+            git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+            if [ "$(git rev-parse origin/main)" = "$(git rev-parse HEAD^)" ]; then
+              echo "::error::The push to main was refused, and not because main moved. See the git error above."
+              exit 1
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              echo "main moved while recording (attempt $attempt of 5); trying again on the new main."
+              sleep $((attempt * 5))
+            fi
           done
 
           echo "::error::main kept moving; the entry could not be pushed after 5 attempts."

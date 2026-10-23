@@ -36,29 +36,57 @@ export const PREVIEW_MARKER = '<!-- changelog-preview -->'
 const PREFIX = /^([a-z]+)(\([^)]*\))?(!)?:\s*/
 
 /**
- * A breaking-change footer: `BREAKING CHANGE:` at the start of a line, as
- * Conventional Commits defines it. Matching the words anywhere in the body is
- * how #44, whose description explained this very bug, released as 2.00.00.
+ * Everything in a description that is not prose, in one left-to-right pass,
+ * so whichever starts first wins — a `<!--` quoted inside code does not open
+ * a comment that swallows the Changelog heading:
+ *
+ *   1. a backtick fence, whose info string cannot itself hold a backtick (so
+ *      ```npm test``` at the start of a line is inline code, not a fence that
+ *      never closes and takes the rest of the body with it);
+ *   2. a tilde fence;
+ *   3. an inline code span, which is kept as written;
+ *   4. an HTML comment: the pull request template explains its rules inside
+ *      them, example bullets and the breaking-change footer included.
+ *
+ * An unclosed fence runs to the end, as Markdown renders it.
  */
-const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m
+const NOT_PROSE = new RegExp(
+  [
+    String.raw`^ {0,3}(\`{3,})[^\`\n]*\n[\s\S]*?(?:^ {0,3}\1\`*[ \t]*$|(?![\s\S]))`,
+    String.raw`^ {0,3}(~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\2~*[ \t]*$|(?![\s\S]))`,
+    String.raw`(\`[^\`\n]*\`)`,
+    String.raw`<!--[\s\S]*?-->`,
+  ].join('|'),
+  'gm'
+)
 
 /**
- * The body with everything that is not prose removed, and line endings
- * normalised.
- *
- * - HTML comments: the pull request template explains its rules inside them,
- *   example bullets and the breaking-change footer included.
- * - Fenced code blocks: a description that quotes an example is not writing
- *   one.
- * - CRLF: GitHub's web editor saves descriptions with `\r\n`, and a stray `\r`
- *   stops the bullet pattern matching at all.
+ * The body with code blocks and comments removed, and line endings
+ * normalised. GitHub's web editor saves descriptions with `\r\n`, and a stray
+ * `\r` stops the bullet pattern matching at all.
  */
 export function prose(body) {
-  return (body ?? '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[`~]*[ \t]*$|(?![\s\S]))/gm, '')
+  return (body ?? '').replace(/\r\n?/g, '\n').replace(NOT_PROSE, (_, _fence, _tilde, span) => span ?? '')
 }
+
+/**
+ * A breaking-change footer: `BREAKING CHANGE: …` starting a line that starts
+ * a paragraph or follows another trailer, as Conventional Commits defines a
+ * footer. Matching the words anywhere is how #44, whose description explained
+ * this very bug, released as 2.00.00 — and matching any line start would do it
+ * again the first time a wrapped sentence happened to break before them.
+ */
+function hasBreakingFooter(body) {
+  const lines = prose(body).split('\n')
+  return lines.some(
+    (line, i) =>
+      /^BREAKING[ -]CHANGE: \S/.test(line) &&
+      (i === 0 || !lines[i - 1].trim() || /^[\w-]+(?:: | #)\S/.test(lines[i - 1]))
+  )
+}
+
+/** The title GitHub gives the pull request its Revert button opens. */
+const GITHUB_REVERT = /^Revert ".+"$/
 
 /** The bump a `release:` label asks for, or null when there is no valid one. */
 function releaseLabel(labels) {
@@ -75,7 +103,7 @@ function bumpReason({ title = '', body = '', labels = [] }) {
   if (labelled) return `the \`release:${labelled}\` label`
   const m = PREFIX.exec(title)
   if (m?.[3]) return 'the `!` in the title'
-  if (BREAKING_FOOTER.test(prose(body))) return 'a `BREAKING CHANGE:` line in the description'
+  if (hasBreakingFooter(body)) return 'a `BREAKING CHANGE:` footer in the description'
   if (m?.[1] === 'feat') return 'the `feat` title'
   return 'the title'
 }
@@ -85,7 +113,7 @@ export function bumpType({ title = '', body = '', labels = [] } = {}) {
   if (labelled) return labelled
 
   const m = PREFIX.exec(title)
-  if (m?.[3] || BREAKING_FOOTER.test(prose(body))) return 'major'
+  if (m?.[3] || hasBreakingFooter(body)) return 'major'
   if (m?.[1] === 'feat') return 'minor'
   return 'patch'
 }
@@ -95,6 +123,37 @@ export function cleanTitle(title = '') {
   const stripped = title.replace(PREFIX, '').trim()
   const text = stripped || title || 'Untitled change'
   return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/**
+ * Where the Changelog section stops: any heading, a rule or setext underline,
+ * a `<details>` block, or a line that is only bold text, which people use as a
+ * heading ("**Test plan**"). Bullets under those are not release notes.
+ */
+const SECTION_END = /^ {0,3}(?:#{1,6}(?:\s|$)|(?:[-*_][ \t]*){3,}$|=+[ \t]*$|<details\b|\*\*[^*]+\*\*:?[ \t]*$|__[^_]+__:?[ \t]*$)/
+
+/**
+ * The bullets in a section, each with its wrapped lines joined back on.
+ *
+ * GitHub renders a line straight after a list item, indented or not, as part
+ * of that item; reading line by line recorded a wrapped bullet cut off
+ * mid-sentence. A blank line ends the item.
+ */
+function bulletsIn(lines) {
+  const bullets = []
+  let open = false
+  for (const raw of lines) {
+    const bullet = /^\s*[-*]\s+(.*)$/.exec(raw)
+    if (bullet) {
+      bullets.push(bullet[1].trim())
+      open = true
+    } else if (open && raw.trim()) {
+      bullets[bullets.length - 1] = `${bullets[bullets.length - 1]} ${raw.trim()}`.trim()
+    } else {
+      open = false
+    }
+  }
+  return bullets.filter(Boolean)
 }
 
 /**
@@ -111,14 +170,11 @@ export function parseChangelog(body = '') {
   if (start === -1) return { changes: [], problems: [] }
 
   const rest = lines.slice(start + 1)
-  const end = rest.findIndex((l) => /^##+\s/.test(l))
+  const end = rest.findIndex((l) => SECTION_END.test(l))
   const changes = []
   const problems = []
 
-  for (const raw of end === -1 ? rest : rest.slice(0, end)) {
-    const line = /^\s*[-*]\s+(.*)$/.exec(raw)?.[1]?.trim()
-    if (!line) continue
-
+  for (const line of bulletsIn(end === -1 ? rest : rest.slice(0, end))) {
     const idx = line.indexOf(':')
     const named = idx === -1 ? '' : line.slice(0, idx).trim().toLowerCase()
     const category = CATEGORIES.find((c) => c.toLowerCase() === named)
@@ -179,7 +235,9 @@ export function lintPullRequest({ title = '', body = '', labels = [], changelogE
   }
 
   const m = PREFIX.exec(title)
-  if (!m) {
+  if (!m && GITHUB_REVERT.test(title.trim())) {
+    // GitHub's own Revert button: recorded as a patch, under the title it gave.
+  } else if (!m) {
     errors.push(
       'The title needs a conventional-commit type, like `fix(users): …` or `feat: …`. The type sets the version bump; without one the title is filed as a fix, word for word.'
     )
