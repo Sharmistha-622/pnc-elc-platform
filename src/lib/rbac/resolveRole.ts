@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { canImpersonate } from '@/lib/rbac/roles'
+import { isAllowedEmail } from '@/lib/auth/allowedEmail'
 
 export const IMMUTABLE_SUPER_ADMIN_EMAILS = ['nitin@navgurukul.org']
 
@@ -20,6 +21,9 @@ export interface ResolvedRole {
  * it guards is worse than no gate.
  *
  * A null user resolves to a null role. Callers must treat that as "deny".
+ * So does a signed-in account outside the organisation's domains: holding a
+ * Google session is not the same as being staff, and `DEFAULT_ROLE` is only
+ * ever a fallback for someone who is.
  */
 export function resolveRole(
   user: User | null,
@@ -30,6 +34,9 @@ export function resolveRole(
   }
 
   const email = user.email?.toLowerCase() ?? null
+  if (!isAllowedEmail(email)) {
+    return { userId: user.id, email, role: null, originalRole: null, isEmulating: false }
+  }
   const isImmutableSuperAdmin = email ? IMMUTABLE_SUPER_ADMIN_EMAILS.includes(email) : false
 
   // Roles stored before RBAC v1 are still display names; normalizeRole maps

@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { profileAccess } from './access'
 
 export type EmployeeDetail = {
   id: string
@@ -12,6 +13,21 @@ export type EmployeeDetail = {
 }
 
 export async function getProfileData(employeeId: string) {
+  // `employee_profiles` is identity data and loads only for the person or the
+  // roles that handle ID documents. A directory role without identity access
+  // still gets the general row, and is told why the rest is missing.
+  const access = await profileAccess(employeeId)
+  if (!access.general && !access.identity) {
+    return {
+      profile: null,
+      relationshipTypes: [],
+      idProofTypes: [],
+      employee: null,
+      employeeName: 'Employee',
+      canViewIdentity: false,
+    }
+  }
+
   const supabase = await createServerSupabaseClient()
 
   // Query employee with safe fallback if exit_date doesn't exist
@@ -52,7 +68,9 @@ export async function getProfileData(employeeId: string) {
   }
 
   const [profileResult, relationTypesResult, idProofTypesResult, employeeData] = await Promise.all([
-    supabase.from('employee_profiles').select('*').eq('employee_id', employeeId).maybeSingle(),
+    access.identity
+      ? supabase.from('employee_profiles').select('*').eq('employee_id', employeeId).maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase.from('relationship_types').select('*').order('name'),
     supabase.from('id_proof_types').select('*').order('name'),
     getEmployee(),
@@ -77,5 +95,6 @@ export async function getProfileData(employeeId: string) {
     idProofTypes: idProofTypesResult.data || [],
     employee,
     employeeName: employee?.name || 'Employee',
+    canViewIdentity: access.identity,
   }
 }

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   LEGACY_ROLE_MAP,
@@ -121,15 +123,40 @@ describe('canAccessRoute', () => {
   // own offer letters.
   it('keeps the letter screens out of manage-users', () => {
     expect(canAccessRoute('pnc_admin', '/manage/letter-templates')).toBe(true)
-    expect(canAccessRoute('pnc_ops', '/manage/letters')).toBe(true)
+    expect(canAccessRoute('fin_admin', '/manage/letters')).toBe(true)
     expect(canAccessRoute('pnc_admin', '/manage/users')).toBe(false)
+  })
+
+  // Every issued letter quotes a CTC. A role that may not read salary may not
+  // open the letters, whatever else it does in the pipeline.
+  it('opens the letters only to roles that may read salary', () => {
+    for (const role of FEATURE_ACCESS.letters) {
+      expect(ROLES[role].access.salary.level, role).not.toBe('none')
+    }
+    expect(canAccessRoute('pnc_ops', '/manage/letters')).toBe(false)
+    expect(canAccessRoute('pnc_ops', '/api/candidate-letters')).toBe(false)
+  })
+
+  // Every candidate screen shows the CTC and the salary annexure. A manager's
+  // salary access is `none`, so the pipeline is closed to them; their own
+  // team's joiners are general data and belong on My Team.
+  it('keeps a manager out of the candidate pipeline and the org directory', () => {
+    for (const url of ['/onboarding', '/onboarding/review/x', '/api/onboarding', '/employees', '/api/employees']) {
+      expect(canAccessRoute('manager', url), url).toBe(false)
+    }
+    expect(canAccessRoute('manager', '/my-team')).toBe(true)
+  })
+
+  it('lets Exec View read confirmations but not start one', () => {
+    expect(canAccessRoute('exec_view', '/confirmations')).toBe(true)
+    expect(canAccessRoute('exec_view', '/confirmations/new')).toBe(false)
+    expect(canAccessRoute('manager', '/confirmations/new')).toBe(true)
   })
 
   // They used to be gated on `onboarding`, which lists `manager` — so every
   // line manager could open the offer-letter editor and the signing
   // authorities. Running the pipeline is not the same as drafting the letters.
   it('keeps a manager out of the letter and signatory screens', () => {
-    expect(canAccessRoute('manager', '/onboarding')).toBe(true)
     for (const url of ['/manage/letter-templates', '/manage/letters', '/manage/signatories']) {
       expect(canAccessRoute('manager', url), url).toBe(false)
     }
@@ -195,6 +222,37 @@ describe('canAccessRoute', () => {
   // rather than discovered again later.
   it('still allows a route nobody has mapped', () => {
     expect(canAccessRoute(DEFAULT_ROLE, '/some-screen-nobody-registered')).toBe(true)
+  })
+
+  // ...but never an API route. `/api/campuses` and friends were unmapped, so
+  // their POST and PATCH answered to every session, a candidate's included.
+  it('refuses an API route nobody has mapped, even to Super Admin', () => {
+    expect(canAccessRoute('super_admin', '/api/some-handler-nobody-registered')).toBe(false)
+  })
+
+  it('maps every API route handler in the app', () => {
+    // Walks the real route tree, so a new handler without an entry fails here
+    // rather than in production.
+    const root = path.join(process.cwd(), 'src/app/api')
+    const publicPrefixes = ['/api/onboarding/token/', '/api/cron/']
+    const routes: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) walk(full)
+        else if (entry.name === 'route.ts') {
+          routes.push('/api/' + path.relative(root, dir).split(path.sep).join('/'))
+        }
+      }
+    }
+    walk(root)
+    expect(routes.length).toBeGreaterThan(10)
+    for (const route of routes) {
+      if (publicPrefixes.some((p) => (route + '/').startsWith(p))) continue
+      const concrete = route.replace(/\[[^\]]+\]/g, 'x')
+      const reachable = ROLE_CODES.filter((r) => canAccessRoute(r, concrete))
+      expect(reachable.length, `${route} is reachable by nobody — unmapped?`).toBeGreaterThan(0)
+    }
   })
 })
 

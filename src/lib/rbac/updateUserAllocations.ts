@@ -4,10 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getCurrentUserRole, IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
-import { normalizeRole, type UserRole } from '@/lib/role-constants'
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
+import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { recordAuditEvent } from '@/lib/audit/service'
 import { canGrantRole, isRoleCode } from '@/lib/rbac/roles'
+import { guard } from '@/lib/rbac/guard'
 
 const GRANT_REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -21,11 +22,14 @@ const GRANT_REFUSALS: Record<string, string> = {
 
 export interface UpdateAllocationsInput {
   targetUserId: string
+  /** Ignored: the target's email is looked up from `targetUserId`. */
   targetEmail: string
   targetName?: string
   newRole: UserRole
   newTeam: string
+  /** Ignored: the target's current role is looked up from `targetUserId`. */
   currentRole?: UserRole | null
+  /** Ignored: the target's current team is looked up from `targetUserId`. */
   currentTeam?: string | null
   reason?: string
 }
@@ -35,31 +39,89 @@ function isValidUuid(id?: string | null): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 }
 
+/**
+ * The target as the server knows it.
+ *
+ * The users screen lists auth accounts and, beneath them, directory employees
+ * who have never signed in, so `targetUserId` is either an auth user id or an
+ * employee id. Whichever it is, the email, current role and current team come
+ * from the records here. The browser's copies of them are what made it
+ * possible to claim a Super Admin was a plain employee and take the role
+ * away, or to name one account and change another.
+ */
+async function lookUpTarget(
+  admin: NonNullable<ReturnType<typeof createAdminSupabaseClient>>,
+  targetUserId: string
+) {
+  const supabase = await createServerSupabaseClient()
+
+  let authUser: any = null
+  if (isValidUuid(targetUserId)) {
+    const { data } = await admin.auth.admin.getUserById(targetUserId)
+    authUser = data?.user ?? null
+  }
+
+  let employee: { id: string; email: string | null; team: string | null } | null = null
+  if (authUser?.email) {
+    const escaped = String(authUser.email).replace(/[\\%_]/g, '\\$&')
+    const { data } = await supabase.from('employees').select('id, email, team').ilike('email', escaped).limit(1)
+    employee = data?.[0] ?? null
+  } else if (isValidUuid(targetUserId)) {
+    const { data } = await supabase
+      .from('employees')
+      .select('id, email, team')
+      .eq('id', targetUserId)
+      .maybeSingle()
+    employee = data ?? null
+  }
+
+  const email = String(authUser?.email ?? employee?.email ?? '').trim().toLowerCase()
+  if (!email) return null
+
+  // A directory employee may still have an auth account under their email.
+  if (!authUser) {
+    const { data: userList } = await admin.auth.admin.listUsers({ page: 1, perPage: 100 })
+    authUser = userList?.users?.find((u) => u.email?.toLowerCase() === email) ?? null
+  }
+
+  const role: UserRole = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(email)
+    ? 'super_admin'
+    : (normalizeRole(authUser?.app_metadata?.role) ?? DEFAULT_ROLE)
+  // The same precedence the users screen shows: the account's team, then the
+  // directory's.
+  const accountTeam = authUser?.user_metadata?.team as string | undefined
+  const team = accountTeam && accountTeam !== 'None' ? accountTeam : employee?.team || 'None'
+
+  return { authUser, email, role, team }
+}
+
 export async function updateUserAllocations(input: UpdateAllocationsInput) {
-  const {
-    targetUserId,
-    targetEmail,
-    targetName,
-    newRole,
-    newTeam,
-    currentRole,
-    currentTeam,
-    reason,
-  } = input
+  const { targetUserId, targetName, newRole, newTeam, reason } = input
 
-  const caller = await getCurrentUserRole()
-
-  const cleanTargetEmail = targetEmail.trim().toLowerCase()
-  const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
+  // The users screen's own gate, checked on both roles.
+  const allowed = await guard('manageUsers')
+  if (!allowed.ok) return { success: false, error: allowed.error }
+  const caller = allowed.caller
 
   if (!isRoleCode(newRole)) {
     return { success: false, error: 'Invalid role selected' }
   }
 
+  const admin = createAdminSupabaseClient()
+  if (!admin) return { success: false, error: 'Role changes are unavailable: no service-role key.' }
+
+  const target = await lookUpTarget(admin, targetUserId)
+  if (!target) return { success: false, error: 'User not found' }
+
+  const cleanTargetEmail = target.email
+  const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
+
   // One authority decides who may grant what. The caller's real role is used,
   // never an emulated one, so impersonating a Super Admin cannot grant like one.
   const decision = canGrantRole(caller.originalRole, newRole, {
-    isSelf: cleanTargetEmail === caller.email?.toLowerCase(),
+    isSelf:
+      cleanTargetEmail === caller.email?.toLowerCase() ||
+      (Boolean(target.authUser?.id) && target.authUser?.id === caller.userId),
   })
   if (!decision.ok) {
     return { success: false, error: GRANT_REFUSALS[decision.reason] ?? 'Not allowed' }
@@ -68,22 +130,20 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   if (isImmutable && newRole !== 'super_admin') {
     return {
       success: false,
-      error: `${targetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
+      error: `${cleanTargetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
     }
   }
 
-  // Removing a sensitive role is as restricted as granting one.
-  const existingRole = normalizeRole(currentRole)
-  if (existingRole) {
-    const overCurrent = canGrantRole(caller.originalRole, existingRole, {})
-    if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic') {
-      return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
-    }
+  // Removing a sensitive role is as restricted as granting one, judged on the
+  // role the target actually holds.
+  const overCurrent = canGrantRole(caller.originalRole, target.role, {})
+  if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic') {
+    return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
   }
 
-  const normalizedCurrentTeam = currentTeam || 'None'
+  const normalizedCurrentTeam = target.team
   const normalizedNewTeam = newTeam || 'None'
-  const normalizedCurrentRole = normalizeRole(currentRole) ?? 'employee'
+  const normalizedCurrentRole = target.role
 
   const roleChanged = normalizedCurrentRole !== newRole
   const teamChanged = normalizedCurrentTeam !== normalizedNewTeam
@@ -111,29 +171,13 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   }
 
   // 1. Update Supabase Auth metadata (if auth account exists)
-  const admin = createAdminSupabaseClient()
-  if (admin) {
+  const authUserRecord = target.authUser
+  if (authUserRecord) {
     try {
-      // Find auth user by targetUserId or by email
-      let authUserRecord: any = null
-      if (isValidUuid(targetUserId)) {
-        const { data: userById } = await admin.auth.admin.getUserById(targetUserId)
-        if (userById?.user) authUserRecord = userById.user
-      }
-
-      if (!authUserRecord) {
-        const { data: userList } = await admin.auth.admin.listUsers({ page: 1, perPage: 100 })
-        authUserRecord = userList?.users?.find(
-          (u) => u.email?.toLowerCase() === cleanTargetEmail
-        )
-      }
-
-      if (authUserRecord) {
-        await admin.auth.admin.updateUserById(authUserRecord.id, {
-          app_metadata: { ...authUserRecord.app_metadata, role: newRole },
-          user_metadata: { ...authUserRecord.user_metadata, team: normalizedNewTeam },
-        })
-      }
+      await admin.auth.admin.updateUserById(authUserRecord.id, {
+        app_metadata: { ...authUserRecord.app_metadata, role: newRole },
+        user_metadata: { ...authUserRecord.user_metadata, team: normalizedNewTeam },
+      })
     } catch (err) {
       console.warn('Supabase Auth user update non-fatal error:', err)
     }

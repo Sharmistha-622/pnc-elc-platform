@@ -1,18 +1,40 @@
-'use server'
+// Not a 'use server' module, and it must never become one. Its only caller is
+// `/api/cron/peer-reminders`, which checks the cron secret first, and it runs
+// on the service-role client: as a server action, any signed-in browser could
+// set it off, with RLS out of the way.
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email/sendEmail'
-import { getNotificationSettings } from '@/lib/settings/service'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { escapeHtml, sendEmail } from '@/lib/email/sendEmail'
+import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from '@/lib/settings/types'
 import { auditPeerFeedback } from '@/lib/audit/events'
 import { resolveSubjectFromConfirmation } from '@/lib/audit/subject'
 
 export async function sendPeerReminders() {
-  const notificationSettings = await getNotificationSettings().catch(() => null)
-  if (notificationSettings && !notificationSettings.peer_reminder_enabled) {
-    return { success: true, remindersSent: 0, message: 'Peer reminders are disabled in settings' }
+  // The scheduler has no user session, so the ordinary server client would
+  // act as `anon`, which holds no table privileges.
+  const supabase = createAdminSupabaseClient()
+  if (!supabase) {
+    return {
+      success: false,
+      error: 'Peer reminders are unavailable: SUPABASE_SERVICE_ROLE_KEY is not configured.',
+    }
   }
 
-  const supabase = await createServerSupabaseClient()
+  // Read here rather than through `getNotificationSettings`, which uses the
+  // session client: its failure falls back to the defaults, where reminders
+  // are on, and would quietly override an admin who switched them off.
+  const { data: storedSettings } = await supabase
+    .from('notification_settings')
+    .select('*')
+    .limit(1)
+    .maybeSingle()
+  const notificationSettings: NotificationSettings = {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...(storedSettings ?? {}),
+  }
+  if (!notificationSettings.peer_reminder_enabled) {
+    return { success: true, remindersSent: 0, message: 'Peer reminders are disabled in settings' }
+  }
 
   const { data: pendingFeedback, error } = await supabase
     .from('peer_feedback')
@@ -29,7 +51,7 @@ export async function sendPeerReminders() {
   }
 
   let remindersSent = 0
-  const subject = notificationSettings?.peer_reminder_subject || 'Reminder: Peer Feedback Requested'
+  const subject = notificationSettings.peer_reminder_subject || 'Reminder: Peer Feedback Requested'
 
   for (const feedback of pendingFeedback) {
     if (!feedback.peer_email) continue
@@ -40,7 +62,7 @@ export async function sendPeerReminders() {
       'peer_feedback_reminder',
       {
         subject,
-        body: `<p>Hi ${feedback.peer_name},</p><p>This is a friendly reminder to share your feedback:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
+        body: `<p>Hi ${escapeHtml(feedback.peer_name ?? '')},</p><p>This is a friendly reminder to share your feedback:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
       },
       feedback.peer_email
     )

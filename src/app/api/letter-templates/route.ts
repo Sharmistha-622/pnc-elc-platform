@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guard } from '@/lib/rbac/guard';
 import { getLetterTemplates, createLetterTemplate } from '@/lib/letter-templates/service';
 
 export async function GET(req: NextRequest) {
+  // `middleware.ts` gates this prefix on `letters` as well. Checked here too,
+  // so the handler does not depend on a route table elsewhere staying right,
+  // and so the original role is checked alongside the effective one.
+  const allowed = await guard('letters');
+  if (!allowed.ok) {
+    return NextResponse.json({ success: false, error: allowed.error }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') as any;
@@ -21,6 +30,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const allowed = await guard('letters');
+  if (!allowed.ok) {
+    return NextResponse.json({ success: false, error: allowed.error }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     if (!body.name || !body.letter_type || !body.employee_type_name || (!body.content && !body.blocks_json)) {

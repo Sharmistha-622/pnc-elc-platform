@@ -11,3 +11,8 @@ export function createAdminSupabaseClient(): SupabaseClient | null {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
+
+/** Whether the service-role key is present, without handing the key to the caller. */
+export function isAdminClientConfigured(): boolean {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+}

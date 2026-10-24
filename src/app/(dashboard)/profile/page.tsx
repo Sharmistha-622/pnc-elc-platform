@@ -3,10 +3,25 @@ import { redirect } from 'next/navigation'
 import { PageBanner } from '@/components/shared/page-banner'
 import { UserCheck, User } from 'lucide-react'
 import { getMyProfileData } from '@/lib/profile/profileActions'
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
+import { accessFor } from '@/lib/rbac/roles'
 import { ProfileClient } from './profile-client'
 
 export default async function ProfilePage() {
-  const { signedIn, userEmail, profile, allEmployees } = await getMyProfileData()
+  const [{ signedIn, userEmail, profile, allEmployees }, { role, originalRole }] = await Promise.all([
+    getMyProfileData(),
+    getCurrentUserRole(),
+  ])
+  // The directory feeds the manager picker, and only P&C may change a
+  // reporting line (`general: edit` org-wide, on both roles). Everyone else
+  // is not sent it at all.
+  const mayAssignManager =
+    !!role &&
+    !!originalRole &&
+    [role, originalRole].every((r) => {
+      const general = accessFor(r, 'general')
+      return general.level === 'edit' && general.scope === 'all'
+    })
 
   if (!signedIn) {
     redirect('/login')
@@ -23,7 +38,7 @@ export default async function ProfilePage() {
       <ProfileClient
         userEmail={userEmail}
         profile={profile}
-        allEmployees={allEmployees}
+        allEmployees={mayAssignManager ? allEmployees : []}
       />
     </div>
   )

@@ -87,16 +87,10 @@ export function EditUserDialog({
     }
   }, [user, open]);
 
-  if (!user) return null;
+  const initialTeam = user?.team || "None";
 
-  const isImmutable = user.email?.toLowerCase() === "nitin@navgurukul.org";
-  const initialRole = (user.role as UserRole) || "employee";
-  const initialTeam = user.team || "None";
-
-  const roleChanged = role !== initialRole;
-  const teamChanged = team !== initialTeam;
-  const hasChanges = roleChanged || teamChanged;
-
+  // Above the early return: a hook called after `if (!user) return null` runs
+  // on some renders and not others, which React does not allow.
   const selectableTeams = React.useMemo(() => {
     const names = new Set<string>();
     deptList.forEach((d) => {
@@ -107,6 +101,15 @@ export function EditUserDialog({
     }
     return Array.from(names).sort();
   }, [deptList, initialTeam]);
+
+  if (!user) return null;
+
+  const isImmutable = user.email?.toLowerCase() === "nitin@navgurukul.org";
+  const initialRole = (user.role as UserRole) || "employee";
+
+  const roleChanged = role !== initialRole;
+  const teamChanged = team !== initialTeam;
+  const hasChanges = roleChanged || teamChanged;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

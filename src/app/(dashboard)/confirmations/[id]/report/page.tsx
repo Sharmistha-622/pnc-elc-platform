@@ -1,4 +1,5 @@
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
+import { guard } from '@/lib/rbac/guard'
 import { ApproveButton } from './ApproveButton'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
@@ -10,6 +11,9 @@ export default async function CompiledReportPage({
 }) {
   const { id } = await params
   const report = await getCompiledFeedback(id)
+  // Only those who can make the final call see the button that makes it;
+  // `approveConfirmation` refuses everyone else regardless.
+  const canApprove = (await guard(['super_admin', 'pnc_admin'])).ok
 
   if (!report) {
     return (
@@ -87,33 +91,56 @@ export default async function CompiledReportPage({
           <h3 className="text-sm font-bold tracking-tight text-foreground">Peer Responses</h3>
         </div>
         <div className="p-4 space-y-3">
-          {report.feedbackEntries.map((entry) => (
-            <div key={entry.id} className="rounded-lg border border-border/60 p-4 bg-muted/10 space-y-2">
+          {report.peers.map((peer) => (
+            <div key={peer.id} className="rounded-lg border border-border/60 p-4 bg-muted/10 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-sm text-foreground">{entry.peerName}</span>
+                <span className="font-semibold text-sm text-foreground">{peer.peerName}</span>
                 <span
                   className={`text-xs px-2.5 py-0.5 font-semibold rounded-lg capitalize ${
-                    entry.responseStatus === 'submitted'
+                    peer.responseStatus === 'submitted'
                       ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                       : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
                   }`}
                 >
-                  {entry.responseStatus}
+                  {peer.responseStatus}
                 </span>
               </div>
-              {entry.feedbackText && (
-                <p className="text-muted-foreground text-sm leading-relaxed bg-background p-3 rounded-lg border border-border/50">
-                  {entry.feedbackText}
-                </p>
-              )}
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pt-1">
-        <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
+      {/* Peers are told their feedback is anonymous, so what was written is
+          listed apart from who was asked, with no name beside it. */}
+      <div className="rounded-lg bg-card border border-border/80 shadow-xs overflow-hidden flex flex-col">
+        <div className="py-3 px-4 border-b border-border/60">
+          <h3 className="text-sm font-bold tracking-tight text-foreground">Written Feedback</h3>
+        </div>
+        <div className="p-4 space-y-3">
+          {report.responses === null ? (
+            <p className="text-sm text-muted-foreground">
+              Your role shows who has responded, not what they wrote.
+            </p>
+          ) : report.responses.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No written feedback has been submitted yet.</p>
+          ) : (
+            report.responses.map((text, i) => (
+              <p
+                key={i}
+                className="text-muted-foreground text-sm leading-relaxed bg-background p-3 rounded-lg border border-border/50"
+              >
+                {text}
+              </p>
+            ))
+          )}
+        </div>
       </div>
+
+      {canApprove && (
+        <div className="pt-1">
+          <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
+        </div>
+      )}
     </div>
   )
 }

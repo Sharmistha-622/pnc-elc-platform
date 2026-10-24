@@ -7,12 +7,17 @@ export function PeerFeedbackForm({ peerFeedbackId }: { peerFeedbackId: string })
   const [feedback, setFeedback] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    await submitPeerFeedback(peerFeedbackId, feedback)
-    setSuccess(true)
+    setFailed(false)
+    // Null means nothing was saved: not this person's request, already
+    // answered, or a failed write. Thanking them regardless hid all three.
+    const saved = await submitPeerFeedback(peerFeedbackId, feedback)
+    if (saved) setSuccess(true)
+    else setFailed(true)
     setSubmitting(false)
   }
 
@@ -39,6 +44,11 @@ export function PeerFeedbackForm({ peerFeedbackId }: { peerFeedbackId: string })
       >
         {submitting ? 'Submitting...' : 'Submit Feedback'}
       </button>
+      {failed && (
+        <p className="text-red-700 dark:text-red-300 text-sm">
+          Your feedback could not be saved. It may already have been submitted.
+        </p>
+      )}
     </form>
   )
 }

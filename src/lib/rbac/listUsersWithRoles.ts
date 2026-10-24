@@ -65,35 +65,11 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
       }
     })
 
-    // Fixed default staff entries for development / seed
-    const defaultStaff: UserRow[] = [
-      {
-        id: 'usr-nitin',
-        email: 'nitin@navgurukul.org',
-        name: 'Nitin Sudarshan',
-        role: 'super_admin',
-        team: "CEO's Office",
-        status: 'active',
-      },
-      {
-        id: 'usr-sharmistha',
-        email: 'sharmisthamazumdar24@navgurukul.org',
-        name: 'Sharmistha Mazumdar',
-        role: 'platform_admin',
-        team: 'PnC',
-        status: 'active',
-      },
-    ]
-
+    // There used to be a hardcoded "default staff" list merged in here, with
+    // two named people and the roles they were assumed to hold. The screen
+    // that grants roles must show the roles people actually hold, so only
+    // auth users and the directory are listed.
     const existingEmails = new Set(authUsers.map((u) => u.email.toLowerCase()))
-
-    // Merge default staff if not already in authUsers
-    defaultStaff.forEach((staff) => {
-      if (!existingEmails.has(staff.email.toLowerCase())) {
-        authUsers.push(staff)
-        existingEmails.add(staff.email.toLowerCase())
-      }
-    })
 
     // Include directory employees who do not have an auth user yet
     const mappedEmployees: UserRow[] = (employees || [])

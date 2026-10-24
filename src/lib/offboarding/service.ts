@@ -5,6 +5,9 @@ import { auditOffboarding, auditAccess, auditLetters } from '@/lib/audit/events'
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { platformConfigRefusal } from '@/lib/settings/access';
+import { guard, guardResource, maySeeSalary } from '@/lib/rbac/guard';
+import { FEATURE_ACCESS } from '@/lib/role-constants';
+import { getCurrentEmployee } from '@/lib/forms/currentEmployee';
 import {
   ExitType,
   OffboardingStatus,
@@ -1168,6 +1171,43 @@ async function recordAuditLog(
 }
 
 // ============================================================================
+// ACCESS
+// ----------------------------------------------------------------------------
+// Every export below is a server action: the browser can call it directly,
+// with any arguments, whichever page imported it. The `/offboarding` route
+// gate does not reach them, so each one checks its caller here.
+// ============================================================================
+
+/**
+ * The full-and-final settlement as a caller without salary access may see it.
+ *
+ * F&F is salary data: the net payable, the deductions taken from it and the
+ * bank reference of the payment. PnC Ops runs exits and needs the clearance
+ * status and blockers, but the matrix gives them `salary: none`. The remarks
+ * go too, because they are where the computed figures get written down.
+ * `other_deductions` is required by the type, so it is zeroed rather than
+ * dropped; the only screen that shows it is the edit form, which this caller
+ * cannot save (`updateFnFDetails`).
+ */
+function withoutSettlementFigures(fnf: OffboardingFnF): OffboardingFnF {
+  return {
+    ...fnf,
+    other_deductions: 0,
+    net_payable_estimate: undefined,
+    payment_reference: null,
+    payment_date: null,
+    remarks: null,
+  };
+}
+
+/** The signed-in user's own employee id, or null. */
+async function currentEmployeeId(): Promise<string | null> {
+  const supabase = await createServerSupabaseClient();
+  const { employee } = await getCurrentEmployee(supabase);
+  return employee?.id ?? null;
+}
+
+// ============================================================================
 // CORE SERVICE LAYER METHODS
 // ============================================================================
 
@@ -1188,6 +1228,9 @@ function auditSubject(c: { employee_id: string; employee_email: string; employee
 }
 
 export async function getAllOffboardingCases(): Promise<OffboardingCase[]> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return [];
+
   try {
     const supabase = await createServerSupabaseClient();
     const controller = new AbortController();
@@ -1221,6 +1264,9 @@ export async function getAllOffboardingCases(): Promise<OffboardingCase[]> {
  * Fetch a single offboarding case by ID with all related records.
  */
 export async function getOffboardingById(id: string): Promise<FullOffboardingData | null> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return null;
+
   let fullData: FullOffboardingData | null = null;
   try {
     const supabase = await createServerSupabaseClient();
@@ -1296,6 +1342,12 @@ export async function getOffboardingById(id: string): Promise<FullOffboardingDat
     }
   }
 
+  // A copy, not the stored record: the memory store hands back the live
+  // object, and redacting that in place would erase the figures for everyone.
+  if (fullData && !maySeeSalary(allowed.caller)) {
+    return { ...fullData, fnf: withoutSettlementFigures(fullData.fnf) };
+  }
+
   return fullData;
 }
 
@@ -1304,6 +1356,20 @@ export async function getOffboardingById(id: string): Promise<FullOffboardingDat
  * Initiate an employee exit.
  */
 export async function initiateOffboardingCase(
+  input: InitiateOffboardingInput
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+  return openOffboardingCase(input);
+}
+
+/**
+ * Opens the case. Not exported: the resignation flow calls this once a
+ * resignation is accepted, which can follow an employee's own response to a
+ * retention offer (`respondToRetention`), and that caller has already been
+ * checked by the action that got here.
+ */
+async function openOffboardingCase(
   input: InitiateOffboardingInput
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
   try {
@@ -1637,6 +1703,9 @@ export async function updateChecklistItem(
   itemId: string,
   updates: Partial<OffboardingChecklistItem>
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -1691,6 +1760,9 @@ export async function updateAssetClearance(
   assetId: string,
   updates: Partial<OffboardingAssetItem>
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -1772,6 +1844,9 @@ export async function updateNDCDepartment(
   department: string,
   updates: Partial<OffboardingNDCDepartment>
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -1847,6 +1922,11 @@ export async function updateFnFDetails(
   caseId: string,
   updates: Partial<OffboardingFnF>
 ): Promise<{ success: boolean; error?: string }> {
+  // Settling F&F is writing salary data, which the offboarding feature alone
+  // does not grant: PnC Ops runs the exit but has `salary: none`.
+  const allowed = await guardResource('salary', 'edit');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -1866,7 +1946,9 @@ export async function updateFnFDetails(
     actor_name: updates.processed_by || 'Finance Lead',
     actor_role: 'finance',
     action: 'F&F Settlement Updated',
-    description: `F&F status transitioned to ${updatedFnf.status.toUpperCase()}${updatedFnf.payment_reference ? ` (Ref: ${updatedFnf.payment_reference})` : ''}`,
+    // No payment reference here: the activity log is shown to everyone who
+    // can open the case, PnC Ops included.
+    description: `F&F status transitioned to ${updatedFnf.status.toUpperCase()}`,
     created_at: nowIso,
   });
 
@@ -1907,6 +1989,9 @@ export async function updateExitDates(
   actualLwd?: string | null,
   reasonForAdjustment?: string
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -1967,6 +2052,9 @@ export async function closeOffboardingCase(
   closedBy: string = 'P&C Operations Lead',
   actualLwd?: string
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -2102,6 +2190,9 @@ export async function generateExitDocument(
   caseId: string,
   docType: 'ndc' | 'experience_letter' | 'relieving_letter'
 ): Promise<{ success: boolean; document?: ExitDocument; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
   if (!existing) return { success: false, error: 'Case not found' };
 
@@ -2149,6 +2240,12 @@ export async function sendOffboardingReminders(): Promise<{
   remindersSent: number;
   details: string[];
 }> {
+  // The "send reminders" button on the offboarding screen. The scheduled run
+  // does not come through here: it has no session to guard, so it lives in
+  // `reminders.ts`, which only the cron route imports.
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, remindersSent: 0, details: [allowed.error] };
+
   const cases = Array.from(MEMORY_OFFBOARDING_STORE.values()).filter(
     (c) => c.caseRecord.status === 'notice_period' || c.caseRecord.status === 'clearance_in_progress'
   );
@@ -2201,6 +2298,12 @@ export async function sendOffboardingReminders(): Promise<{
  * Get configurable offboarding policy settings.
  */
 export async function getOffboardingSettings(): Promise<OffboardingSettings> {
+  // Read by the Offboarding tab of /manage/settings as well as by the exit
+  // screens, so either feature admits. The policy holds nothing sensitive;
+  // a refused caller gets the built-in defaults.
+  const allowed = await guard([...FEATURE_ACCESS.offboarding, ...FEATURE_ACCESS.platformConfig]);
+  if (!allowed.ok) return { ...DEFAULT_OFFBOARDING_SETTINGS };
+
   try {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from('offboarding_settings').select('*').limit(1).single();
@@ -2604,6 +2707,9 @@ function initResignationSeedScenarios() {
  * doesn't exist in the remote database.
  */
 export async function getAllResignationRequests(): Promise<ResignationRequest[]> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return [];
+
   initResignationSeedScenarios();
   initSeedScenarios();
 
@@ -2640,6 +2746,9 @@ export async function getAllResignationRequests(): Promise<ResignationRequest[]>
  * Fetch a single resignation request by ID.
  */
 export async function getResignationRequestById(id: string): Promise<ResignationRequest | null> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return null;
+
   initResignationSeedScenarios();
 
   try {
@@ -2677,6 +2786,19 @@ export async function getResignationRequestById(id: string): Promise<Resignation
 export async function submitResignationRequest(
   input: SubmitResignationInput
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
+  // P&C log resignations for anyone, from any channel. Anyone else may only
+  // resign themselves, through the platform: an email or P&C entry is not
+  // theirs to file, and a P&C entry is accepted on P&C's behalf the moment
+  // it is created.
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) {
+    const self = await guard('self');
+    const ownId = self.ok ? await currentEmployeeId() : null;
+    if (!ownId || ownId !== input.employee_id || input.source !== 'platform') {
+      return { success: false, error: allowed.error };
+    }
+  }
+
   initResignationSeedScenarios();
 
   try {
@@ -2801,6 +2923,9 @@ export async function submitReviewDecision(
   notes?: string,
   holdDays?: number
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   initResignationSeedScenarios();
   const req = MEMORY_RESIGNATION_STORE.get(requestId);
   if (!req) return { success: false, error: 'Resignation request not found' };
@@ -2834,7 +2959,7 @@ export async function submitReviewDecision(
     req.status = 'resignation_accepted';
 
     // Activate the downstream offboarding case
-    const initRes = await initiateOffboardingCase({
+    const initRes = await openOffboardingCase({
       employee_id: req.employee_id,
       employee_name: req.employee_name,
       employee_email: req.employee_email,
@@ -2937,9 +3062,17 @@ export async function respondToRetention(
   response: 'accepted_withdrawal' | 'declined_withdrawal',
   notes?: string
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
+  // The retention offer is answered by the employee it was made to, or by
+  // P&C recording that answer for them. Nobody else.
+  const allowed = await guard('offboarding');
+  const self = allowed.ok ? null : await guard('self');
+  const ownId = self?.ok ? await currentEmployeeId() : null;
+  if (!allowed.ok && !ownId) return { success: false, error: allowed.error };
+
   initResignationSeedScenarios();
   const req = MEMORY_RESIGNATION_STORE.get(requestId);
   if (!req) return { success: false, error: 'Resignation request not found' };
+  if (!allowed.ok && req.employee_id !== ownId) return { success: false, error: allowed.error };
 
   const nowIso = new Date().toISOString();
   req.employee_retention_response = response;
@@ -2955,7 +3088,7 @@ export async function respondToRetention(
     // Employee declines retention -> Proceed to Exit Initiated!
     req.status = 'resignation_accepted';
 
-    const initRes = await initiateOffboardingCase({
+    const initRes = await openOffboardingCase({
       employee_id: req.employee_id,
       employee_name: req.employee_name,
       employee_email: req.employee_email,
@@ -3013,6 +3146,9 @@ export async function resolveDisagreement(
   resolvedDecision: 'accepted' | 'retention_proposed',
   notes?: string
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
+  const allowed = await guard('offboarding');
+  if (!allowed.ok) return { success: false, error: allowed.error };
+
   initResignationSeedScenarios();
   const req = MEMORY_RESIGNATION_STORE.get(requestId);
   if (!req) return { success: false, error: 'Resignation request not found' };
@@ -3026,7 +3162,7 @@ export async function resolveDisagreement(
     req.pnc_decision = 'accepted';
     req.status = 'resignation_accepted';
 
-    const initRes = await initiateOffboardingCase({
+    const initRes = await openOffboardingCase({
       employee_id: req.employee_id,
       employee_name: req.employee_name,
       employee_email: req.employee_email,

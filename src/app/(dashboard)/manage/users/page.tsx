@@ -1,5 +1,6 @@
 import React from "react";
 import { requireFeature } from "@/lib/rbac/requireFeature";
+import { isAdminClientConfigured } from "@/lib/supabase/admin";
 import { listUsersWithRoles } from "@/lib/rbac/listUsersWithRoles";
 import { getDepartments } from "@/lib/departments/service";
 import { UsersRolesTable } from "./users-roles-table";
@@ -8,7 +9,7 @@ import { Users } from "lucide-react";
 
 export default async function ManageUsersPage() {
   const caller = await requireFeature("manageUsers");
-  const isConfigured = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const isConfigured = isAdminClientConfigured();
   const [users, departments] = await Promise.all([
     listUsersWithRoles(),
     getDepartments(false),

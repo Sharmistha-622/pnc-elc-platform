@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guard } from '@/lib/rbac/guard';
 import {
   getLocations,
   createLocation,
@@ -22,6 +23,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Reading the list is open to staff; changing master data is not.
+  const access = await guard('masterData');
+  if (!access.ok) return NextResponse.json({ success: false, error: access.error }, { status: 403 });
+
   try {
     const body = await req.json();
     if (!body.name || !body.name.trim()) {
@@ -47,6 +52,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const access = await guard('masterData');
+  if (!access.ok) return NextResponse.json({ success: false, error: access.error }, { status: 403 });
+
   try {
     const body = await req.json();
     const { id, ...updates } = body;
