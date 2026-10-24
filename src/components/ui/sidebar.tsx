@@ -362,7 +362,11 @@ function SidebarSeparator({
     <Separator
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn("bg-sidebar-border mx-2 w-auto", className)}
+      // `Separator` sets `data-[orientation=horizontal]:w-full`, and the
+      // attribute selector outranks a plain `w-auto`. Full width plus `mx-2`
+      // is 16px wider than the column, which is what put a horizontal
+      // scrollbar under the nav. The override has to carry the same variant.
+      className={cn("bg-sidebar-border mx-2 w-auto data-[orientation=horizontal]:w-auto", className)}
       {...props}
     />
   )
@@ -374,7 +378,9 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        // Vertical only. Every label truncates, so anything wider than the
+        // column is a layout bug — clip it rather than offer a scrollbar.
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto group-data-[collapsible=icon]:overflow-hidden",
         className
       )}
       {...props}

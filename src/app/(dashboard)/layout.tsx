@@ -36,6 +36,8 @@ export default async function DashboardLayout({
     let profileAvatar = ""
     let team: string | null = null
     let employeeType: string | null = null
+    // Undefined until we know: the sidebar then falls back to the role alone.
+    let hasReports: boolean | undefined
 
     if (authUser) {
         profileEmail = authUser.email || profileEmail
@@ -51,7 +53,7 @@ export default async function DashboardLayout({
         try {
             const { data: employee } = await supabase
                 .from('employees')
-                .select('name, email, teams(name), employee_types(name)')
+                .select('id, name, email, teams(name), employee_types(name)')
                 .eq('email', profileEmail)
                 .maybeSingle()
 
@@ -59,6 +61,14 @@ export default async function DashboardLayout({
                 if (employee.name) profileName = employee.name
                 team = (employee.teams as any)?.name || null
                 employeeType = (employee.employee_types as any)?.name || null
+
+                // A count, not the rows: the shell only needs to know whether
+                // My Team leads anywhere.
+                const { count, error } = await supabase
+                    .from('employees')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('manager_id', employee.id)
+                if (!error) hasReports = (count ?? 0) > 0
             }
         } catch {
             // Ignore DB schema lookup failure in disconnected environments
@@ -99,7 +109,7 @@ export default async function DashboardLayout({
                         <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
                             <SiteHeader userRole={effectiveRole} />
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
-                                <AppSidebar userRole={effectiveRole} />
+                                <AppSidebar userRole={effectiveRole} hasReports={hasReports} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
                                     {children}
                                 </SidebarInset>
