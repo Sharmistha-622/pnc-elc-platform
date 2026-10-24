@@ -3,6 +3,8 @@
 The vault is a **second Supabase project**. Core already exists; this is the
 other one. Everything here is done by Super Admin, from Super Admin's machine.
 
+What belongs in it, field by field, is in [`vault-inventory.md`](./vault-inventory.md).
+
 Nothing in this guide should ever be pasted into Vercel, into this repository,
 or into a chat window — including with me. If you need me to debug something,
 send the error, not the key.
@@ -22,35 +24,55 @@ Create **two**:
 | Vault | `elc-vault` | production |
 | Vault dev | `elc-vault-dev` | dummy data only; where anything is tried first |
 
-Choose the same region as core. Set a strong database password and put it in
-your password manager, not in a file.
+Choose **`ap-south-1` (Mumbai)** for both. Payroll needs India-hosted storage,
+and the vault is where payroll data lives. Core is currently in Singapore and is
+planned to move to Mumbai; do not match the vault to core's current region.
+Set a strong database password and put it in your password manager, not in a
+file.
 
 **Members:** add nobody yet. The platform team is never added to either. The
 only other member will be the break-glass owner in step 5.
 
 ## 2. Apply the schema
 
-From this repository, on your machine:
+From this repository, on your machine, with each project's connection string
+(Project Settings → Database). Apply all three files, in order:
 
 ```bash
 # dev first, always
-supabase link --project-ref <elc-vault-dev-ref>
-supabase db push --file supabase/vault/migrations/0001_vault_schema.sql
+for f in supabase/vault/migrations/000{1,2,3}_*.sql; do
+  psql "$ELC_VAULT_DEV_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+done
 
 # then production
-supabase link --project-ref <elc-vault-ref>
-supabase db push --file supabase/vault/migrations/0001_vault_schema.sql
+for f in supabase/vault/migrations/000{1,2,3}_*.sql; do
+  psql "$ELC_VAULT_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+done
 ```
 
-Re-running it is safe; it is idempotent.
+Pasting each file into the SQL editor, in the same order, works as well.
+Re-running them is safe; they are idempotent.
 
-Then check the walls are up — this should return **zero rows**:
+`0003` is not optional. Without it, every function in the vault is callable by
+anyone holding the vault's anon key, and three of them run with the owner's
+rights: `read_identity_number` would hand a full Aadhaar number to whoever asked,
+and `log_access` would let them write fake rows into the access log.
+
+Then check the walls are up. Both of these should return **zero rows**:
 
 ```sql
 select tablename, policyname, roles
   from pg_policies
  where schemaname = 'public'
    and roles::text[] && array['anon','authenticated'];
+
+select p.proname, r.rolname
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  cross join pg_roles r
+ where n.nspname = 'public'
+   and r.rolname in ('anon', 'authenticated')
+   and has_function_privilege(r.oid, p.oid, 'execute');
 ```
 
 If anything comes back, stop: something is reachable without going through a
@@ -218,4 +240,11 @@ rendered into `candidate_letters.content`.
 Standing up the vault does not move any of it. That migration is its own piece
 of work, and it is the point at which the platform team stops being able to
 read salaries — so it should be done deliberately, with the data moved and the
-core copies dropped in the same change, not left duplicated in both.
+core copies dropped in the same change, not left duplicated in both. The full
+list, column by column, is the migration table in
+[`vault-inventory.md`](./vault-inventory.md#what-is-in-core-today-that-does-not-belong-there).
+
+Until then, `202610241000_lockdown_rls.sql` keeps those tables away from the
+wrong *app users*. It cannot keep them from anyone who is a member of the core
+project or can read its service-role key — which is why those seats are listed,
+and limited, in the inventory.
