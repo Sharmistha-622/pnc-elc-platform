@@ -27,3 +27,16 @@ description: Secrets, environment variables, and auth handling
   instead of persisting the secret.
 - Log errors without leaking sensitive payloads (user emails, tokens) into
   client-visible console output in production code paths.
+- Every exported function in a `'use server'` file, and every route handler,
+  checks the caller with `src/lib/rbac/guard.ts` before it reads or writes
+  anyone's data. Ownership too: a manager reaches only their reports, and an
+  employee only themselves. Take identity from the session, never from the
+  request body.
+- Only organisation accounts hold a role (`src/lib/auth/allowedEmail.ts`;
+  `is_org_email()` in the database). Keep the two lists in step.
+- No cookie, header or parameter may choose who the signed-in user is.
+  Emulation (`dev-role-override`) may only narrow access.
+- The repository is public. No real names, emails, phone numbers or amounts
+  in seeds, fixtures, tests or examples.
+- See `REVIEW.md` for the full checklist a change is reviewed against.
+
