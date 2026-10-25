@@ -22,7 +22,6 @@ import {
   Compass,
   DatabaseBackup,
   FileCheck2,
-  FilePlus,
   FileText,
   History,
   Inbox,
@@ -83,6 +82,24 @@ export type NavSection = {
   items: NavItem[];
 };
 
+/**
+ * The sitemap.
+ *
+ * Four groups, each answering one question a person arrives with:
+ *
+ *   My Workspace    what is mine — my profile, what I've been asked to fill
+ *                   in, the people who report to me
+ *   People          the employee lifecycle, in the order it runs: hire,
+ *                   directory, confirm, appraise, exit — then the letters
+ *                   each step produces
+ *   Insights        org-wide numbers
+ *   Administration  how the platform itself is run
+ *
+ * Only places belong here, never actions: "New Confirmation" is a button on
+ * the Confirmations screen, not a destination of its own. Anything a role
+ * cannot open is pruned before it renders (`visibleSections`), so an Employee
+ * sees Dashboard, My Profile and My Forms and nothing else.
+ */
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: "home",
@@ -94,17 +111,16 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "My Workspace",
     items: [
       { title: "My Profile", url: "/profile", icon: User },
-      { title: "My Team", url: "/my-team", icon: Users2 },
       { title: "My Forms", url: "/my-forms", icon: Inbox },
+      // Hidden by `visibleSections` for anyone with no direct reports, however
+      // senior: an empty team page is a dead end, not a feature.
+      { title: "My Team", url: "/my-team", icon: Users2 },
     ],
   },
 
   {
-    // Ordered the way the lifecycle runs — hire, hold, confirm, appraise,
-    // exit — which is the order the dashboard cards and the help registry
-    // already tell it in.
-    id: "lifecycle",
-    label: "Employee Lifecycle",
+    id: "people",
+    label: "People",
     items: [
       {
         title: "Onboarding",
@@ -114,57 +130,44 @@ export const NAV_SECTIONS: NavSection[] = [
         // reasons but belong to this item.
         alsoActiveFor: ["/manage/onboarding"],
         items: [
-          { title: "Hub", url: "/onboarding", icon: Compass, match: "exact" },
+          { title: "Overview", url: "/onboarding", icon: Compass, match: "exact" },
           {
-            title: "Candidate",
+            title: "Candidates",
             url: "/onboarding/candidate",
             icon: UserPlus,
             alsoActiveFor: ["/manage/onboarding", "/onboarding/review"],
           },
-          { title: "Employee", url: "/onboarding/employee", icon: BadgeCheck },
+          { title: "New Joiners", url: "/onboarding/employee", icon: BadgeCheck },
         ],
       },
       { title: "Employees", url: "/employees", icon: Users },
-      {
-        title: "Confirmations",
-        url: "/confirmations",
-        icon: ClipboardList,
-        items: [
-          { title: "All Confirmations", url: "/confirmations", icon: ClipboardList, match: "exact" },
-          { title: "New Confirmation", url: "/confirmations/new", icon: FilePlus, match: "exact" },
-        ],
-      },
+      { title: "Confirmations", url: "/confirmations", icon: ClipboardList },
       { title: "Appraisals", url: "/appraisals", icon: TrendingUp },
       { title: "Offboarding", url: "/offboarding", icon: UserMinus },
+      {
+        // One entry rather than three: the letters, the templates they are
+        // drafted from, and who signs them are one job.
+        title: "Letters",
+        url: "/manage/letters",
+        icon: FileCheck2,
+        items: [
+          { title: "Issued Letters", url: "/manage/letters", icon: FileCheck2 },
+          { title: "Templates", url: "/manage/letter-templates", icon: FileText },
+          { title: "Signatories", url: "/manage/signatories", icon: PenTool },
+        ],
+      },
     ],
   },
 
   {
     id: "insights",
     label: "Insights",
-    items: [
-      { title: "Reports", url: "/reports", icon: BarChart3 },
-      { title: "Audit Trail", url: "/audit", icon: History },
-    ],
+    items: [{ title: "Reports", url: "/reports", icon: BarChart3 }],
   },
 
   {
-    // Split from the platform group because the two answer to different
-    // features: these four are `letters` and `platformConfig` work that P&C
-    // and Finance do, not account administration.
-    id: "documents",
-    label: "Documents & Comms",
-    items: [
-      { title: "Letter Templates", url: "/manage/letter-templates", icon: FileText },
-      { title: "Letters", url: "/manage/letters", icon: FileCheck2 },
-      { title: "Signatories", url: "/manage/signatories", icon: PenTool },
-      { title: "Emails", url: "/manage/emails", icon: Mail },
-    ],
-  },
-
-  {
-    id: "platform",
-    label: "Platform",
+    id: "admin",
+    label: "Administration",
     items: [
       {
         title: "Users & Roles",
@@ -172,7 +175,8 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ShieldCheck,
         alsoActiveFor: ["/manage/roles"],
       },
-      { title: "Platform Settings", url: "/manage/settings", icon: SlidersHorizontal },
+      { title: "Settings", url: "/manage/settings", icon: SlidersHorizontal },
+      { title: "Email Center", url: "/manage/emails", icon: Mail },
       {
         title: "Data Management",
         url: "/data-management",
@@ -181,7 +185,8 @@ export const NAV_SECTIONS: NavSection[] = [
         // up the hub it happens to live under.
         notActiveFor: ["/data-management/forms"],
       },
-      { title: "Forms", url: "/data-management/forms", icon: FileText },
+      { title: "Form Builder", url: "/data-management/forms", icon: ClipboardList },
+      { title: "Audit Trail", url: "/audit", icon: History },
     ],
   },
 ];
@@ -219,18 +224,28 @@ export function isItemOnPath(pathname: string, item: NavItem): boolean {
  * whose own url is out of reach still renders when a child is reachable, and
  * points at the first child that is.
  *
+ * `hasReports: false` also drops My Team. The route stays open to the role —
+ * someone may gain a reportee tomorrow — but a link to an empty page is noise.
+ * Left undefined, the role alone decides.
+ *
  * This is navigation only. `requireFeature` on each route group and the check
  * in `middleware.ts` are what actually enforce access; hiding a link has never
  * been a control.
  */
-export function visibleSections(role: UserRole | null | undefined): NavSection[] {
+export function visibleSections(
+  role: UserRole | null | undefined,
+  options: { hasReports?: boolean } = {}
+): NavSection[] {
+  const shows = (url: string) =>
+    canAccessRoute(role, url) && !(url === "/my-team" && options.hasReports === false);
+
   return NAV_SECTIONS.map((section) => ({
     ...section,
     items: section.items.flatMap((item) => {
       if (!item.items) {
-        return canAccessRoute(role, item.url) ? [item] : [];
+        return shows(item.url) ? [item] : [];
       }
-      const items = item.items.filter((child) => canAccessRoute(role, child.url));
+      const items = item.items.filter((child) => shows(child.url));
       if (items.length === 0) return [];
       return [{ ...item, items, url: items[0].url }];
     }),

@@ -101,12 +101,16 @@ export type Feature =
   | "myTeam"
   | "employees"
   | "onboarding"
+  | "offers"
   | "letters"
+  | "lettersEdit"
   | "confirmations"
+  | "confirmationsInitiate"
   | "appraisals"
   | "offboarding"
   | "reports"
   | "dataManagement"
+  | "masterData"
   | "platformConfig"
   | "manageUsers";
 
@@ -159,14 +163,35 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // (`getMyProfileData`, `getMyForms`), not by the route.
   self: STAFF,
   myTeam: STAFF_WITH_REPORTS,
-  employees: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "fin_ops", "exec_view", "manager"],
-  onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "manager"],
-  // Split out of `onboarding` deliberately. The letter, signatory and template
-  // screens were gated on it, and `onboarding` lists `manager` — so every line
-  // manager could open the offer-letter editor and the signing authorities.
-  // Drafting letters is P&C and Finance work; running the pipeline is not.
-  letters: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin"],
+  // The org-wide directory. `manager` is NOT here: the matrix scopes their
+  // general access to their own team, and that is what My Team shows. The
+  // directory loads everyone, and links on to profiles and ID documents.
+  employees: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "fin_ops", "exec_view"],
+  // `manager` is NOT here either. Every candidate screen carries the CTC and
+  // the salary annexure, and a manager's salary access is `none`. What a
+  // manager needs — who is joining their team, and when — is general data and
+  // belongs on My Team, not behind the whole pipeline.
+  onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin"],
+  // Creating a candidate: the form takes the CTC, so this is salary work.
+  // PnC Admin "enters the CTC on every offer"; PnC Ops (salary: none) runs the
+  // rest of the pipeline but does not make offers.
+  offers: ["super_admin", "pnc_admin"],
+  // Split out of `onboarding` deliberately: drafting letters is not running
+  // the pipeline. Every issued letter quotes a CTC, so only roles that may
+  // read salary are here — which leaves PnC Ops out (salary: none), and the
+  // templates and signatories are configuration they hold no access to either.
+  letters: ["super_admin", "pnc_admin", "fin_admin"],
+  // Drafting templates, issuing letters and naming signatories is P&C's. Fin
+  // Admin reads letters; it does not write them. No route of its own: the
+  // write handlers and actions check it, and it matches the "pnc write"
+  // policies on the letter tables in 202610241000_lockdown_rls.sql.
+  lettersEdit: ["super_admin", "pnc_admin"],
+  // Reading the confirmation pipeline. Exec View is here to see it; it is a
+  // read-only role and cannot start one (`confirmationsInitiate`).
   confirmations: ["super_admin", "pnc_admin", "pnc_ops", "exec_view", "manager"],
+  // Starting a confirmation: the people who run probation, not those who
+  // only review it.
+  confirmationsInitiate: ["super_admin", "pnc_admin", "pnc_ops", "manager"],
   appraisals: ["super_admin", "pnc_admin", "fin_admin", "exec_view", "manager"],
   // Fin Admin is here for full-and-final settlement. `manager` is NOT: the
   // screen loads every case in the organisation (`getAllOffboardingCases`),
@@ -179,6 +204,11 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   reports: ["super_admin", "pnc_admin", "fin_admin", "exec_view"],
   // Templates and automation: the platform roles' job, and nothing sensitive.
   dataManagement: ["super_admin", "platform_admin", "platform_ops", "pnc_admin"],
+  // Changing the lookup lists — departments, campuses, locations, employment
+  // types. Narrower than the screen: Platform Ops holds `config: view`.
+  // Matches the "data management writes" policy in 202610241000_lockdown_rls.sql.
+  // No route of its own; the lookup APIs' POST and PATCH check it.
+  masterData: ["super_admin", "pnc_admin", "platform_admin"],
   // Confirmation windows, appraisal cycles and peer-feedback rules are P&C's
   // own process, so PnC Admin reaches the screen. They reach it READ-ONLY:
   // `ROLES.pnc_admin.access.config` is `view`, and the settings server actions
@@ -230,6 +260,8 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/onboarding", "onboarding"],
   ["/api/onboarding", "onboarding"],
   ["/manage/onboarding", "onboarding"],
+  ["/onboarding/candidate/new", "offers"],
+  ["/manage/onboarding/new", "offers"],
 
   ["/manage/letter-templates", "letters"],
   ["/manage/letters", "letters"],
@@ -238,6 +270,7 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/api/letter-templates", "letters"],
 
   ["/confirmations", "confirmations"],
+  ["/confirmations/new", "confirmationsInitiate"],
   ["/appraisals", "appraisals"],
   ["/offboarding", "offboarding"],
   ["/reports", "reports"],
@@ -253,6 +286,16 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/manage/settings", "platformConfig"],
   ["/manage/emails", "platformConfig"],
 
+  // Lookup lists every form in the app reads (departments, campuses, ...).
+  // Reading them is open to staff; their POST and PATCH handlers check
+  // `masterData` themselves, since a prefix cannot tell methods apart.
+  ["/api/departments", "self"],
+  ["/api/campuses", "self"],
+  ["/api/locations", "self"],
+  ["/api/employment-types", "self"],
+  // Asset allocation for a joiner, called from the onboarding screens.
+  ["/api/integrations", "onboarding"],
+
   // The shadcn component gallery. Not linked from the nav; platform-only.
   ["/components", "manageUsers"],
   ["/manage", "manageUsers"],
@@ -263,7 +306,12 @@ export function canAccessRoute(role: UserRole | null | undefined, url: string): 
   // so an unauthenticated caller is never treated as an ordinary Employee.
   if (!role) return false;
   const matches = ROUTE_FEATURE.filter(([p]) => url === p || url.startsWith(p + "/"));
-  if (matches.length === 0) return true;
+  // Screens fail open — a page with no entry is reachable by staff, and
+  // `sidebar-nav.test.ts` stops the nav pointing at one. An API route fails
+  // CLOSED: a handler nobody mapped is a handler nobody reviewed, and it
+  // answers to every session, a candidate's included. The public ones
+  // (`/api/onboarding/token/`, `/api/cron/`) never reach this check.
+  if (matches.length === 0) return !url.startsWith("/api/");
   const [, feature] = matches.reduce((best, cur) => (cur[0].length > best[0].length ? cur : best));
   return FEATURE_ACCESS[feature].includes(role);
 }

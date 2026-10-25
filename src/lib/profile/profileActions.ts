@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
+import { guardResource } from '@/lib/rbac/guard'
+import { accessFor } from '@/lib/rbac/roles'
 
 export interface EmployeeProfileData {
   id: string
@@ -168,6 +170,21 @@ export async function getMyProfileData(): Promise<{
 }
 
 export async function updateReportingManager(employeeId: string, managerId: string | null) {
+  // The reporting line decides who holds `manager` over whom, and with it who
+  // reads that person's feedback and records their confirmation. So it is set
+  // by those who edit general data org-wide. `employee` also has general
+  // `edit`, scoped to their own record, which `guardResource` alone would
+  // pass; without the scope check anyone could make themselves anyone's
+  // manager.
+  const allowed = await guardResource('general', 'edit')
+  if (
+    !allowed.ok ||
+    accessFor(allowed.caller.role, 'general').scope !== 'all' ||
+    accessFor(allowed.caller.originalRole, 'general').scope !== 'all'
+  ) {
+    return { success: false, error: 'Only People & Culture can change a reporting line.' }
+  }
+
   const supabase = await createServerSupabaseClient()
 
   if (employeeId === managerId) {

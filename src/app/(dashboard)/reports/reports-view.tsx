@@ -48,6 +48,8 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { UnifiedReportsData } from '@/lib/reports/getReportsData'
+import { useUserContext } from '@/contexts/user-context'
+import { canAccessRoute } from '@/lib/role-constants'
 import { PageBanner } from '@/components/shared/page-banner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -74,6 +76,10 @@ interface ReportsViewProps {
 type TabType = 'appraisals' | 'confirmations' | 'onboarding' | 'headcount' | 'emails'
 
 export function ReportsView({ data }: ReportsViewProps) {
+  const user = useUserContext()
+  // Exec View reads the funnel but cannot open a candidate record; a link
+  // that only redirects them home is worse than no link.
+  const canInspect = canAccessRoute(user?.role, '/onboarding/review/x')
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialTab = (searchParams.get('tab') as TabType) || 'appraisals'
@@ -1034,12 +1040,14 @@ export function ReportsView({ data }: ReportsViewProps) {
                           {new Date(o.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button asChild variant="outline" size="sm" className="h-7 text-[10px] rounded-lg px-2">
-                            <Link href={`/onboarding/review/${o.invitation_token || o.id}`}>
-                              <span>Inspect</span>
-                              <ChevronRight className="size-3 ml-1" />
-                            </Link>
-                          </Button>
+                          {canInspect && (
+                            <Button asChild variant="outline" size="sm" className="h-7 text-[10px] rounded-lg px-2">
+                              <Link href={`/onboarding/review/${o.id}`}>
+                                <span>Inspect</span>
+                                <ChevronRight className="size-3 ml-1" />
+                              </Link>
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))

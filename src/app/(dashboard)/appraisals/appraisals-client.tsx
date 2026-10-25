@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useUserContext } from '@/contexts/user-context'
+import { canAccessRoute } from '@/lib/role-constants'
 import {
   TrendingUp,
   Calendar,
@@ -46,6 +48,10 @@ interface AppraisalsClientProps {
 }
 
 export function AppraisalsClient({ entries }: AppraisalsClientProps) {
+  // Managers and Exec View read the cohort; only directory roles open a
+  // profile, which carries contact and identity details.
+  const user = useUserContext()
+  const canOpenProfiles = canAccessRoute(user?.role, '/employees/x/profile')
   const [activeTab, setActiveTab] = useState<'all' | 'july' | 'december'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('ALL')
@@ -320,16 +326,19 @@ export function AppraisalsClient({ entries }: AppraisalsClientProps) {
                   </TableCell>
 
                   <TableCell className="py-2.5 px-3 text-right">
-                    <Link href={`/employees/${e.employeeId}`}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2.5 text-xs rounded-lg font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
-                      >
-                        Profile
-                        <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </Link>
+                    {canOpenProfiles && (
+                      // `/employees/<id>` has no page of its own; the profile is the screen.
+                      <Link href={`/employees/${e.employeeId}/profile`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2.5 text-xs rounded-lg font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
+                        >
+                          Profile
+                          <ChevronRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </Link>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

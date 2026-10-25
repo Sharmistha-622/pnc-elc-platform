@@ -1,16 +1,12 @@
-import { sendOffboardingReminders } from '@/lib/offboarding/service';
+import { sendScheduledOffboardingReminders } from '@/lib/offboarding/reminders';
 import { NextResponse } from 'next/server';
+import { carriesCronSecret } from '@/lib/auth/cronSecret';
 
 export async function GET(request: Request) {
-  // An unset CRON_SECRET must fail closed. Comparing against
-  // `Bearer ${undefined}` would otherwise accept the literal string
-  // "Bearer undefined" from anyone.
-  const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get('authorization');
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!carriesCronSecret(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const result = await sendOffboardingReminders();
+  const result = await sendScheduledOffboardingReminders();
   return NextResponse.json(result);
 }

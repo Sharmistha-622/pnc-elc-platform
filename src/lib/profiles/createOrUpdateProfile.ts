@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { auditEmployee } from '@/lib/audit/events'
 import { resolveEmployeeSubject } from '@/lib/audit/subject'
+import { profileAccess } from './access'
 
 export type ProfileInput = {
   employeeId: string
@@ -24,6 +25,11 @@ export type ProfileInput = {
 }
 
 export async function createOrUpdateProfile(input: ProfileInput) {
+  // ID numbers, addresses and phone numbers are identity data. The person may
+  // keep their own up to date, and the roles that verify ID documents may
+  // correct anyone's; nobody else may write them, whatever page they are on.
+  if (!(await profileAccess(input.employeeId)).identity) return null
+
   const supabase = await createServerSupabaseClient()
 
   const payload = {

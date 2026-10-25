@@ -34,6 +34,9 @@ import {
 } from '@/components/ui/select'
 import { updateReportingManager, type EmployeeProfileData } from '@/lib/profile/profileActions'
 import { toast } from 'sonner'
+import { useUserContext } from '@/contexts/user-context'
+import { accessFor } from '@/lib/rbac/roles'
+import { canAccessRoute } from '@/lib/role-constants'
 
 interface ProfileClientProps {
   userEmail: string | null
@@ -42,6 +45,15 @@ interface ProfileClientProps {
 }
 
 export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClientProps) {
+  const user = useUserContext()
+  // Who reports to whom is the directory, and changing it is `general: edit`
+  // org-wide — P&C's call, not the employee's. `updateReportingManager`
+  // refuses everyone else; this only stops offering them a button that fails.
+  const general = user?.role ? accessFor(user.role, 'general') : null
+  const canChangeManager = general?.level === 'edit' && general.scope === 'all'
+  // A reportee's profile carries their phone and address, which a line
+  // manager's role does not include; the link shows only where it opens.
+  const canOpenProfiles = canAccessRoute(user?.role, '/employees/x/profile')
   const [isEditingManager, setIsEditingManager] = useState(false)
   const [selectedManagerId, setSelectedManagerId] = useState<string>(
     profile?.manager?.id || ''
@@ -207,7 +219,7 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
                 </div>
               </div>
 
-              {!isEditingManager && (
+              {!isEditingManager && canChangeManager && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -245,6 +257,7 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
               ) : (
                 <div className="text-center py-6 border border-dashed rounded-xl space-y-2">
                   <p className="text-xs text-muted-foreground">No reporting manager assigned yet.</p>
+                  {canChangeManager && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -253,6 +266,7 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
                   >
                     Select Manager
                   </Button>
+                  )}
                 </div>
               )
             ) : (
@@ -349,11 +363,13 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
                       </div>
                     </div>
 
-                    <Link href={`/employees/${rep.id}/profile`}>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-semibold text-indigo-600">
-                        Profile
-                      </Button>
-                    </Link>
+                    {canOpenProfiles && (
+                      <Link href={`/employees/${rep.id}/profile`}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-semibold text-indigo-600">
+                          Profile
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

@@ -41,6 +41,15 @@ describe('NAV_SECTIONS', () => {
     expect(new Set(titles).size).toBe(titles.length)
   })
 
+  // A nav entry is somewhere to go. "New Confirmation" used to sit beside
+  // "All Confirmations", which put a create action in front of Exec View, a
+  // read-only role. Actions belong on the screen they act on.
+  it('lists places, not actions', () => {
+    for (const url of allUrls) {
+      expect(url, url).not.toMatch(/\/(new|create|edit)(\/|$)/)
+    }
+  })
+
   it('starts each parent on a child it actually lists', () => {
     for (const item of allItems) {
       if (!item.items?.length) continue
@@ -70,12 +79,12 @@ describe('isItemActive', () => {
 
   it('lights Onboarding up for the candidate screens parked under /manage', () => {
     expect(isItemActive('/manage/onboarding/new', find('Onboarding'))).toBe(true)
-    expect(isItemActive('/onboarding/review/abc123', find('Candidate'))).toBe(true)
+    expect(isItemActive('/onboarding/review/abc123', find('Candidates'))).toBe(true)
   })
 
   it('does not light Data Management up for the form builder', () => {
     expect(isItemActive('/data-management/forms/7', find('Data Management'))).toBe(false)
-    expect(isItemActive('/data-management/forms/7', find('Forms'))).toBe(true)
+    expect(isItemActive('/data-management/forms/7', find('Form Builder'))).toBe(true)
     expect(isItemActive('/data-management/campuses', find('Data Management'))).toBe(true)
   })
 
@@ -95,8 +104,8 @@ describe('visibleSections', () => {
     // Platform Admin touches no employee data, so the lifecycle group should
     // not render as a heading above nothing.
     const ids = visibleSections('platform_admin').map((s) => s.id)
-    expect(ids).not.toContain('lifecycle')
-    expect(ids).toContain('platform')
+    expect(ids).not.toContain('people')
+    expect(ids).toContain('admin')
   })
 
   it('never shows an item the role cannot open', () => {
@@ -149,5 +158,27 @@ describe('visibleSections', () => {
       const items = visibleSections(role).flatMap((s) => s.items)
       expect(items.length, role).toBeGreaterThan(1)
     }
+  })
+
+  it('gives an Employee only what is theirs', () => {
+    const titles = visibleSections('employee').flatMap((s) => s.items).map((i) => i.title)
+    expect(titles).toEqual(['Dashboard', 'My Profile', 'My Forms'])
+  })
+
+  it('keeps the platform team out of the People section entirely', () => {
+    // Whoever builds the platform sees none of the lifecycle screens, all of
+    // which carry identity, salary or performance data for somebody.
+    for (const role of ['platform_admin', 'platform_ops'] as RoleCode[]) {
+      expect(visibleSections(role).map((s) => s.id), role).not.toContain('people')
+    }
+  })
+
+  it('drops My Team for someone with no reports, and only then', () => {
+    const titles = (hasReports?: boolean) =>
+      visibleSections('pnc_admin', { hasReports }).flatMap((s) => s.items).map((i) => i.title)
+    expect(titles(false)).not.toContain('My Team')
+    expect(titles(true)).toContain('My Team')
+    // Unknown is not "none": a failed lookup must not hide a manager's team.
+    expect(titles(undefined)).toContain('My Team')
   })
 })

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { signedUrlFor } from '@/lib/onboarding/candidate-storage';
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole';
+import { getCurrentEmployee } from '@/lib/forms/currentEmployee';
+import { canHandleDocuments } from '@/lib/documents/access';
 
 /**
  * Open an employee document that lives in private storage.
@@ -9,7 +12,11 @@ import { signedUrlFor } from '@/lib/onboarding/candidate-storage';
  * no long-lived link to an identity or bank proof is ever rendered into HTML
  * that might be cached, screenshotted or shared.
  *
- * Access is gated by `middleware.ts` on the `employees` feature.
+ * `middleware.ts` gates the prefix on the `employees` feature, which is the
+ * directory: Fin Admin, Fin Ops and Exec View pass it with `identity: none`.
+ * So this checks what the documents page checks — the roles that handle ID
+ * documents, by both effective and original role — or that the documents are
+ * the caller's own.
  */
 export async function GET(
   _req: NextRequest,
@@ -17,6 +24,18 @@ export async function GET(
 ) {
   const { id, documentType } = await params;
   const supabase = await createServerSupabaseClient();
+
+  const { userId, role, originalRole } = await getCurrentUserRole();
+  const handlesDocuments = canHandleDocuments(role) && canHandleDocuments(originalRole);
+  if (!userId || !handlesDocuments) {
+    const { employee } = userId ? await getCurrentEmployee(supabase) : { employee: null };
+    if (!employee || employee.id !== id) {
+      return NextResponse.json(
+        { success: false, error: 'You do not have access to this document.' },
+        { status: 403 }
+      );
+    }
+  }
 
   const { data: doc } = await supabase
     .from('documents')

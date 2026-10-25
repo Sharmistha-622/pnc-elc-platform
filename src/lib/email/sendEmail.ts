@@ -1,7 +1,16 @@
-'use server'
+// ============================================================================
+// Gmail transport
+// ----------------------------------------------------------------------------
+// Deliberately NOT a 'use server' module. `sendEmail` takes any recipient, any
+// subject and any HTML, so as a server action it would let any signed-in
+// browser send arbitrary mail from the organisation's Google Workspace account.
+// Only server code imports it — the lifecycle services, which decide who is
+// written to and why, are the actions the browser may call.
+// ============================================================================
 
 import { google } from 'googleapis'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 const oAuth2Client = new google.auth.OAuth2(
@@ -12,6 +21,27 @@ const oAuth2Client = new google.auth.OAuth2(
 oAuth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 })
+
+/**
+ * A value safe to place in a mail header.
+ *
+ * A CR or LF in `To`, `Cc` or `Subject` ends that header and starts another,
+ * so a name or subject carrying one could add a `Bcc:` line or replace the
+ * body. Folding them to spaces keeps the value readable and on one line.
+ */
+function headerValue(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim()
+}
+
+/** Escapes a value for interpolation into an email's HTML body. */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 function createEmailBody(to: string, subject: string, htmlBody: string, cc?: string) {
   const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
@@ -56,7 +86,9 @@ export async function sendEmail(
   data: Record<string, string>,
   recipient: string
 ) {
-  const subject = data.subject || `Notification: ${template}`
+  const subject = headerValue(data.subject || `Notification: ${template}`)
+  const to = headerValue(recipient)
+  const cc = data.cc ? headerValue(data.cc) : undefined
   const htmlBody = data.body || `<p>You have a new notification: ${template}</p>`
   const newLogId = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
   const category = getCategoryFromTemplate(template)
@@ -66,7 +98,7 @@ export async function sendEmail(
 
   try {
     const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
-    const raw = createEmailBody(recipient, subject, htmlBody, data.cc)
+    const raw = createEmailBody(to, subject, htmlBody, cc)
 
     const response = await gmail.users.messages.send({
       userId: 'me',
@@ -77,11 +109,13 @@ export async function sendEmail(
 
     // Automatically record real successful dispatch in database
     try {
-      const supabase = await createServerSupabaseClient()
+      // Service-role when available: reminders are sent from cron runs, which
+      // have no session, and the database refuses the anonymous role.
+      const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
       await supabase.from('email_delivery_logs').insert({
         id: newLogId,
-        recipient_name: data.recipient_name || recipient.split('@')[0],
-        recipient_email: recipient,
+        recipient_name: data.recipient_name || to.split('@')[0],
+        recipient_email: to,
         recipient_role: data.recipient_role || null,
         category,
         notification_type: notificationType,
@@ -104,16 +138,21 @@ export async function sendEmail(
 
     return { success: true, messageId }
   } catch (error: any) {
-    console.error('Error sending email:', error)
-    const errorMsg = error?.message || String(error)
+    // The message and code only. A Gmail client error carries the request it
+    // failed on — the OAuth bearer token in its headers and the whole message
+    // in its body — and none of that belongs in a log.
+    const errorMsg = error?.message || 'Unknown error'
+    console.error('Error sending email:', errorMsg, error?.code ?? '')
 
     // Automatically record failure in database
     try {
-      const supabase = await createServerSupabaseClient()
+      // Service-role when available: reminders are sent from cron runs, which
+      // have no session, and the database refuses the anonymous role.
+      const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
       await supabase.from('email_delivery_logs').insert({
         id: newLogId,
-        recipient_name: data.recipient_name || recipient.split('@')[0],
-        recipient_email: recipient,
+        recipient_name: data.recipient_name || to.split('@')[0],
+        recipient_email: to,
         recipient_role: data.recipient_role || null,
         category,
         notification_type: notificationType,

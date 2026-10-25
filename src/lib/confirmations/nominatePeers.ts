@@ -1,16 +1,36 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email/sendEmail'
+import { escapeHtml, sendEmail } from '@/lib/email/sendEmail'
 import { getNotificationSettings } from '@/lib/settings/service'
 import { auditPeerFeedback } from '@/lib/audit/events'
 import { resolveSubjectFromConfirmation } from '@/lib/audit/subject'
+import { guard } from '@/lib/rbac/guard'
+import { FEATURE_ACCESS } from '@/lib/role-constants'
+import { isAllowedEmail } from '@/lib/auth/allowedEmail'
+import { confirmationEmployeeId, mayActOnConfirmationOf } from './access'
 
 export async function nominatePeers(
   confirmationId: string,
   peers: { name: string; employeeId?: string; email?: string }[]
 ) {
+  // Nominating is part of starting a confirmation, and each nomination sends
+  // an email, so it is gated as tightly: P&C for anyone, and a line manager
+  // (whatever their role) only on a confirmation about one of their reports.
+  const allowed = await guard('dashboard')
+  if (!allowed.ok) return null
+
   const supabase = await createServerSupabaseClient()
+  const subjectId = await confirmationEmployeeId(supabase, confirmationId)
+  if (!(await mayActOnConfirmationOf(supabase, allowed.caller, subjectId, FEATURE_ACCESS.confirmationsInitiate))) {
+    return null
+  }
+
+  // A peer answers by signing in, and only organisation accounts can. Anyone
+  // else would be emailed a link they could never use, and their feedback
+  // would never arrive.
+  if (peers.some((peer) => peer.email && !isAllowedEmail(peer.email))) return null
+
    const rows = peers.map((peer) => ({
     confirmation_id: confirmationId,
     peer_name: peer.name,
@@ -44,7 +64,7 @@ export async function nominatePeers(
         'peer_feedback_request',
         {
           subject,
-          body: `<p>Hi ${peer.name},</p><p>You've been nominated to provide feedback as part of a confirmation review. Please share your feedback using the link below:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
+          body: `<p>Hi ${escapeHtml(peer.name)},</p><p>You've been nominated to provide feedback as part of a confirmation review. Please share your feedback using the link below:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
         },
         peer.email
       )

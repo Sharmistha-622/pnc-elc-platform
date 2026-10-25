@@ -65,11 +65,13 @@ export function generateInvitationToken(candidateName: string): string {
     .replace(/^-|-$/g, '')
     .slice(0, 24);
 
-  // 10 random characters. The token is the only credential guarding a
-  // candidate's PII, so it is long enough not to be guessable and the name is
-  // only a readability suffix.
+  // 16 random characters from a 32-letter alphabet: 80 bits. The token is the
+  // only credential guarding a candidate's PII, so it must not be guessable;
+  // the name is only a readability suffix. (Was 10 characters, 50 bits;
+  // tokens already issued keep working.) 256 is a multiple of 32, so the
+  // modulo below carries no bias.
   const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
-  const bytes = new Uint8Array(10);
+  const bytes = new Uint8Array(16);
   globalThis.crypto.getRandomValues(bytes);
   const random = Array.from(bytes, (b) => chars[b % chars.length]).join('');
 
@@ -232,8 +234,59 @@ export async function getOnboardingById(idOrToken: string): Promise<FullOnboardi
   return assemble(record, children);
 }
 
+/**
+ * When the portal is closed. A withdrawn joiner's link must stop working the
+ * day they withdraw, and someone already on the roster signs in like any
+ * other employee. `joiner_status` is reliable for `withdrawn` only (it was
+ * backfilled once and is not kept current otherwise), so joining is read from
+ * `status`.
+ */
+const PORTAL_CLOSED_JOINER = new Set(['withdrawn', 'active', 'confirmed']);
+const PORTAL_CLOSED_STATUS = new Set(['completed']);
+
+/**
+ * The candidate portal's lookup: the invitation token, and nothing else.
+ *
+ * This used to be `getOnboardingById`, which tries the record's uuid first —
+ * so the unauthenticated portal API answered to a record id as readily as to
+ * the token, and record ids are not secrets (they appear in the audit trail
+ * as `entity_id`). The dashboard keeps the id-or-token lookup; it sits behind
+ * a session and a role check.
+ */
 export async function getOnboardingByToken(token: string): Promise<FullOnboardingData | null> {
-  return getOnboardingById(token);
+  if (!token || isUuid(token)) return null;
+  const db = onboardingDb();
+  const res = await db
+    .from('onboarding_records')
+    .select('id, status, joiner_status')
+    .eq('invitation_token', token)
+    .maybeSingle();
+  assertOk(res.error, 'Failed to load onboarding record by token');
+  if (
+    !res.data ||
+    PORTAL_CLOSED_JOINER.has(res.data.joiner_status as string) ||
+    PORTAL_CLOSED_STATUS.has(res.data.status as string)
+  ) {
+    return null;
+  }
+  return getOnboardingById(res.data.id as string);
+}
+
+/**
+ * What the portal may send back to the candidate holding the token.
+ *
+ * Their own details and letters, yes — an offer reaches a candidate as a
+ * letter. P&C's working record of them, no: the activity log is staff notes,
+ * account provisioning is internal, and a storage path is an address into a
+ * private bucket.
+ */
+export function toPortalView(data: FullOnboardingData): FullOnboardingData {
+  return {
+    ...data,
+    activityLogs: [],
+    provisioning: null,
+    documents: data.documents.map((d) => ({ ...d, storage_reference: null }) as OnboardingDocument),
+  };
 }
 
 export async function getAllFullOnboardingData(): Promise<FullOnboardingData[]> {
@@ -440,10 +493,10 @@ export async function sendOnboardingInvitation(id: string): Promise<FullOnboardi
 // ---------------------------------------------------------------------------
 
 export async function recordPortalVisit(
-  tokenOrId: string,
+  token: string,
   metadata?: { ip?: string; userAgent?: string }
 ): Promise<FullOnboardingData | null> {
-  const data = await getOnboardingById(tokenOrId);
+  const data = await getOnboardingByToken(token);
   if (!data) return null;
 
   const { record } = data;

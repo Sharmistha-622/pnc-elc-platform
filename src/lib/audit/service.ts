@@ -1,10 +1,12 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import {
   AuditEvent,
   AuditEventInput,
   AuditModule,
   AuditQueryFilters,
 } from './types';
+import type { UserRole } from '@/lib/role-constants';
 
 // ============================================================================
 // UNIFIED EMPLOYEE AUDIT SERVICE
@@ -18,6 +20,19 @@ import {
 // ============================================================================
 
 const AUDIT_TABLE = 'employee_audit_log';
+
+/**
+ * The client an audit write goes through.
+ *
+ * The service-role client when there is one. Events are recorded from the
+ * candidate portal and from cron runs too, and neither carries a session: the
+ * database refuses the anonymous role everything, so a session-bound write
+ * there was silently dropped. This module is not a server action — nothing in
+ * the browser can call it — and it only ever appends.
+ */
+async function auditWriter() {
+  return createAdminSupabaseClient() ?? (await createServerSupabaseClient());
+}
 const QUERY_TIMEOUT_MS = 3000;
 
 /** In-process mirror, newest first. Bounded so a long-lived dev server cannot grow without limit. */
@@ -149,7 +164,7 @@ export async function recordAuditEvent(input: AuditEventInput): Promise<AuditEve
   rememberInMemory(event);
 
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await auditWriter();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
 
@@ -176,7 +191,7 @@ export async function recordAuditEvents(inputs: AuditEventInput[]): Promise<Audi
   events.forEach(rememberInMemory);
 
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await auditWriter();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
 
@@ -307,6 +322,53 @@ export async function getEmployeeAuditTrail(
     employee_id: subject.employee_id || undefined,
     employee_email: subject.employee_email || undefined,
   });
+}
+
+// ----------------------------------------------------------------------------
+// WHAT EACH READER SEES
+// ----------------------------------------------------------------------------
+
+/**
+ * Roles that read an event in full.
+ *
+ * The trail is reached by everyone in `dataManagement`, the platform roles
+ * included, but an event's field changes and metadata carry the values behind
+ * it: F&F figures and payment references, rejection and extension reasons,
+ * before-and-after values of a person's record. The platform roles hold
+ * `performance`, `salary` and `identity` at `none`, and a log line is not a
+ * way round that.
+ */
+const FULL_DETAIL_ROLES: readonly UserRole[] = ['super_admin', 'pnc_admin'];
+
+/**
+ * Modules whose sentences describe configuration rather than a person, and so
+ * stay readable to the platform roles: maintaining settings and data is their
+ * job. Every other module's description can quote a reason or an amount.
+ */
+const CONFIG_MODULES: readonly AuditModule[] = ['settings', 'data_management'];
+
+const RESTRICTED_DESCRIPTION = 'Details are visible to Super Admin and PnC Admin.';
+
+/** True when the caller may read descriptions, changes and metadata in full. */
+export function readsFullAuditDetail(caller: { role: UserRole; originalRole: UserRole }): boolean {
+  return FULL_DETAIL_ROLES.includes(caller.role) && FULL_DETAIL_ROLES.includes(caller.originalRole);
+}
+
+/**
+ * The events as this caller may see them. Who, when, which module and which
+ * action are kept for everyone the route admits; the values are not.
+ */
+export function auditEventsFor(
+  events: AuditEvent[],
+  caller: { role: UserRole; originalRole: UserRole }
+): AuditEvent[] {
+  if (readsFullAuditDetail(caller)) return events;
+  return events.map((e) => ({
+    ...e,
+    description: CONFIG_MODULES.includes(e.module) ? e.description : RESTRICTED_DESCRIPTION,
+    changes: null,
+    metadata: null,
+  }));
 }
 
 /** Per-module event counts for the current result set, for summary tiles. */
