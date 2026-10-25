@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.00.05",
+    "date": "2026-10-25",
+    "title": "Restore what #46 cut off, and the highlight its follow-up lost",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Line managers can open My Team again."
+      },
+      {
+        "category": "Fixes",
+        "description": "Confirmation reports and manager decisions show Confirmations as selected in the sidebar again."
+      },
+      {
+        "category": "Fixes",
+        "description": "The dashboard, the Appraisals page and the onboarding employee table offer only the screens your role can open, instead of links that bounce back to the dashboard."
+      },
+      {
+        "category": "Fixes",
+        "description": "Turning an email template on or off as PnC Admin now explains that platform settings are view-only, instead of reporting a failure."
+      }
+    ]
+  },
+  {
     "version": "2.00.04",
     "date": "2026-10-25",
     "title": "Claude/eager lamport c3ctxg",
