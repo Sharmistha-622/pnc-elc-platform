@@ -88,6 +88,15 @@ describe('isItemActive', () => {
     expect(isItemActive('/data-management/campuses', find('Data Management'))).toBe(true)
   })
 
+  // Both of Confirmations' children are exact matches, so on a detail page the
+  // parent is the only row that can show where you are; nav-main gives it the
+  // fill in exactly that case.
+  it('leaves a Confirmations detail page to the parent', () => {
+    const confirmations = allItems.find((i) => i.title === 'Confirmations')!
+    expect(isItemActive('/confirmations/42/report', confirmations)).toBe(true)
+    expect((confirmations.items ?? []).some((c) => isItemActive('/confirmations/42/report', c))).toBe(false)
+  })
+
   it('marks a parent as on-path when a child is the current screen', () => {
     const onboarding = allItems.find((i) => i.title === 'Onboarding')!
     expect(isItemOnPath('/onboarding/employee', onboarding)).toBe(true)
@@ -162,7 +171,7 @@ describe('visibleSections', () => {
 
   it('gives an Employee only what is theirs', () => {
     const titles = visibleSections('employee').flatMap((s) => s.items).map((i) => i.title)
-    expect(titles).toEqual(['Dashboard', 'My Profile', 'My Forms'])
+    expect(titles).toEqual(['Dashboard', 'My Profile', 'My Forms', 'My Team'])
   })
 
   it('keeps the platform team out of the People section entirely', () => {

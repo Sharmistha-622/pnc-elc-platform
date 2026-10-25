@@ -166,13 +166,20 @@ describe('canAccessRoute', () => {
   // means allow" and handed them to every signed-in user. /offboarding was the
   // sharp one: it loads every exit case in the organisation.
   it('gates the screens that used to fall through to everyone', () => {
-    for (const url of ['/offboarding', '/reports', '/audit', '/my-team']) {
+    for (const url of ['/offboarding', '/reports', '/audit']) {
       expect(canAccessRoute('employee', url), url).toBe(false)
     }
     expect(canAccessRoute('pnc_admin', '/offboarding')).toBe(true)
     expect(canAccessRoute('exec_view', '/reports')).toBe(true)
     expect(canAccessRoute('platform_ops', '/audit')).toBe(true)
     expect(canAccessRoute('manager', '/my-team')).toBe(true)
+  })
+
+  // Nothing derives `manager` from the reporting line yet, so a line manager
+  // is usually stored as `employee`. The page itself lists only their own
+  // reportees.
+  it('lets an employee open their own team', () => {
+    expect(canAccessRoute('employee', '/my-team')).toBe(true)
   })
 
   // Every staff role is also somebody's employee.

@@ -30,7 +30,7 @@ export type { NavItem, NavLeaf }
  * for it: whether it is the current screen, and whether the current screen is
  * one of its children.
  */
-export type RenderedItem = NavItem & {
+export type RenderedItem = Omit<NavItem, "items"> & {
   isActive?: boolean
   /** The current screen is a child of this item, not this item itself. */
   isOnPath?: boolean
@@ -122,12 +122,12 @@ function TopItem({
         <CollapsibleTrigger asChild>
           <SidebarMenuButton
             tooltip={item.tooltipOverride || item.title}
-            // A parent is never shown as the selected screen — one of its
-            // children is. Painting the active fill on both read as two
-            // separate selections; the lighter on-path treatment says "the
-            // thing you are looking at lives in here" without competing.
-            // `item.isActive` is true here whenever a child is (a parent's url
-            // prefixes its children's), so it must not reach `isActive`.
+            // The fill marks one row: the child that is the current screen
+            // when there is one, so the two do not read as two selections,
+            // and the parent itself only when no child covers the path —
+            // /confirmations/<id>/report, which neither exact-match child
+            // matches, would otherwise show nothing selected at all.
+            isActive={item.isActive && !item.items?.some((child) => child.isActive)}
             className={cn(item.isOnPath && "font-medium text-sidebar-accent-foreground")}
           >
             <item.icon />
