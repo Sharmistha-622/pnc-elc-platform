@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.00.06",
+    "date": "2026-10-25",
+    "title": "Payroll design set for Finance and P&C review",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Payroll design set for Finance and P&C review"
+      }
+    ]
+  },
+  {
     "version": "2.00.05",
     "date": "2026-10-25",
     "title": "Restore what #46 cut off, and the highlight its follow-up lost",
