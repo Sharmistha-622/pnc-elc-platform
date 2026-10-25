@@ -94,7 +94,7 @@ describe('isItemActive', () => {
   it('leaves a Confirmations detail page to the parent', () => {
     const confirmations = allItems.find((i) => i.title === 'Confirmations')!
     expect(isItemActive('/confirmations/42/report', confirmations)).toBe(true)
-    expect(confirmations.items!.some((c) => isItemActive('/confirmations/42/report', c))).toBe(false)
+    expect((confirmations.items ?? []).some((c) => isItemActive('/confirmations/42/report', c))).toBe(false)
   })
 
   it('marks a parent as on-path when a child is the current screen', () => {
@@ -171,7 +171,7 @@ describe('visibleSections', () => {
 
   it('gives an Employee only what is theirs', () => {
     const titles = visibleSections('employee').flatMap((s) => s.items).map((i) => i.title)
-    expect(titles).toEqual(['Dashboard', 'My Profile', 'My Forms'])
+    expect(titles).toEqual(['Dashboard', 'My Profile', 'My Forms', 'My Team'])
   })
 
   it('keeps the platform team out of the People section entirely', () => {
