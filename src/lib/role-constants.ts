@@ -155,8 +155,8 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // reporting line, but nothing assigns it yet (`deriveRole` in
   // rbac/lifecycle.ts is never called, and it cannot be granted by hand), so
   // most line managers are stored as `employee`. The page lists only the
-  // viewer's own reportees (`getMyProfileData`), so someone with none sees an
-  // empty team, not anyone else's.
+  // viewer's own reportees (`getMyProfileData`), and the sidebar drops the
+  // link for someone with none (`visibleSections`' `hasReports`).
   myTeam: STAFF,
   // The org-wide directory. `manager` is NOT here: the matrix scopes their
   // general access to their own team, and that is what My Team shows. The

@@ -98,7 +98,8 @@ export type NavSection = {
  * Only places belong here, never actions: "New Confirmation" is a button on
  * the Confirmations screen, not a destination of its own. Anything a role
  * cannot open is pruned before it renders (`visibleSections`), so an Employee
- * sees Dashboard, My Profile and My Forms and nothing else.
+ * sees Dashboard, My Profile and My Forms, and My Team once someone reports
+ * to them.
  */
 export const NAV_SECTIONS: NavSection[] = [
   {
