@@ -22,7 +22,10 @@ Create **two**:
 | Vault | `elc-vault` | production |
 | Vault dev | `elc-vault-dev` | dummy data only; where anything is tried first |
 
-Choose the same region as core. Set a strong database password and put it in
+Choose **`ap-south-1` (Mumbai)** for both. Payroll and HR data must stay in
+India-hosted storage. Core is currently in Singapore and is planned to move to
+Mumbai before real data is loaded (`docs/payroll/decisions.md`, D-01), so do
+not match core's current region. Set a strong database password and put it in
 your password manager, not in a file.
 
 **Members:** add nobody yet. The platform team is never added to either. The
