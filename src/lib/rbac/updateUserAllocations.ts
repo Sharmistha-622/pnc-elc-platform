@@ -184,8 +184,14 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   }
 
   // 2. Update employee record in public.employees (if present)
+  //
+  // With the service-role client, already in hand. The directory is
+  // `general: edit` for P&C only, so a Platform Admin's session is refused the
+  // write by the database — and an update refused by RLS changes zero rows
+  // without an error, which reported success while the team never moved. The
+  // `manageUsers` guard and `canGrantRole` above decide who gets this far.
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = admin
 
     let teamId: string | null = null
     let departmentId: string | null = null

@@ -103,6 +103,7 @@ export type Feature =
   | "onboarding"
   | "offers"
   | "letters"
+  | "lettersEdit"
   | "confirmations"
   | "confirmationsInitiate"
   | "appraisals"
@@ -180,6 +181,11 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // read salary are here — which leaves PnC Ops out (salary: none), and the
   // templates and signatories are configuration they hold no access to either.
   letters: ["super_admin", "pnc_admin", "fin_admin"],
+  // Drafting templates, issuing letters and naming signatories is P&C's. Fin
+  // Admin reads letters; it does not write them. No route of its own: the
+  // write handlers and actions check it, and it matches the "pnc write"
+  // policies on the letter tables in 202610241000_lockdown_rls.sql.
+  lettersEdit: ["super_admin", "pnc_admin"],
   // Reading the confirmation pipeline. Exec View is here to see it; it is a
   // read-only role and cannot start one (`confirmationsInitiate`).
   confirmations: ["super_admin", "pnc_admin", "pnc_ops", "exec_view", "manager"],

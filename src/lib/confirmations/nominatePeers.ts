@@ -6,25 +6,30 @@ import { getNotificationSettings } from '@/lib/settings/service'
 import { auditPeerFeedback } from '@/lib/audit/events'
 import { resolveSubjectFromConfirmation } from '@/lib/audit/subject'
 import { guard } from '@/lib/rbac/guard'
-import { confirmationEmployeeId, isTeamScoped, managesEmployee } from './access'
+import { FEATURE_ACCESS } from '@/lib/role-constants'
+import { isAllowedEmail } from '@/lib/auth/allowedEmail'
+import { confirmationEmployeeId, mayActOnConfirmationOf } from './access'
 
 export async function nominatePeers(
   confirmationId: string,
   peers: { name: string; employeeId?: string; email?: string }[]
 ) {
   // Nominating is part of starting a confirmation, and each nomination sends
-  // an email, so it is gated as tightly: `confirmationsInitiate`, and for a
-  // line manager only on a confirmation about one of their reports.
-  const allowed = await guard('confirmationsInitiate')
+  // an email, so it is gated as tightly: P&C for anyone, and a line manager
+  // (whatever their role) only on a confirmation about one of their reports.
+  const allowed = await guard('dashboard')
   if (!allowed.ok) return null
 
   const supabase = await createServerSupabaseClient()
-  if (
-    isTeamScoped(allowed.caller) &&
-    !(await managesEmployee(supabase, await confirmationEmployeeId(supabase, confirmationId)))
-  ) {
+  const subjectId = await confirmationEmployeeId(supabase, confirmationId)
+  if (!(await mayActOnConfirmationOf(supabase, allowed.caller, subjectId, FEATURE_ACCESS.confirmationsInitiate))) {
     return null
   }
+
+  // A peer answers by signing in, and only organisation accounts can. Anyone
+  // else would be emailed a link they could never use, and their feedback
+  // would never arrive.
+  if (peers.some((peer) => peer.email && !isAllowedEmail(peer.email))) return null
 
    const rows = peers.map((peer) => ({
     confirmation_id: confirmationId,

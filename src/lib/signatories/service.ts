@@ -18,7 +18,7 @@ import {
  * list is P&C's to maintain. Fin Admin drafts letters but does not decide who
  * signs them.
  */
-const SIGNATORY_EDITORS = ['super_admin', 'pnc_admin'] as const
+const SIGNATORY_EDITORS = 'lettersEdit' as const
 
 function isTableMissingError(error: any): boolean {
   if (!error) return false

@@ -235,11 +235,14 @@ export async function getOnboardingById(idOrToken: string): Promise<FullOnboardi
 }
 
 /**
- * Joiner statuses the portal is closed to. A withdrawn joiner's link must stop
- * working the day they withdraw, and someone already on the roster signs in
- * like any other employee.
+ * When the portal is closed. A withdrawn joiner's link must stop working the
+ * day they withdraw, and someone already on the roster signs in like any
+ * other employee. `joiner_status` is reliable for `withdrawn` only (it was
+ * backfilled once and is not kept current otherwise), so joining is read from
+ * `status`.
  */
-const PORTAL_CLOSED = new Set(['withdrawn', 'active', 'confirmed']);
+const PORTAL_CLOSED_JOINER = new Set(['withdrawn', 'active', 'confirmed']);
+const PORTAL_CLOSED_STATUS = new Set(['completed']);
 
 /**
  * The candidate portal's lookup: the invitation token, and nothing else.
@@ -255,11 +258,17 @@ export async function getOnboardingByToken(token: string): Promise<FullOnboardin
   const db = onboardingDb();
   const res = await db
     .from('onboarding_records')
-    .select('id, joiner_status')
+    .select('id, status, joiner_status')
     .eq('invitation_token', token)
     .maybeSingle();
   assertOk(res.error, 'Failed to load onboarding record by token');
-  if (!res.data || PORTAL_CLOSED.has(res.data.joiner_status as string)) return null;
+  if (
+    !res.data ||
+    PORTAL_CLOSED_JOINER.has(res.data.joiner_status as string) ||
+    PORTAL_CLOSED_STATUS.has(res.data.status as string)
+  ) {
+    return null;
+  }
   return getOnboardingById(res.data.id as string);
 }
 

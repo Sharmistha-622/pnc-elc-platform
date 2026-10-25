@@ -60,10 +60,22 @@ export interface DashboardData {
   stats: StatResult[];
 }
 
-/** Active joiner statuses — offered and not yet withdrawn or on the roster. */
-const PIPELINE = ["offer_pending", "offer_accepted", "docs_submitted", "docs_verified"];
-/** Accepted offers: someone who will actually turn up. */
-const ACCEPTED = ["offer_accepted", "docs_submitted", "docs_verified"];
+// Counted on `status`, the field every onboarding transition writes.
+// `joiner_status` was backfilled once and is otherwise only ever set to
+// `withdrawn`, so it is used for that and nothing else.
+/** Offered and not yet joined. */
+const PIPELINE = [
+  "draft", "invited", "in_progress", "submitted", "under_review",
+  "changes_requested", "approved", "account_provisioning",
+];
+/** Documents in, waiting on P&C. */
+const AWAITING_REVIEW = ["submitted", "under_review"];
+/** The candidate has accepted and started the portal: they will turn up. */
+const ACCEPTED = [
+  "in_progress", "submitted", "under_review", "changes_requested", "approved", "account_provisioning",
+];
+/** Rows that are not withdrawn. A null `joiner_status` is a live candidate. */
+const NOT_WITHDRAWN = "joiner_status.is.null,joiner_status.neq.withdrawn";
 const OPEN_FEEDBACK = ["pending", "reminded"];
 const CLOSED_EXITS = "(completed,cancelled)";
 /** A task panel shows this many; the rest are a click away. */
@@ -112,12 +124,15 @@ async function loadStat(
     case "candidatesToReview": {
       const admin = pipeline();
       if (!admin) return null;
-      return count(id, headCount(admin, "onboarding_records").eq("joiner_status", "docs_submitted"));
+      return count(
+        id,
+        headCount(admin, "onboarding_records").in("status", AWAITING_REVIEW).or(NOT_WITHDRAWN)
+      );
     }
     case "candidatesInPipeline": {
       const admin = pipeline();
       if (!admin) return null;
-      return count(id, headCount(admin, "onboarding_records").in("joiner_status", PIPELINE));
+      return count(id, headCount(admin, "onboarding_records").in("status", PIPELINE).or(NOT_WITHDRAWN));
     }
     case "joiningSoon": {
       const admin = pipeline();
@@ -125,7 +140,8 @@ async function loadStat(
       return count(
         id,
         headCount(admin, "onboarding_records")
-          .in("joiner_status", ACCEPTED)
+          .in("status", ACCEPTED)
+          .or(NOT_WITHDRAWN)
           .gte("joining_date", today)
           .lte("joining_date", addDays(today, 14))
       );
@@ -184,7 +200,11 @@ async function loadMyForms(): Promise<TaskGroup> {
   return group;
 }
 
-async function loadMyPeerFeedback(db: Db, me: { id: string } | null): Promise<TaskGroup> {
+async function loadMyPeerFeedback(
+  db: Db,
+  me: { id: string } | null,
+  email: string | null
+): Promise<TaskGroup> {
   const group: TaskGroup = {
     id: "myPeerFeedback",
     label: "Feedback you've been asked for",
@@ -193,22 +213,34 @@ async function loadMyPeerFeedback(db: Db, me: { id: string } | null): Promise<Ta
     items: [],
     loaded: true,
   };
-  if (!me) return group;
+  if (!me && !email) return group;
 
-  const { data, error } = await db
-    .from("peer_feedback")
-    .select("id, confirmations(employees(name))")
-    .eq("peer_employee_id", me.id)
-    .in("response_status", OPEN_FEEDBACK)
-    .order("created_at", { ascending: true })
-    .limit(TASK_LIMIT);
+  // A peer is nominated either from the directory (employee id) or by typing
+  // their address (email only), so both are asked for and merged. Explicit
+  // filters, not RLS: for P&C roles RLS returns every request in the org.
+  const open = () =>
+    db
+      .from("peer_feedback")
+      .select("id, created_at, confirmations(employees(name))")
+      .in("response_status", OPEN_FEEDBACK)
+      .order("created_at", { ascending: true })
+      .limit(TASK_LIMIT);
+  const results = await Promise.all([
+    me ? open().eq("peer_employee_id", me.id) : null,
+    email ? open().ilike("peer_email", email.replace(/[\\%_]/g, "\\$&")) : null,
+  ]);
 
-  if (error) {
-    console.error(`dashboard: peer feedback requests failed (${error.code ?? "unknown"})`);
+  const failed = results.find((r) => r?.error);
+  if (failed?.error) {
+    console.error(`dashboard: peer feedback requests failed (${failed.error.code ?? "unknown"})`);
     return { ...group, loaded: false };
   }
 
-  group.items = (data ?? []).map((row) => {
+  const byId = new Map<string, { id: string; created_at: string; confirmations: unknown }>();
+  for (const r of results) for (const row of r?.data ?? []) byId.set(row.id as string, row as never);
+  const data = [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+
+  group.items = data.map((row) => {
     const subject = (row.confirmations as { employees?: { name?: string } | null } | null)?.employees?.name;
     return {
       id: row.id as string,
@@ -281,12 +313,12 @@ export async function getDashboardData(
   if (!dashboard) return null;
 
   const db = await createServerSupabaseClient();
-  const { employee: me } = await getCurrentEmployee(db);
+  const { employee: me, email } = await getCurrentEmployee(db);
   const today = istToday();
 
   const taskLoaders: Record<TaskWidgetId, () => Promise<TaskGroup>> = {
     myForms: loadMyForms,
-    myPeerFeedback: () => loadMyPeerFeedback(db, me),
+    myPeerFeedback: () => loadMyPeerFeedback(db, me, email),
     teamDecisions: () => loadTeamDecisions(db, me),
   };
 

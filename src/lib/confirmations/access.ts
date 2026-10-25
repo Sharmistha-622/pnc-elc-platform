@@ -1,7 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { accessFor } from '@/lib/rbac/roles'
-import type { Guarded } from '@/lib/rbac/guard'
+import { passes, type Guarded } from '@/lib/rbac/guard'
+import { FEATURE_ACCESS } from '@/lib/role-constants'
 
 // ============================================================================
 // Who may do what with a confirmation
@@ -98,3 +99,24 @@ export async function isNominatedPeer(
     request.peer_email && email && request.peer_email.trim().toLowerCase() === email.trim().toLowerCase()
   )
 }
+
+/**
+ * True when the caller may act on this employee's confirmation.
+ *
+ * Either they run the process for everyone (`roles`, minus the team-scoped
+ * `manager`), or they are this employee's line manager — whatever their role.
+ * A user holds one role, so an executive or a PnC Ops lead with direct
+ * reports does not hold `manager`: the reporting line, not the role, is what
+ * makes them someone's manager. Before this check existed they were refused
+ * the decision on their own report while the dashboard listed it for them.
+ */
+export async function mayActOnConfirmationOf(
+  supabase: Db,
+  caller: Guarded,
+  employeeId: string | null | undefined,
+  roles: readonly string[]
+): Promise<boolean> {
+  if (!isTeamScoped(caller) && passes(caller, roles as typeof FEATURE_ACCESS.dashboard)) return true
+  return managesEmployee(supabase, employeeId)
+}
+

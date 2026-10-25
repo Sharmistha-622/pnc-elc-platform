@@ -87,15 +87,27 @@ $$;
 -- The caller's role. Null — matching no policy — for anyone outside the
 -- organisation, however they came by a session. Otherwise the stored role,
 -- with the owner pinned to super_admin and `employee` as the fail-safe for
--- organisation members who have none.
+-- organisation members who have none, or whose stored value is not a v1 code.
+--
+-- Read from auth.users, not from the JWT. The token carries the role as it
+-- was when it was issued, so a demoted user kept their old rights here until
+-- it expired, while the app (which reads the user fresh) had already taken
+-- them away. Security definer, because sessions cannot read auth.users.
 create or replace function public.current_app_role() returns text
-  language sql stable
+  language sql stable security definer
+  set search_path = public
   as $$
   select case
-    when not public.is_org_email(auth.jwt() ->> 'email') then null
-    when lower(auth.jwt() ->> 'email') = 'nitin@navgurukul.org' then 'super_admin'
-    else coalesce(auth.jwt() -> 'app_metadata' ->> 'role', 'employee')
-  end;
+    when not public.is_org_email(u.email) then null
+    when lower(u.email) = 'nitin@navgurukul.org' then 'super_admin'
+    when u.raw_app_meta_data ->> 'role' in (
+      'super_admin', 'pnc_admin', 'pnc_ops', 'fin_admin', 'fin_ops', 'exec_view',
+      'platform_admin', 'platform_ops', 'manager', 'employee', 'pre_joiner', 'candidate'
+    ) then u.raw_app_meta_data ->> 'role'
+    else 'employee'
+  end
+  from auth.users u
+  where u.id = auth.uid()
 $$;
 
 create or replace function public.has_role(variadic p_roles text[]) returns boolean
@@ -336,9 +348,11 @@ create policy "identity roles write" on public.documents for all to authenticate
 -- The pipeline: the `confirmations` roles org-wide, a manager for their own
 -- reports, the employee for their own outcome, and a nominated peer for the
 -- one confirmation they are reviewing.
+-- Fin Admin reads outcomes (`outcomes_only`): the reports screen counts
+-- decisions. This table holds the decision, never the reasoning.
 create policy "pipeline, team, self or peer read" on public.confirmations for select to authenticated
   using (
-    public.has_role('super_admin', 'pnc_admin', 'pnc_ops', 'exec_view')
+    public.has_role('super_admin', 'pnc_admin', 'pnc_ops', 'exec_view', 'fin_admin')
     or public.manages(employee_id)
     or employee_id = public.current_employee_id()
     or public.is_peer_on(id)

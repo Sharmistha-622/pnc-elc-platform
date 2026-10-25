@@ -187,6 +187,13 @@ describe('the database and the app agree', () => {
     expect(domains).toEqual(DEFAULT_ALLOWED_DOMAINS)
   })
 
+  it('on who may write letters, templates and signatories', async () => {
+    const { FEATURE_ACCESS } = await import('@/lib/role-constants')
+    const block = lockdown.match(/foreach t in array array\['letter_templates', 'authorized_signatories'\][\s\S]*?"pnc write"[\s\S]*?using \(public\.has_role\(([^)]+)\)\)/)?.[1] ?? ''
+    const roles = [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
+    expect(roles).toEqual([...FEATURE_ACCESS.lettersEdit].sort())
+  })
+
   it('on who may change master data', async () => {
     const { FEATURE_ACCESS } = await import('@/lib/role-constants')
     const block = lockdown.match(/"data management writes"[\s\S]*?using \(public\.has_role\(([^)]+)\)\)/)?.[1] ?? ''

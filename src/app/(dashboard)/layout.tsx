@@ -11,6 +11,7 @@ import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
 import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
+import { getHasReports } from "@/lib/employees/hasReports"
 
 export default async function DashboardLayout({
     children,
@@ -36,8 +37,6 @@ export default async function DashboardLayout({
     let profileAvatar = ""
     let team: string | null = null
     let employeeType: string | null = null
-    // Undefined until we know: the sidebar then falls back to the role alone.
-    let hasReports: boolean | undefined
 
     if (authUser) {
         profileEmail = authUser.email || profileEmail
@@ -53,7 +52,7 @@ export default async function DashboardLayout({
         try {
             const { data: employee } = await supabase
                 .from('employees')
-                .select('id, name, email, teams(name), employee_types(name)')
+                .select('name, email, teams(name), employee_types(name)')
                 .eq('email', profileEmail)
                 .maybeSingle()
 
@@ -61,14 +60,6 @@ export default async function DashboardLayout({
                 if (employee.name) profileName = employee.name
                 team = (employee.teams as any)?.name || null
                 employeeType = (employee.employee_types as any)?.name || null
-
-                // A count, not the rows: the shell only needs to know whether
-                // My Team leads anywhere.
-                const { count, error } = await supabase
-                    .from('employees')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('manager_id', employee.id)
-                if (!error) hasReports = (count ?? 0) > 0
             }
         } catch {
             // Ignore DB schema lookup failure in disconnected environments
@@ -90,6 +81,8 @@ export default async function DashboardLayout({
     }
 
     const effectiveRole: UserRole = role || DEFAULT_ROLE
+    // Whether My Team leads anywhere. Shared with the dashboard page.
+    const hasReports = await getHasReports()
 
     const userData: User = {
         id: authUser.id,

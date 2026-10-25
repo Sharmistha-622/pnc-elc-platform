@@ -50,6 +50,11 @@ change it reports none.
 - Email header injection through recipient and subject. Unescaped names in
   email HTML.
 - A conditional React hook in the edit-user dialog.
+- A role change took effect in the app at once but in the database only when
+  the session token was refreshed. A demoted user therefore kept their
+  database rights until the token expired. Policies now read the role from
+  `auth.users`, not the token, and the probe includes a persona whose token
+  claims a role it no longer holds.
 - `npm run lint` linted nothing. ESLint matched no `.ts` or `.tsx` file, so CI's
   lint step always passed. It now lints everything.
 
@@ -62,11 +67,12 @@ mistakes it for a bug.
 |---|---|
 | **Manager** | No Onboarding and no org-wide Employees directory: My Team covers their reports. Reportees' profiles and documents are no longer linked (phone, address and ID scans are not a manager's). Confirmations and appraisals show their own team only |
 | **PnC Ops** | No Letters (every letter quotes a CTC). Cannot create a candidate (the form takes the CTC). The pipeline shows no CTC, annexure or letter text. Exits show no full-and-final amounts. Feedback shows who responded, not what they wrote |
-| **Fin Admin** | Can no longer open candidate ID documents (`identity: none`) |
+| **Fin Admin** | Can no longer open candidate ID documents (`identity: none`). Reads letters and templates but does not edit them (`lettersEdit`) |
+| **Anyone with direct reports, in any role** | Starts and decides confirmations for their own reports. The reporting line makes someone a manager, not the role, so an Exec View or PnC Ops lead keeps this |
 | **Exec View** | Reads confirmations but cannot start one |
 | **Platform Admin and Ops** | Cannot import employees, read form answers, or see audit event details |
 | **Employee** | Cannot change their own manager. The "link existing record" and "switch profile" controls on My Forms are gone |
-| **Anyone outside the organisation's domain** | Signed out at sign-in |
+| **Anyone outside the organisation's domain** | Signed out at sign-in, and cannot be nominated as a peer reviewer: they could never sign in to answer |
 | **Everyone** | The dashboard shows what is waiting on them and the numbers for their role, instead of eight shortcut cards. The sidebar lists only what they can open |
 
 ## Actions only the owner can take

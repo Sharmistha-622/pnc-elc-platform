@@ -34,7 +34,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const allowed = await guard('letters');
+  const allowed = await guard('lettersEdit');
   if (!allowed.ok) {
     return NextResponse.json({ success: false, error: allowed.error }, { status: 403 });
   }
@@ -67,7 +67,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const allowed = await guard('letters');
+  const allowed = await guard('lettersEdit');
   if (!allowed.ok) {
     return NextResponse.json({ success: false, error: allowed.error }, { status: 403 });
   }

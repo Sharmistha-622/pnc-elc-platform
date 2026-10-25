@@ -73,34 +73,48 @@ begin
   end if;
 end $$;
 
--- Become a persona the way PostgREST does: claims first, then the role.
-create function pg_temp.claims(p_email text, p_role text) returns text
-  language sql as $$
-  select json_build_object(
-    'sub', gen_random_uuid(), 'email', p_email, 'role', 'authenticated',
-    'app_metadata', json_build_object('role', p_role)
-  )::text
-$$;
 
 -------------------------------------------------------------------------
 -- The matrix, as expectations
 -------------------------------------------------------------------------
--- One row per persona: how it signs in, and what it should see.
-create table pg_temp.cast_list (persona text, email text, app_role text, db_role text);
-insert into pg_temp.cast_list values
-  ('anon',            null,                         null,             'anon'),
-  ('outsider',        'someone@gmail.com',          'super_admin',    'authenticated'),
-  ('employee (R)',    'r@navgurukul.org',           'employee',       'authenticated'),
-  ('peer (X)',        'x@navgurukul.org',           'employee',       'authenticated'),
-  ('manager (M)',     'm@navgurukul.org',           'manager',        'authenticated'),
-  ('pnc_ops',         'ops@navgurukul.org',         'pnc_ops',        'authenticated'),
-  ('pnc_admin',       'pa@navgurukul.org',          'pnc_admin',      'authenticated'),
-  ('fin_admin',       'fa@navgurukul.org',          'fin_admin',      'authenticated'),
-  ('fin_ops',         'fo@navgurukul.org',          'fin_ops',        'authenticated'),
-  ('exec_view',       'ex@navgurukul.org',          'exec_view',      'authenticated'),
-  ('platform_admin',  'plat@navgurukul.org',        'platform_admin', 'authenticated'),
-  ('platform_ops',    'plops@navgurukul.org',       'platform_ops',   'authenticated'),
-  ('super_admin',     'sa@navgurukul.org',          'super_admin',    'authenticated');
+-- One row per persona: how it signs in, the role stored for it, the role its
+-- token claims, and what it should see. The database must trust the stored
+-- role, never the token's copy.
+create table pg_temp.cast_list (
+  persona text, email text, stored_role text, token_role text, db_role text,
+  id uuid default gen_random_uuid()
+);
+insert into pg_temp.cast_list (persona, email, stored_role, token_role, db_role) values
+  ('anon',            null,                    null,             null,            'anon'),
+  ('outsider',        'someone@gmail.com',     'super_admin',    'super_admin',   'authenticated'),
+  -- Demoted since their token was issued: it still says super_admin.
+  ('stale token',     'stale@navgurukul.org',  'employee',       'super_admin',   'authenticated'),
+  ('employee (R)',    'r@navgurukul.org',      'employee',       'employee',      'authenticated'),
+  ('peer (X)',        'x@navgurukul.org',      'employee',       'employee',      'authenticated'),
+  ('manager (M)',     'm@navgurukul.org',      'manager',        'manager',       'authenticated'),
+  ('pnc_ops',         'ops@navgurukul.org',    'pnc_ops',        'pnc_ops',       'authenticated'),
+  ('pnc_admin',       'pa@navgurukul.org',     'pnc_admin',      'pnc_admin',     'authenticated'),
+  ('fin_admin',       'fa@navgurukul.org',     'fin_admin',      'fin_admin',     'authenticated'),
+  ('fin_ops',         'fo@navgurukul.org',     'fin_ops',        'fin_ops',       'authenticated'),
+  ('exec_view',       'ex@navgurukul.org',     'exec_view',      'exec_view',     'authenticated'),
+  ('platform_admin',  'plat@navgurukul.org',   'platform_admin', 'platform_admin','authenticated'),
+  ('platform_ops',    'plops@navgurukul.org',  'platform_ops',   'platform_ops',  'authenticated'),
+  ('super_admin',     'sa@navgurukul.org',     'super_admin',    'super_admin',   'authenticated');
+
+-- Their accounts, as Supabase Auth would hold them.
+insert into auth.users (id, email, raw_app_meta_data)
+  select id, email, jsonb_build_object('role', stored_role)
+    from pg_temp.cast_list where email is not null;
+
+-- Become a persona the way PostgREST does: claims first, then the role.
+create function pg_temp.claims(p_email text) returns text
+  language sql as $$
+  select json_build_object(
+    'sub', c.id, 'email', c.email, 'role', 'authenticated',
+    'app_metadata', json_build_object('role', c.token_role)
+  )::text
+  from pg_temp.cast_list c where c.email = p_email
+$$;
 
 create table pg_temp.expectations (tbl text, allow text[]);
 insert into pg_temp.expectations values
@@ -108,12 +122,13 @@ insert into pg_temp.expectations values
   ('onboarding_records',     '{}'),
   ('salary_structures',      '{}'),
   -- The directory: staff, not the internet and not outsiders.
-  ('employees',              '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('employees',              '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   -- Identity: the person, and identity: edit roles. Not their manager, not
   -- Finance, not leadership, not the platform team.
   ('employee_profiles',      '{"employee (R)",pnc_ops,pnc_admin,super_admin}'),
   -- The confirmation: the pipeline roles, R's manager, R, and the peer.
-  ('confirmations',          '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  -- Fin Admin reads outcomes for reports.
+  ('confirmations',          '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,exec_view,super_admin}'),
   -- Feedback text: never the subject, never Finance or the platform team.
   -- (pnc_ops is a known, documented residual — see the migration.)
   ('peer_feedback',          '{"peer (X)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
@@ -139,7 +154,7 @@ declare
 begin
   for c in select * from pg_temp.cast_list loop
     perform set_config('request.jwt.claims',
-      case when c.email is null then '' else pg_temp.claims(c.email, c.app_role) end, false);
+      case when c.email is null then '' else pg_temp.claims(c.email) end, false);
     execute format('set role %I', c.db_role);
     for i in 1 .. array_length(tbls, 1) loop
       perform pg_temp.expect(
@@ -156,7 +171,7 @@ end $$;
 -------------------------------------------------------------------------
 -- The account takeover: an employee writes their own email onto a colleague's
 -- record, after which `current_employee_id()` would resolve to that colleague.
-do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('x@navgurukul.org', 'employee'), false); end $$;
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('x@navgurukul.org'), false); end $$;
 set role authenticated;
 update public.employees set email = 'x@navgurukul.org' where id = '00000000-0000-0000-0000-00000000000b';
 reset role;
@@ -181,7 +196,7 @@ end $$;
 reset role;
 
 -- Platform Admin cannot read form answers through the forms policies.
-do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('plat@navgurukul.org', 'platform_admin'), false); end $$;
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('plat@navgurukul.org'), false); end $$;
 set role authenticated;
 do $$
 declare allowed boolean;

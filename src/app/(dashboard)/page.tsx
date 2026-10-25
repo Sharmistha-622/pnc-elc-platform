@@ -3,6 +3,7 @@ import { ShieldAlert } from "lucide-react";
 import { DashboardGreeting } from "@/components/dashboard-greeting";
 import { requireFeature } from "@/lib/rbac/requireFeature";
 import { getDashboardData } from "@/lib/dashboard/getDashboardData";
+import { getHasReports } from "@/lib/employees/hasReports";
 import { TONES } from "@/lib/ui/tone";
 import { AtAGlance } from "./_components/dashboard/at-a-glance";
 import { WaitingOnYou } from "./_components/dashboard/waiting-on-you";
@@ -20,8 +21,12 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ denied?: string }>;
 }) {
-  const [{ role }, { denied }] = await Promise.all([requireFeature("dashboard"), searchParams]);
-  const data = await getDashboardData(role);
+  const [{ role }, { denied }, hasReports] = await Promise.all([
+    requireFeature("dashboard"),
+    searchParams,
+    getHasReports(),
+  ]);
+  const data = await getDashboardData(role, { hasReports });
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">

@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { auditOffboarding, auditAccess, auditLetters } from '@/lib/audit/events';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email/sendEmail';
@@ -1193,6 +1194,7 @@ function withoutSettlementFigures(fnf: OffboardingFnF): OffboardingFnF {
   return {
     ...fnf,
     other_deductions: 0,
+    asset_recovery_amount: 0,
     net_payable_estimate: undefined,
     payment_reference: null,
     payment_date: null,
@@ -1283,11 +1285,24 @@ export async function getOffboardingById(id: string): Promise<FullOffboardingDat
     clearTimeout(timeout);
 
     if (!caseErr && caseRow) {
+      // PnC Ops runs the exit but holds `salary: none`, and the database
+      // closes `offboarding_fnf` to them. They still need to see where the
+      // settlement stands and what is blocking it, so for them those columns
+      // — and no amount — are read with the service-role client, past the
+      // `offboarding` guard above.
+      const salary = maySeeSalary(allowed.caller);
+      const fnfQuery = salary
+        ? supabase.from('offboarding_fnf').select('*')
+        : (createAdminSupabaseClient() ?? supabase)
+            .from('offboarding_fnf')
+            .select(
+              'id, offboarding_id, status, blocked_reasons, payable_days, leave_encashment_days, gratuity_eligible, processed_at, created_at, updated_at'
+            );
       const [chkRes, assetRes, ndcRes, fnfRes, logsRes] = await Promise.all([
         supabase.from('offboarding_checklists').select('*').eq('offboarding_id', id),
         supabase.from('offboarding_asset_clearances').select('*').eq('offboarding_id', id),
         supabase.from('offboarding_ndc').select('*').eq('offboarding_id', id),
-        supabase.from('offboarding_fnf').select('*').eq('offboarding_id', id).single(),
+        fnfQuery.eq('offboarding_id', id).maybeSingle(),
         supabase.from('offboarding_activity_log').select('*').eq('offboarding_id', id).order('created_at', { ascending: false }),
       ]);
 
@@ -1302,7 +1317,7 @@ export async function getOffboardingById(id: string): Promise<FullOffboardingDat
         checklist: chkRes.data || [],
         assets: assetRes.data || [],
         ndc: ndcRes.data || [],
-        fnf: fnfRes.data || {
+        fnf: {
           id: `fnf-${id}`,
           offboarding_id: id,
           status: 'not_started',
@@ -1314,6 +1329,7 @@ export async function getOffboardingById(id: string): Promise<FullOffboardingDat
           blocked_reasons: [],
           created_at: caseRow.created_at,
           updated_at: caseRow.updated_at,
+          ...((fnfRes.data as Partial<OffboardingFnF> | null) ?? {}),
         },
         activityLogs: logsRes.data || [],
         documents: [],

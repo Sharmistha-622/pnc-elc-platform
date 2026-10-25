@@ -3,13 +3,14 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { escapeHtml, sendEmail } from '@/lib/email/sendEmail'
 import { guard } from '@/lib/rbac/guard'
-import { isTeamScoped, managesEmployee } from './access'
+import { FEATURE_ACCESS } from '@/lib/role-constants'
+import { mayActOnConfirmationOf } from './access'
 
 // Emails the employee under review, asking them to fill their own form
 export async function notifyEmployee(employee: { name: string; email: string }) {
   // Sent as the last step of starting a confirmation, so it answers to the
   // same gate as `createConfirmation`.
-  const allowed = await guard('confirmationsInitiate')
+  const allowed = await guard('dashboard')
   if (!allowed.ok) return { success: false, error: allowed.error }
 
   // The address must belong to someone in the directory — for a line manager,
@@ -25,7 +26,7 @@ export async function notifyEmployee(employee: { name: string; email: string }) 
     .limit(1)
   const found = ((rows ?? []) as { id: string; name: string | null; email: string | null }[])[0]
   if (!found?.email) return { success: false, error: 'No employee has that email address.' }
-  if (isTeamScoped(allowed.caller) && !(await managesEmployee(supabase, found.id))) {
+  if (!(await mayActOnConfirmationOf(supabase, allowed.caller, found.id, FEATURE_ACCESS.confirmationsInitiate))) {
     return { success: false, error: 'That employee does not report to you.' }
   }
 

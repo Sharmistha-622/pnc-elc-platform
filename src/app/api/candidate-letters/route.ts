@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const allowed = await guard('letters');
+  const allowed = await guard('lettersEdit');
   if (!allowed.ok) {
     return NextResponse.json({ success: false, error: allowed.error }, { status: 403 });
   }
