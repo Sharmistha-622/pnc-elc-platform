@@ -12,12 +12,17 @@ Do NOT edit src/lib/changelog.json — the Changelog workflow writes it after
 this PR merges. Two branches both editing that file is what used to conflict
 on every release.
 
-The version bump comes from this PR's title prefix (`feat:` → minor,
-`feat!:` or a BREAKING CHANGE footer → major, anything else → patch), or from
-a `release:major|minor|patch` label, which wins. Add `no-changelog` to skip
-the note entirely.
+The title must start with a type: fix, feat, chore, docs, refactor, perf,
+test, build, ci, style or revert. It sets the version bump (`feat:` → minor,
+`feat!:` or a line beginning `BREAKING CHANGE:` → major, anything else →
+patch), unless a `release:major|minor|patch` label says otherwise. Add
+`no-changelog` to skip the note entirely.
 
 Leave this section out and the PR title is used instead.
+
+The Changelog check comments on this PR with the exact version and note that
+merging it will record, and fails on a title or bullet that would record a
+wrong one.
 -->
 
 - Fixes:
