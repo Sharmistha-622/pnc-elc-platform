@@ -1,5 +1,49 @@
 [
   {
+    "version": "2.01.00",
+    "date": "2026-10-25",
+    "title": "Segment the sidenav into role-aware groups and register the unmapped routes",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Registered the six dashboard routes that no feature claimed — `/offboarding`, `/reports`, `/audit`, `/my-team`, `/my-forms` and `/profile` were reachable by every signed-in user, including candidates."
+      },
+      {
+        "category": "Security",
+        "description": "Line managers can no longer open the offer-letter editor, letter templates or the signing authorities; those screens moved out of the `onboarding` feature into a new `letters` feature."
+      },
+      {
+        "category": "Security",
+        "description": "Platform settings writes are refused server-side for roles with view-only `config` access, rather than relying on the form being read-only."
+      },
+      {
+        "category": "Features",
+        "description": "Grouped the sidebar into six labelled sections with separators, pruned per role so a group whose screens are all out of reach disappears entirely."
+      },
+      {
+        "category": "Features",
+        "description": "PnC Admin can now read platform settings and email configuration, with a view-only banner and server-enforced refusal on writes."
+      },
+      {
+        "category": "Improvements",
+        "description": "Moved the nav tree out of `app-sidebar.tsx` into `src/lib/navigation/sidebar-nav.ts`, capped it at two levels in the type system, and replaced twenty-five hand-written active-path expressions with one matcher."
+      },
+      {
+        "category": "Fixes",
+        "description": "A parent nav item no longer shows as selected alongside its active child."
+      },
+      {
+        "category": "Fixes",
+        "description": "The sidebar accordion now opens the right section after client-side navigation instead of only on first render."
+      },
+      {
+        "category": "Fixes",
+        "description": "Candidates and pre-joiners who reach the app outside their invitation link get a notice page instead of a redirect loop."
+      }
+    ]
+  },
+  {
     "version": "2.00.06",
     "date": "2026-10-25",
     "title": "Payroll design set for Finance and P&C review",
