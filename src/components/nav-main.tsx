@@ -124,9 +124,8 @@ function TopItem({
             tooltip={item.tooltipOverride || item.title}
             // The fill marks one row: the child that is the current screen
             // when there is one, so the two do not read as two selections,
-            // and the parent itself only when no child covers the path —
-            // /confirmations/<id>/report, which neither exact-match child
-            // matches, would otherwise show nothing selected at all.
+            // and the parent itself only when no child covers the path, so a
+            // page none of them matches still shows where you are.
             isActive={item.isActive && !item.items?.some((child) => child.isActive)}
             className={cn(item.isOnPath && "font-medium text-sidebar-accent-foreground")}
           >
