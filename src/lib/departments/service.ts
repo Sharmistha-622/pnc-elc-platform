@@ -1,4 +1,7 @@
-import { createClient } from '@/lib/supabase/client';
+// The server client, bound to the caller's session. These run inside API
+// route handlers, where the browser client has no session and was querying
+// as the anonymous role — which the database no longer serves.
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Department, CreateDepartmentInput, UpdateDepartmentInput } from './types';
 
 // Default initial state matching the requested 10 NavGurukul departments
@@ -120,7 +123,7 @@ let memoryDepartments: Department[] = [...DEFAULT_DEPARTMENTS];
 
 export async function getDepartments(includeArchived: boolean = true): Promise<Department[]> {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     let query = supabase.from('departments').select('*').order('name');
     if (!includeArchived) {
       query = query.eq('is_archived', false);
@@ -152,7 +155,7 @@ export async function createDepartment(input: CreateDepartmentInput): Promise<De
   };
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from('departments').insert(newDept).select().single();
     if (!error && data) {
       memoryDepartments = [data as Department, ...memoryDepartments];
@@ -176,7 +179,7 @@ export async function updateDepartment(
   };
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('departments')
       .update(updatedFields)

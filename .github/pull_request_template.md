@@ -22,7 +22,19 @@ Leave this section out and the PR title is used instead.
 
 - Fixes:
 
+## Data access
+
+<!--
+Required. Reviewed against REVIEW.md. "None" is a fine answer when it is true.
+-->
+
+- **New or changed screens, API routes, server actions:**
+- **Roles that can now see something they could not before, and what:**
+- **Sensitive fields touched (salary, bank, ID numbers, written feedback):**
+
 ## Checks
 
 - [ ] `npm test`, `npm run lint` and `npx tsc --noEmit` pass locally
 - [ ] Any migration re-runs cleanly on an already-migrated database
+- [ ] If `supabase/` changed: `scripts/rls-probe.sh` passes
+- [ ] No real personal data, secrets or production identifiers anywhere in the diff

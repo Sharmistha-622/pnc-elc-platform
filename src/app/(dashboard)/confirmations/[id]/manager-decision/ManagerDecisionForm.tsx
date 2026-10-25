@@ -17,13 +17,18 @@ export function ManagerDecisionForm({
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!decision) return
     setSubmitting(true)
-    await updateManagerDecision(confirmationId, decision, rescheduleDate || undefined)
-    setSuccess(true)
+    setFailed(false)
+    // Null means the decision was not recorded — refused, or failed. It used
+    // to be ignored, so a refusal still read "Decision recorded".
+    const saved = await updateManagerDecision(confirmationId, decision, rescheduleDate || undefined)
+    if (saved) setSuccess(true)
+    else setFailed(true)
     setSubmitting(false)
   }
 
@@ -106,6 +111,11 @@ export function ManagerDecisionForm({
       >
         {submitting ? 'Submitting...' : 'Submit Decision'}
       </button>
+      {failed && (
+        <p className="text-red-700 dark:text-red-300 text-sm">
+          The decision was not recorded. Only the employee&apos;s reporting manager or P&amp;C can record it.
+        </p>
+      )}
     </form>
   )
 }

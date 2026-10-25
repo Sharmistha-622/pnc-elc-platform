@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOnboardingByToken, uploadCandidateDocument } from '@/lib/onboarding/service';
+import { getOnboardingByToken, toPortalView, uploadCandidateDocument } from '@/lib/onboarding/service';
 import {
   uploadCandidateFile,
   formatFileSize,
@@ -64,7 +64,7 @@ export async function POST(
         uploaded.path,
         uploaded.mimeType
       );
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({ success: true, data: data ? toPortalView(data) : data });
     } catch (dbError: any) {
       // Do not leave an orphan object behind that no row points at.
       await removeCandidateFile(uploaded.path);

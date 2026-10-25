@@ -1,4 +1,7 @@
-import { createClient } from '@/lib/supabase/client';
+// The server client, bound to the caller's session. These run inside API
+// route handlers, where the browser client has no session and was querying
+// as the anonymous role — which the database no longer serves.
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import {
   EmploymentType,
   CreateEmploymentTypeInput,
@@ -102,7 +105,7 @@ function normalizeRecord(item: any): EmploymentType {
 
 export async function getEmploymentTypes(includeArchived: boolean = true): Promise<EmploymentType[]> {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     let query = supabase.from('employee_types').select('*').order('name');
     if (!includeArchived) {
       query = query.or('status.eq.active,status.is.null');
@@ -147,7 +150,7 @@ export async function createEmploymentType(input: CreateEmploymentTypeInput): Pr
   };
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from('employee_types').insert(newType).select().single();
     if (!error && data) {
       const inserted = normalizeRecord(data);
@@ -176,7 +179,7 @@ export async function updateEmploymentType(
   }
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('employee_types')
       .update(updatedFields)
@@ -212,7 +215,7 @@ export async function makeAllEmploymentTypesActive(): Promise<void> {
   }));
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     await supabase.from('employee_types').update({ status: 'active' }).neq('status', 'active');
   } catch (err) {
     // ignore

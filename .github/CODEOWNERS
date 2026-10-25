@@ -1,0 +1,38 @@
+# Code owners for the paths that decide who sees what.
+#
+# A change to any of these can widen access to salary, bank details, ID
+# numbers or written feedback, so it needs the owner's review before it
+# merges. GitHub enforces this only while branch protection on `main` has
+# "Require review from Code Owners" switched on.
+#
+# Everything else in the repository needs no specific reviewer. See REVIEW.md
+# for what a review of these paths has to check.
+
+# The database: schema, policies, and the vault.
+/supabase/                         @Nitinsudarshan
+/scripts/rls-probe.sh              @Nitinsudarshan
+
+# Who a request is, and what their role reaches.
+/src/middleware.ts                 @Nitinsudarshan
+/src/lib/role-constants.ts         @Nitinsudarshan
+/src/lib/rbac/                     @Nitinsudarshan
+/src/lib/auth/                     @Nitinsudarshan
+/src/lib/supabase/                 @Nitinsudarshan
+/src/lib/vault/                    @Nitinsudarshan
+/src/lib/security/                 @Nitinsudarshan
+/src/lib/**/access.ts              @Nitinsudarshan
+/src/lib/onboarding/redact.ts      @Nitinsudarshan
+
+# Every route handler: each one is reachable directly, not just from a screen.
+/src/app/api/                      @Nitinsudarshan
+/src/app/auth/                     @Nitinsudarshan
+
+# The policy itself, and the checks that hold the code to it.
+/docs/rbac.md                      @Nitinsudarshan
+/docs/vault-*.md                   @Nitinsudarshan
+/rules/security.md                 @Nitinsudarshan
+/rules/data-access.md              @Nitinsudarshan
+/rules/rbac-settings.md            @Nitinsudarshan
+/REVIEW.md                         @Nitinsudarshan
+/eslint.config.mjs                 @Nitinsudarshan
+/.github/                          @Nitinsudarshan

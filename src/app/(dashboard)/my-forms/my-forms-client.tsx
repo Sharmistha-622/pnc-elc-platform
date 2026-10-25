@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useMemo, useTransition } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Inbox,
   FileCheck2,
@@ -10,10 +9,6 @@ import {
   AlertCircle,
   Search,
   ExternalLink,
-  UserCheck,
-  UserPlus,
-  Sparkles,
-  Loader2,
   Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -35,19 +30,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
-import {
-  createOrLinkSelfEmployee,
-  linkEmailToExistingEmployee,
-  setDevEmployeeCookie,
-} from '@/lib/forms/employeeLinkActions'
-import { toast } from 'sonner'
 import type { MyFormItem } from '@/lib/forms/getMyForms'
 
 interface MyFormsClientProps {
   signedInEmail: string | null
   employee: { id: string; name: string } | null
   items: MyFormItem[]
-  allEmployees: { id: string; name: string; email: string | null }[]
 }
 
 const statusBadgeConfig: Record<
@@ -84,53 +72,11 @@ export function MyFormsClient({
   signedInEmail,
   employee,
   items,
-  allEmployees,
 }: MyFormsClientProps) {
-  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
-
-  // Linking state
-  const [isPending, startTransition] = useTransition()
-  const [selectedEmpToLink, setSelectedEmpToLink] = useState<string>('')
-
-  // Handle self-link
-  const handleAutoCreateProfile = () => {
-    startTransition(async () => {
-      const res = await createOrLinkSelfEmployee()
-      if (res.success) {
-        toast.success('Your employee profile has been linked!')
-        router.refresh()
-      } else {
-        toast.error(res.error || 'Failed to link profile')
-      }
-    })
-  }
-
-  // Handle link to existing
-  const handleLinkExisting = () => {
-    if (!selectedEmpToLink) return
-    startTransition(async () => {
-      const res = await linkEmailToExistingEmployee(selectedEmpToLink)
-      if (res.success) {
-        toast.success('Your email is now linked to the selected employee record!')
-        router.refresh()
-      } else {
-        toast.error(res.error || 'Failed to link employee')
-      }
-    })
-  }
-
-  // Handle preview as employee
-  const handleSwitchPreview = (empId: string) => {
-    startTransition(async () => {
-      await setDevEmployeeCookie(empId === 'RESET' ? null : empId)
-      toast.info(empId === 'RESET' ? 'Reset to signed-in user' : 'Switched employee preview mode')
-      router.refresh()
-    })
-  }
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -181,59 +127,16 @@ export function MyFormsClient({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-amber-200 dark:border-amber-900/40 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Option 1: Auto create record */}
-            <div className="bg-card/80 p-4 rounded-lg border border-border space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Quick Setup</h4>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Create an employee profile using your current authenticated Google account details to immediately access assigned forms.
-              </p>
-              <Button
-                onClick={handleAutoCreateProfile}
-                disabled={isPending}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold h-9 gap-2 shadow-xs"
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                Create My Employee Profile
-              </Button>
-            </div>
-
-            {/* Option 2: Link to existing */}
-            <div className="bg-card/80 p-4 rounded-lg border border-border space-y-3">
-              <div className="flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Link Existing Record</h4>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Associate your email address with an existing employee already present in the company directory.
-              </p>
-              <div className="flex items-center gap-2">
-                <Select value={selectedEmpToLink} onValueChange={setSelectedEmpToLink}>
-                  <SelectTrigger className="h-9 text-xs rounded-lg flex-1">
-                    <SelectValue placeholder="Select employee from list..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg max-h-56">
-                    {allEmployees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id} className="text-xs">
-                        {emp.name} {emp.email ? `(${emp.email})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={handleLinkExisting}
-                  disabled={!selectedEmpToLink || isPending}
-                  variant="outline"
-                  className="h-9 rounded-lg text-xs font-semibold shrink-0"
-                >
-                  Link
-                </Button>
-              </div>
-            </div>
-          </div>
+          {/* There used to be a "Link Existing Record" picker and a "Create My
+              Employee Profile" button here. The first let anyone claim any
+              employee's record — and with it their forms and profile — by
+              writing their own email onto it. The second let any signed-in
+              account add itself to the roster. Both are P&C's call, not the
+              user's. */}
+          <p className="text-sm text-muted-foreground pl-12">
+            Ask the P&amp;C team to add this email to your employee record. Your forms will
+            appear here as soon as it is linked.
+          </p>
         </div>
       </div>
     )
@@ -317,27 +220,9 @@ export function MyFormsClient({
           </Select>
         </div>
 
-        {/* Current profile info & switch preview */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-muted-foreground hidden md:inline">
-            Active Profile: <strong className="text-foreground">{employee.name}</strong>
-          </span>
-          <Select onValueChange={handleSwitchPreview}>
-            <SelectTrigger className="h-8 text-xs rounded-lg w-[160px]">
-              <SelectValue placeholder="Switch Profile..." />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg max-h-56">
-              <SelectItem value="RESET" className="font-semibold text-indigo-600">
-                ↺ Default ({signedInEmail})
-              </SelectItem>
-              {allEmployees.map((emp) => (
-                <SelectItem key={emp.id} value={emp.id} className="text-xs">
-                  {emp.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <span className="text-xs text-muted-foreground hidden md:inline shrink-0">
+          Signed in as <strong className="text-foreground">{employee.name}</strong>
+        </span>
       </div>
 
       {/* 3. Table */}

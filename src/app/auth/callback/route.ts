@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from "@/lib/rbac/resolveRole";
+import { isAllowedEmail } from "@/lib/auth/allowedEmail";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -13,6 +14,13 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    // A Google account outside the organisation completes OAuth like any
+    // other. Refuse it here, before the session is ever used: otherwise it
+    // would sign in as the fail-safe `employee`.
+    if (!error && !isAllowedEmail(data?.session?.user?.email)) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/login?error=domain`);
+    }
     if (!error) {
       // Keep the immutable owner's stored role correct on sign-in.
       //

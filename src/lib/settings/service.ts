@@ -3,7 +3,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { platformConfigRefusal } from './access'
-import { sendEmail, pingEmailProvider, type EmailPingResult } from '@/lib/email/sendEmail'
+import { guard } from '@/lib/rbac/guard'
+import { sendEmail, pingEmailProvider as pingGmail, type EmailPingResult } from '@/lib/email/sendEmail'
 import {
   type GeneralSetting,
   type ConfirmationRule,
@@ -261,6 +262,10 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 }
 
 export async function getEmailDeliveryLogs(): Promise<EmailDeliveryLog[]> {
+  // Who was emailed, about what, with a preview of the body: the email
+  // screen's business, and a server action the browser can call directly.
+  const allowed = await guard('platformConfig')
+  if (!allowed.ok) return []
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
@@ -281,7 +286,18 @@ export async function getEmailDeliveryLogs(): Promise<EmailDeliveryLog[]> {
   }
 }
 
-export { pingEmailProvider, type EmailPingResult }
+
+/**
+ * Checks the Gmail credentials from the provider screen.
+ *
+ * `sendEmail.ts` is not a server action module, so this file is where the
+ * check becomes callable from the browser — and therefore where it is gated.
+ */
+export async function pingEmailProvider(): Promise<EmailPingResult> {
+  const allowed = await guard('platformConfig')
+  if (!allowed.ok) return { ok: false, status: 'error', message: allowed.error }
+  return pingGmail()
+}
 
 
 export async function resendEmailDeliveryLog(
@@ -378,13 +394,70 @@ export async function updateEmailTemplate(
   }
 }
 
+/**
+ * What the browser is shown in place of a stored credential.
+ *
+ * The provider screen needs to know whether a secret is set, never what it
+ * is. This result is serialised into the page, so any value left in it is
+ * readable by whoever can open the screen, and by anything that page loads.
+ */
+const SECRET_MASK = '••••••••'
+
+/**
+ * Every provider field that holds a credential, or part of one. The refresh
+ * token preview is listed because it used to carry the first sixteen
+ * characters of GOOGLE_REFRESH_TOKEN, and an earlier save may have stored
+ * that prefix in the table.
+ */
+const SECRET_FIELDS = [
+  'gmail_app_password',
+  'gmail_client_secret',
+  'gmail_refresh_token_preview',
+  'ses_secret_access_key',
+  'resend_api_key',
+  'smtp_password',
+] as const
+
+function withSecretsMasked(config: EmailProviderConfig): EmailProviderConfig {
+  const masked = { ...config }
+  for (const field of SECRET_FIELDS) {
+    masked[field] = config[field] ? SECRET_MASK : undefined
+  }
+  return masked
+}
+
+/**
+ * The update with every untouched mask removed.
+ *
+ * The provider form saves the whole config it was given, masks included, and
+ * writing those back would replace each real secret with dots. A credential
+ * never contains '•', so a value that does is a mask the admin left alone (or
+ * typed after) and is dropped; only a newly entered secret is written. The
+ * refresh token preview is never written from the browser at all.
+ */
+function withoutMaskedSecrets(updates: Partial<EmailProviderConfig>): Partial<EmailProviderConfig> {
+  const clean = { ...updates }
+  for (const field of SECRET_FIELDS) {
+    const value = clean[field]
+    if (field === 'gmail_refresh_token_preview' || (typeof value === 'string' && value.includes('•'))) {
+      delete clean[field]
+    }
+  }
+  return clean
+}
+
 export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
+  // Reached from the browser as a server action, so the route gate on
+  // /manage/emails does not cover it. A refused caller gets the built-in
+  // defaults, which already ship to every browser in `settings/types.ts`.
+  const allowed = await guard('platformConfig')
+  if (!allowed.ok) return withSecretsMasked({ ...DEFAULT_EMAIL_PROVIDER_CONFIG })
+
   const envSender = process.env.GOOGLE_SENDER_EMAIL || DEFAULT_EMAIL_PROVIDER_CONFIG.from_email
   const envClientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_EMAIL_PROVIDER_CONFIG.gmail_client_id
   const hasRefreshToken = Boolean(process.env.GOOGLE_REFRESH_TOKEN)
-  const refreshTokenPreview = process.env.GOOGLE_REFRESH_TOKEN
-    ? `${process.env.GOOGLE_REFRESH_TOKEN.slice(0, 16)}••••••••••••••••`
-    : undefined
+  // Whether a token is configured, never any part of it.
+  const refreshTokenPreview = hasRefreshToken ? SECRET_MASK : undefined
 
   const liveConfig: EmailProviderConfig = {
     ...DEFAULT_EMAIL_PROVIDER_CONFIG,
@@ -421,11 +494,11 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
       .single()
 
     if (error || !data) {
-      return liveConfig
+      return withSecretsMasked(liveConfig)
     }
-    return { ...liveConfig, ...data }
+    return withSecretsMasked({ ...liveConfig, ...data })
   } catch {
-    return liveConfig
+    return withSecretsMasked(liveConfig)
   }
 }
 
@@ -435,24 +508,26 @@ export async function updateEmailProviderConfig(
 ): Promise<{ success: boolean; data?: EmailProviderConfig; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
+  const changes = withoutMaskedSecrets(updates)
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from('email_provider_config')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...changes, updated_at: new Date().toISOString() })
       .select()
       .single()
 
     if (error) {
       revalidatePath('/manage/emails')
-      return { success: true, data: { ...DEFAULT_EMAIL_PROVIDER_CONFIG, ...updates } }
+      return { success: true, data: withSecretsMasked({ ...DEFAULT_EMAIL_PROVIDER_CONFIG, ...changes }) }
     }
 
     revalidatePath('/manage/emails')
-    return { success: true, data }
+    // The row read back holds the stored secrets; it goes to the browser too.
+    return { success: true, data: withSecretsMasked(data) }
   } catch {
     revalidatePath('/manage/emails')
-    return { success: true, data: { ...DEFAULT_EMAIL_PROVIDER_CONFIG, ...updates } }
+    return { success: true, data: withSecretsMasked({ ...DEFAULT_EMAIL_PROVIDER_CONFIG, ...changes }) }
   }
 }
 
@@ -1030,6 +1105,8 @@ export async function addDocumentType(
 // ============================================================================
 
 export async function getSettingsChangeLog(limit: number = 50) {
+  const allowed = await guard('platformConfig')
+  if (!allowed.ok) return []
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase

@@ -12,7 +12,7 @@ export default async function EmployeeProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { profile, relationshipTypes, idProofTypes, employee, employeeName } =
+  const { profile, relationshipTypes, idProofTypes, employee, employeeName, canViewIdentity } =
     await getProfileData(id);
 
   // Project pre-existing module activity logs into the trail on first read.
@@ -36,14 +36,23 @@ export default async function EmployeeProfilePage({
         }
       />
 
-      {/* Main Profile Form Card styled like onboarding Personal Information */}
-      <ProfileForm
-        employeeId={id}
-        employee={employee}
-        existingProfile={profile}
-        relationshipTypes={relationshipTypes}
-        idProofTypes={idProofTypes}
-      />
+      {/* Main Profile Form Card styled like onboarding Personal Information.
+          Only for those who may see identity data: shown to anyone else, the
+          form would render blank and a save would overwrite the real record. */}
+      {canViewIdentity ? (
+        <ProfileForm
+          employeeId={id}
+          employee={employee}
+          existingProfile={profile}
+          relationshipTypes={relationshipTypes}
+          idProofTypes={idProofTypes}
+        />
+      ) : (
+        <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+          Personal details — ID numbers, addresses and contact numbers — are visible only to the
+          employee and to People &amp; Culture.
+        </div>
+      )}
 
       {/* Complete cross-module history for this person */}
       <AuditTrail

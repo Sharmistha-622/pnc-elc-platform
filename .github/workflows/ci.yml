@@ -37,3 +37,32 @@ jobs:
           # not talk to Supabase. Real values live in the deployment env.
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
+
+  # Every migration, applied to a throwaway Postgres that behaves like a fresh
+  # Supabase project, then read as each role. Fails if any persona can see a
+  # row the RBAC matrix denies it — the database is the last line, so it gets
+  # its own check rather than trusting the app's.
+  rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # The baseline schema is a Postgres 17 dump.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: RLS probe
+        run: scripts/rls-probe.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
