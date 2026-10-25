@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { DEFAULT_ALLOWED_DOMAINS } from "@/lib/auth/allowedEmail";
 
 export function LoginForm() {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
@@ -17,6 +18,9 @@ export function LoginForm() {
   // paths are honoured, so `?next=https://evil.example` cannot redirect out.
   const rawNext = searchParams.get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  // Set by the auth callback when a Google account outside the organisation
+  // tried to sign in. A fixed message, never the parameter's own text.
+  const domainRefused = searchParams.get("error") === "domain";
 
   const handleGoogleLogin = async () => {
     setIsSocialLoading(true);
@@ -27,6 +31,9 @@ export function LoginForm() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          // Narrows Google's account picker to the organisation. Convenience
+          // only — the callback is what refuses anyone else.
+          queryParams: { hd: DEFAULT_ALLOWED_DOMAINS[0] },
         },
       });
       if (error) throw error;
@@ -58,6 +65,15 @@ export function LoginForm() {
         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-1.5">
           Access NG with your account
         </p>
+
+        {domainRefused && !error && (
+          <div role="alert" className="w-full mt-4 p-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-lg text-left">
+            <p className="text-xs font-semibold text-rose-700 dark:text-rose-400 leading-tight">
+              Sign in with your @{DEFAULT_ALLOWED_DOMAINS[0]} Google account. Personal accounts
+              cannot use the platform.
+            </p>
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (

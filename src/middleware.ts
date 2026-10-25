@@ -11,6 +11,8 @@ import { canAccessRoute, isPortalOnlyRole } from '@/lib/role-constants'
 const PUBLIC_PREFIXES = [
   '/login',
   '/auth/callback',
+  // Signs out an account outside the organisation's domains, and nobody else.
+  '/auth/signout',
   '/api/onboarding/token/', // candidate portal API, token-authenticated
   '/api/cron/',
 ]
@@ -70,9 +72,18 @@ export async function middleware(request: NextRequest) {
     // is not the only thing standing between a Viewer and /manage.
     const { role } = resolveRole(user, request.cookies.get('dev-role-override')?.value)
 
-    // Server components cannot read the pathname. Passing it on lets a layout
-    // re-check `canAccessRoute` for itself rather than trusting this one gate.
-    response.headers.set('x-pathname', pathname)
+    // Signed in, but with no role at all: an account outside the
+    // organisation's domains. Every route would refuse it and the refusals
+    // would loop, so end the session instead.
+    if (!role) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { success: false, error: 'This account is not allowed to use the platform.' },
+          { status: 403 }
+        )
+      }
+      return NextResponse.redirect(new URL('/auth/signout', request.url))
+    }
 
     // The notice page is the one dashboard-adjacent screen a portal-only role
     // is meant to reach, and sending them there again from there would loop.

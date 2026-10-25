@@ -2,6 +2,9 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useUserContext } from '@/contexts/user-context'
+import { canAccessRoute } from '@/lib/role-constants'
+import { canHandleDocuments } from '@/lib/documents/access'
 import {
   Users,
   Search,
@@ -45,6 +48,13 @@ interface MyTeamClientProps {
 }
 
 export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyTeamClientProps) {
+  const user = useUserContext()
+  // A line manager sees their team's general record here and nothing more:
+  // profiles carry phone numbers and addresses, documents carry ID scans, and
+  // the matrix gives a manager neither. Links appear only for roles that can
+  // open what they lead to.
+  const canOpenProfiles = canAccessRoute(user?.role, '/employees/x/profile')
+  const canOpenDocuments = canOpenProfiles && canHandleDocuments(user?.role ?? null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [currentPage, setCurrentPage] = useState(1)
@@ -268,18 +278,22 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
 
                   <TableCell className="py-2.5 px-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/employees/${rep.id}/documents`}>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
-                          <FolderOpen className="h-3 w-3" />
-                          <span>Docs</span>
-                        </Button>
-                      </Link>
-                      <Link href={`/employees/${rep.id}/profile`}>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 gap-1">
-                          <span>Profile</span>
-                          <ChevronRight className="h-3 w-3" />
-                        </Button>
-                      </Link>
+                      {canOpenDocuments && (
+                        <Link href={`/employees/${rep.id}/documents`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
+                            <FolderOpen className="h-3 w-3" />
+                            <span>Docs</span>
+                          </Button>
+                        </Link>
+                      )}
+                      {canOpenProfiles && (
+                        <Link href={`/employees/${rep.id}/profile`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 gap-1">
+                            <span>Profile</span>
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -295,11 +309,13 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
                         ? 'No reportees match your current filters.'
                         : 'No team members are currently assigned to report to you. You can assign managers from employee profiles or candidate onboarding.'}
                     </p>
-                    <Link href="/employees">
-                      <Button size="sm" variant="outline" className="mt-2 text-xs rounded-lg">
-                        Browse Full Directory
-                      </Button>
-                    </Link>
+                    {canOpenProfiles && (
+                      <Link href="/employees">
+                        <Button size="sm" variant="outline" className="mt-2 text-xs rounded-lg">
+                          Browse Full Directory
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.00.04",
+    "date": "2026-10-25",
+    "title": "Claude/eager lamport c3ctxg",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Claude/eager lamport c3ctxg"
+      }
+    ]
+  },
+  {
     "version": "2.00.03",
     "date": "2026-10-23",
     "title": "Finish the sidebar and settings gating from #46",

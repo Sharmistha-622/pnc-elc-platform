@@ -2,12 +2,23 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { guard } from '@/lib/rbac/guard'
 import {
   type AuthorizedSignatory,
   type CreateSignatoryInput,
   type UpdateSignatoryInput,
   DEFAULT_SIGNATORIES,
 } from './types'
+
+/**
+ * Who may change the signatories.
+ *
+ * Reading them is part of drafting letters (`letters`). Changing them is not:
+ * the default signatory's name and signature go out on every offer, so the
+ * list is P&C's to maintain. Fin Admin drafts letters but does not decide who
+ * signs them.
+ */
+const SIGNATORY_EDITORS = 'lettersEdit' as const
 
 function isTableMissingError(error: any): boolean {
   if (!error) return false
@@ -16,6 +27,9 @@ function isTableMissingError(error: any): boolean {
 }
 
 export async function getSignatories(): Promise<AuthorizedSignatory[]> {
+  const allowed = await guard('letters')
+  if (!allowed.ok) return []
+
   try {
     const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
@@ -47,6 +61,9 @@ export async function getSignatories(): Promise<AuthorizedSignatory[]> {
 export async function createSignatory(
   input: CreateSignatoryInput
 ): Promise<{ success: boolean; data?: AuthorizedSignatory; error?: string }> {
+  const allowed = await guard(SIGNATORY_EDITORS)
+  if (!allowed.ok) return { success: false, error: allowed.error }
+
   try {
     const supabase = await createServerSupabaseClient()
 
@@ -102,6 +119,9 @@ export async function updateSignatory(
   id: string,
   input: UpdateSignatoryInput
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard(SIGNATORY_EDITORS)
+  if (!allowed.ok) return { success: false, error: allowed.error }
+
   try {
     const supabase = await createServerSupabaseClient()
 
@@ -142,6 +162,9 @@ export async function updateSignatory(
 }
 
 export async function deleteSignatory(id: string): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard(SIGNATORY_EDITORS)
+  if (!allowed.ok) return { success: false, error: allowed.error }
+
   try {
     const supabase = await createServerSupabaseClient()
     const { error } = await supabase.from('authorized_signatories').delete().eq('id', id)
@@ -161,6 +184,9 @@ export async function deleteSignatory(id: string): Promise<{ success: boolean; e
 }
 
 export async function setDefaultSignatory(id: string): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard(SIGNATORY_EDITORS)
+  if (!allowed.ok) return { success: false, error: allowed.error }
+
   try {
     const supabase = await createServerSupabaseClient()
 
@@ -191,6 +217,9 @@ export async function toggleSignatoryActive(
   id: string,
   is_active: boolean
 ): Promise<{ success: boolean; error?: string }> {
+  const allowed = await guard(SIGNATORY_EDITORS)
+  if (!allowed.ok) return { success: false, error: allowed.error }
+
   try {
     const supabase = await createServerSupabaseClient()
 

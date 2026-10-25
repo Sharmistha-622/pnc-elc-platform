@@ -7,7 +7,9 @@ import {
   togglePolicyStatus,
   signGeneratedDocument,
   submitCandidateOnboarding,
+  toPortalView,
 } from '@/lib/onboarding/service';
+import type { FullOnboardingData } from '@/lib/onboarding/types';
 
 export async function GET(
   req: NextRequest,
@@ -21,7 +23,7 @@ export async function GET(
     if (!visited) {
       return NextResponse.json({ success: false, error: 'Invalid invitation link' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, data: visited });
+    return NextResponse.json({ success: true, data: toPortalView(visited) });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -69,7 +71,11 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data: result });
+    // Each action returns the refreshed record; the candidate gets their view
+    // of it, never P&C's.
+    const isRecord = (r: unknown): r is FullOnboardingData =>
+      !!r && typeof r === 'object' && 'record' in r && 'documents' in r;
+    return NextResponse.json({ success: true, data: isRecord(result) ? toPortalView(result) : result });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

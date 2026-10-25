@@ -19,7 +19,7 @@ To register one:
 1. Open `src/lib/role-constants.ts`.
 2. Add the feature to the `Feature` union — e.g. `"onboarding"`.
 3. Add its entry to `FEATURE_ACCESS` listing every role code allowed in:
-   `onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin", "manager"],`
+   `onboarding: ["super_admin", "pnc_admin", "pnc_ops", "fin_admin"],`
    Role **codes**, not display names — `roleLabel()` turns a code into a label.
 4. Map its route prefix in `ROUTE_FEATURE`: `["/onboarding", "onboarding"],`
    Map the API routes that serve it too, or the screen is gated and its data
@@ -38,14 +38,24 @@ To register one:
 6. Add it to the sidebar in `src/lib/navigation/sidebar-nav.ts` if it has a
    screen. `visibleSections()` prunes against the same `canAccessRoute`, so a
    registered feature needs no extra wiring in the component.
+7. Start every exported server action and route handler with a guard from
+   `src/lib/rbac/guard.ts` (`guard(feature)`, `guardResource(resource, level)`).
+   A route gate does not cover them: the browser calls them directly.
+8. If a role should see a number on its dashboard, add a widget to
+   `src/lib/dashboard/widgets.ts`.
+
+`src/lib/rbac/layout-gates.test.ts` fails if a page has no gate, or if its
+gate and middleware disagree. `src/lib/security/guardrails.test.ts` fails if
+a server action has no guard.
 
 Adding the feature to `Feature` without adding it to `FEATURE_ACCESS` is a type
 error, which is deliberate — the matrix cannot silently fall out of date.
 
 ### Why an unregistered route is the dangerous case
 
-`canAccessRoute` returns `true` when no prefix matches. That is a deliberate
-fail-open for genuinely public-to-staff screens, and it is also how
+`canAccessRoute` returns `true` when no prefix matches a *screen*. That is a
+deliberate fail-open for genuinely public-to-staff screens. An unmatched
+`/api/` path is refused. That fail-open is also how
 `/offboarding`, `/reports`, `/audit`, `/my-team`, `/my-forms` and `/profile`
 were reachable by every signed-in user, candidates included, until they were
 registered. `src/lib/navigation/sidebar-nav.test.ts` now fails if a nav item

@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { guard } from '@/lib/rbac/guard'
 import { getAppraisalReportData, TeamCohortBreakdown } from '@/lib/appraisals/getAppraisalReportData'
 
 export interface ConfirmationReportItem {
@@ -21,7 +23,6 @@ export interface OnboardingReportItem {
   status: string
   department: string | null
   created_at: string
-  invitation_token?: string
 }
 
 export interface EmployeeHeadcountItem {
@@ -83,6 +84,13 @@ export interface UnifiedReportsData {
 
 export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   const supabase = await createServerSupabaseClient()
+  // Candidate records are closed to user sessions at the database (see
+  // 202610241000_lockdown_rls.sql): the onboarding API redacts CTC per role,
+  // and a direct table grant would let a session read around that. The
+  // funnel below reads them with the service-role client, so it checks the
+  // role itself first rather than trusting the page it was called from.
+  const access = await guard('reports')
+  const onboardingDb = access.ok ? createAdminSupabaseClient() : null
 
   // 1. Appraisals data
   let appraisalsData = {
@@ -137,9 +145,14 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   let onbPreJoining = 0
   let onbPostJoining = 0
   try {
-    const { data: onbRows, error } = await supabase
+    if (!onboardingDb) throw new Error('Onboarding funnel unavailable for this role')
+    // `personal_email`, not `email`: there is no `email` column, so this query
+    // failed and the funnel has always rendered empty. It also selected the
+    // invitation token — the candidate portal's only credential — and sent it
+    // to every role on this screen.
+    const { data: onbRows, error } = await onboardingDb
       .from('onboarding_records')
-      .select('id, candidate_name, designation, email, status, department, created_at, invitation_token')
+      .select('id, candidate_name, designation, personal_email, status, department, created_at')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -158,11 +171,10 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
           id: row.id,
           candidate_name: row.candidate_name,
           designation: row.designation,
-          email: row.email,
+          email: row.personal_email,
           status,
           department: row.department,
           created_at: row.created_at,
-          invitation_token: row.invitation_token,
         })
       }
     }

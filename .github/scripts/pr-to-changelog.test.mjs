@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { bumpType, changesFromBody, cleanTitle, buildOutputs } from './pr-to-changelog.mjs'
+import {
+  bumpType,
+  changesFromBody,
+  cleanTitle,
+  buildOutputs,
+  lintPullRequest,
+  preview,
+  prose,
+  PREVIEW_MARKER,
+  parseChangelog,
+} from './pr-to-changelog.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const TEMPLATE = fs.readFileSync(path.join(ROOT, '.github/pull_request_template.md'), 'utf8')
@@ -127,5 +137,240 @@ describe('buildOutputs', () => {
       body: "## Changelog\n- Fixes: it's fixed.",
     })
     expect(out.changeArgs).toBe("--change 'Fixes: it'\\''s fixed.'")
+  })
+})
+
+// Each of these is a real pull request that put a wrong entry on main.
+describe('regressions from real merges', () => {
+  // #44's own description explained the bug it fixed, and so contained the
+  // words mid-sentence. Matched anywhere, they released it as 2.00.00.
+  it('does not read a breaking change out of prose that mentions one (#44)', () => {
+    const body = [
+      '## What this changes',
+      '',
+      '- The template explains the rules inside HTML comments, and those comments contain the words "BREAKING CHANGE". bumpType scanned the raw body.',
+      '',
+      '## Changelog',
+      '',
+      '- Fixes: the template no longer makes every PR a major release.',
+    ].join('\n')
+    expect(bumpType({ title: 'fix(ci): stop the PR template breaking the changelog workflow', body })).toBe(
+      'patch'
+    )
+  })
+
+  // #46 was named by GitHub after a long commit subject: no type, and cut off.
+  it('refuses a title GitHub generated and truncated (#46)', () => {
+    const { errors } = lintPullRequest({
+      title: 'Segment the sidenav into role-aware groups, and close the gates behin…',
+    })
+    expect(errors.some((e) => e.includes('conventional-commit type'))).toBe(true)
+    expect(errors.some((e) => e.includes('cut off'))).toBe(true)
+  })
+
+  it('refuses a title named after the branch (#47)', () => {
+    expect(lintPullRequest({ title: 'Claude/cool feynman xwono8' }).errors).not.toEqual([])
+  })
+})
+
+describe('the breaking-change footer', () => {
+  it('counts only at the start of a line', () => {
+    expect(bumpType({ title: 'fix: x', body: 'Intro.\n\nBREAKING CHANGE: the route moved' })).toBe('major')
+    expect(bumpType({ title: 'fix: x', body: 'This is not a BREAKING CHANGE: honestly' })).toBe('patch')
+    expect(bumpType({ title: 'fix: x', body: 'breaking change: lower case is prose' })).toBe('patch')
+  })
+
+  it('ignores one quoted in a code block', () => {
+    const body = 'Example:\n\n```\nfeat!: something\n\nBREAKING CHANGE: example only\n```\n'
+    expect(bumpType({ title: 'docs: explain footers', body })).toBe('patch')
+  })
+
+  it('reads one written in a CRLF description', () => {
+    expect(bumpType({ title: 'fix: x', body: 'Intro.\r\n\r\nBREAKING CHANGE: moved\r\n' })).toBe('major')
+  })
+})
+
+describe('prose', () => {
+  it('drops an unclosed fence to the end, as Markdown renders it', () => {
+    expect(prose('kept\n```\n- Fixes: inside\n')).toBe('kept\n')
+  })
+
+  it('leaves inline code alone', () => {
+    expect(changesFromBody('## Changelog\n- Fixes: `foo()` no longer throws.')).toEqual([
+      'Fixes: `foo()` no longer throws.',
+    ])
+  })
+
+  it('ignores bullets quoted in a code block inside the section', () => {
+    const body = '## Changelog\n\n- Fixes: real.\n\n```md\n- Fixes: example\n```\n'
+    expect(changesFromBody(body)).toEqual(['Fixes: real.'])
+  })
+})
+
+describe('lintPullRequest', () => {
+  const ok = { title: 'fix(users): render roles', body: '## Changelog\n- Fixes: roles render.' }
+
+  it('passes a well-formed pull request', () => {
+    expect(lintPullRequest(ok)).toEqual({ errors: [], warnings: [] })
+  })
+
+  it('passes the real template with only a title filled in', () => {
+    const { errors } = lintPullRequest({ title: 'fix(users): render roles', body: TEMPLATE })
+    expect(errors).toEqual([])
+  })
+
+  it('refuses an unknown type and a capitalised one', () => {
+    expect(lintPullRequest({ ...ok, title: 'fet: typo' }).errors[0]).toContain('not a known type')
+    expect(lintPullRequest({ ...ok, title: 'Fix: capitalised' }).errors[0]).toContain('conventional-commit type')
+  })
+
+  it('refuses a type with nothing after it', () => {
+    expect(lintPullRequest({ ...ok, title: 'fix:' }).errors[0]).toContain('nothing after it')
+  })
+
+  it('refuses a bullet that would be dropped', () => {
+    const { errors } = lintPullRequest({
+      ...ok,
+      body: '## Changelog\n- Feature: singular\n- just a note\n- Fixes: kept.',
+    })
+    expect(errors).toHaveLength(2)
+    expect(errors[0]).toContain('Feature: singular')
+  })
+
+  it('does not count an unfilled placeholder as a problem', () => {
+    expect(lintPullRequest({ ...ok, body: '## Changelog\n- Fixes:\n- Features: real.' }).errors).toEqual([])
+  })
+
+  it('refuses a changelog.json edit unless labelled for it', () => {
+    expect(lintPullRequest({ ...ok, changelogEdited: true }).errors[0]).toContain('changelog-edit')
+    expect(lintPullRequest({ ...ok, changelogEdited: true, labels: ['changelog-edit'] }).errors).toEqual([])
+    // A correction PR records no note of its own, so it is usually no-changelog too.
+    expect(
+      lintPullRequest({ title: 'whatever', changelogEdited: true, labels: ['no-changelog'] }).errors
+    ).toHaveLength(1)
+  })
+
+  it('asks nothing else of a no-changelog pull request', () => {
+    expect(lintPullRequest({ title: 'Some branch name…', labels: ['no-changelog'] })).toEqual({
+      errors: [],
+      warnings: [],
+    })
+  })
+
+  it('refuses a release label that means nothing', () => {
+    expect(lintPullRequest({ ...ok, labels: ['release:huge'] }).errors[0]).toContain('release:huge')
+  })
+
+  it('warns, without failing, on a major release and on a missing section', () => {
+    const major = lintPullRequest({ ...ok, title: 'feat!: drop the v1 API' })
+    expect(major.errors).toEqual([])
+    expect(major.warnings[0]).toContain('**major**')
+    expect(lintPullRequest({ title: 'fix: x' }).warnings[0]).toContain('no `## Changelog` bullets')
+  })
+})
+
+describe('preview', () => {
+  it('shows the exact version and note the recorder will write', () => {
+    const { markdown, ok } = preview({
+      title: 'feat(nav): group the sidebar',
+      body: '## Changelog\n- Improvements: the sidebar is grouped.',
+      current: '1.05.03',
+    })
+    expect(ok).toBe(true)
+    expect(markdown.startsWith(PREVIEW_MARKER)).toBe(true)
+    expect(markdown).toContain('**1.06.00**, a minor release from 1.05.03')
+    expect(markdown).toContain('> **Group the sidebar**')
+    expect(markdown).toContain('> - Improvements: the sidebar is grouped.')
+  })
+
+  it('agrees with what the recorder is given', () => {
+    const pr = { title: 'fix: a thing', body: "## Changelog\n- Fixes: it's fixed." }
+    const out = buildOutputs(pr)
+    expect(out.changeArgs).toBe("--change 'Fixes: it'\\''s fixed.'")
+    expect(preview({ ...pr, current: '1.00.00' }).markdown).toContain("> - Fixes: it's fixed.")
+  })
+
+  it('fails and says why', () => {
+    const { markdown, ok } = preview({ title: 'Claude/some branch', current: '1.00.00' })
+    expect(ok).toBe(false)
+    expect(markdown).toContain('**Fix before merging:**')
+  })
+
+  it('says when nothing will be recorded', () => {
+    const { markdown, ok } = preview({ title: 'chore: tooling', labels: ['no-changelog'] })
+    expect(ok).toBe(true)
+    expect(markdown).toContain('records no release note')
+  })
+})
+
+// From the review of the check itself: inputs that would still have recorded
+// a wrong note.
+describe('what counts as prose', () => {
+  it('does not let a comment opener quoted in a code block swallow the section', () => {
+    // The `-->` that closes the template's own comment further down is what
+    // the quoted opener used to run to, taking the heading with it.
+    const body = 'The template diff:\n\n```diff\n+<!-- new rule\n```\n\n## Changelog\n\n<!-- Bullets here… -->\n\n- Improvements: kept.\n'
+    expect(changesFromBody(body)).toEqual(['Improvements: kept.'])
+  })
+
+  it('does not let a comment opener in inline code swallow the section', () => {
+    const body = 'Strips `<!--` comments.\n\n## Changelog\n\n- Fixes: kept.\n\n<!-- a real comment -->\n'
+    expect(changesFromBody(body)).toEqual(['Fixes: kept.'])
+  })
+
+  it('reads inline triple-backtick code at a line start as code, not a fence', () => {
+    const body = '```npm test``` passes now.\n\n## Changelog\n\n- Fixes: kept.'
+    expect(changesFromBody(body)).toEqual(['Fixes: kept.'])
+  })
+})
+
+describe('the breaking-change footer, as a footer', () => {
+  it('ignores the words where a wrapped sentence happens to break before them', () => {
+    const body = 'bumpType used to match the words anywhere, so a description that said\nBREAKING CHANGE: in passing released a major version.'
+    expect(bumpType({ title: 'fix(ci): x', body })).toBe('patch')
+  })
+
+  it('counts it after another trailer', () => {
+    expect(bumpType({ title: 'fix: x', body: 'Intro.\n\nRefs: #12\nBREAKING CHANGE: moved' })).toBe('major')
+  })
+})
+
+describe('where the Changelog section ends', () => {
+  for (const [name, divider] of [
+    ['a bold pseudo-heading', '**Test plan**'],
+    ['a level-one heading', '# Notes'],
+    ['a rule', '---'],
+    ['a details block', '<details><summary>Logs</summary>'],
+  ]) {
+    it(`stops at ${name}`, () => {
+      const body = `## Changelog\n\n- Fixes: kept.\n\n${divider}\n\n- ran npm test`
+      expect(parseChangelog(body)).toEqual({ changes: ['Fixes: kept.'], problems: [] })
+    })
+  }
+})
+
+describe('wrapped bullets', () => {
+  it('joins an indented continuation back on', () => {
+    const body = '## Changelog\n\n- Fixes: a pull request whose description\n  mentions the words no longer releases a major.\n- Security: two.'
+    expect(changesFromBody(body)).toEqual([
+      'Fixes: a pull request whose description mentions the words no longer releases a major.',
+      'Security: two.',
+    ])
+  })
+
+  it('joins a lazy continuation, as GitHub renders it', () => {
+    expect(changesFromBody('## Changelog\n- Fixes: one\nstill one.')).toEqual(['Fixes: one still one.'])
+  })
+
+  it('stops at a blank line', () => {
+    expect(changesFromBody('## Changelog\n- Fixes: one.\n\nA paragraph after the list.')).toEqual(['Fixes: one.'])
+  })
+})
+
+describe("GitHub's Revert button", () => {
+  it('passes the check and records a patch under the title it gave', () => {
+    const pr = { title: 'Revert "feat(nav): group the sidebar"', body: 'Reverts Sharmistha-622/pnc-elc-platform#46' }
+    expect(lintPullRequest(pr).errors).toEqual([])
+    expect(buildOutputs(pr)).toMatchObject({ type: 'patch', title: 'Revert "feat(nav): group the sidebar"' })
   })
 })

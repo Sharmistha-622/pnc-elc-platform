@@ -27,8 +27,10 @@ const FOLDER_LABEL: Record<string, string> = {
 
 export default async function EmployeeDocumentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { originalRole } = await getCurrentUserRole()
-  if (!canHandleDocuments(originalRole)) {
+  // Both roles, as everywhere else: a Super Admin viewing the app as Fin Admin
+  // should be refused what a real Fin Admin is.
+  const { role, originalRole } = await getCurrentUserRole()
+  if (!canHandleDocuments(role) || !canHandleDocuments(originalRole)) {
     return <p className="p-8 text-sm text-muted-foreground">You do not have access to employee documents.</p>
   }
 

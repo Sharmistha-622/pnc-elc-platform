@@ -12,3 +12,4 @@ See [`docs/vault-setup.md`](../../../docs/vault-setup.md).
 |---|---|
 | `0001_vault_schema.sql` | roles, people, compensation, bank details, identity documents, feedback, the append-only access log, break-glass log, private storage, and service-role-only RLS |
 | `0002_sealed_records.sql` | document numbers, provenance for records sealed from core, and `read_identity_number` — the only read path for a full number, which logs and refuses Exec View |
+| `0003_lock_functions.sql` | revokes EXECUTE on every function from `anon` and `authenticated` — without it the vault's anon key could call `read_identity_number` and `log_access` directly |

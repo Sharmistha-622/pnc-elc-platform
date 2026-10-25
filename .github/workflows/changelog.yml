@@ -7,10 +7,15 @@ name: Changelog
 # no amount of CI can resolve that after the fact. Only main writes, so there
 # is nothing to conflict over.
 #
+# changelog-check.yml previews this same note on the pull request before it
+# merges, from the same script, and fails on a title or bullet that would
+# record a wrong one.
+#
 # Requires contents: write. If main is a protected branch, this workflow's
 # push will be rejected unless the app or a PAT is allowed to bypass the
 # protection — set that up, or the job will fail loudly rather than silently
-# skipping the note.
+# skipping the note. Requiring the Changelog check on main is exactly that
+# case; rules/version-and-changelog.md says how to let this push through.
 
 on:
   pull_request:
@@ -47,33 +52,103 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: node .github/scripts/pr-to-changelog.mjs >> "$GITHUB_OUTPUT"
 
-      - name: Add it
+      # A merge that changed nothing main did not already have records
+      # nothing. #47 and #49 carried the same commit, and whichever merged
+      # second still recorded the fix a second time. A pull request that only
+      # corrects changelog.json lands here too, rather than adding a note
+      # about itself.
+      #
+      # "Before" is main as it was before the pull request landed. For a merge
+      # commit that is its first parent. A rebase merge leaves the PR's
+      # commits on main one by one and names the last, so there it is that
+      # many commits back; a squash with several commits then reaches further
+      # than it needs to, which can only make the merge look changed — never
+      # skip one that was not a no-op.
+      - name: Check the merge changed something
+        id: changed
         if: steps.entry.outputs.skip != 'true'
-        # The title goes through the environment, not into the script text. A
-        # PR title is anyone's to write: interpolated, a quote truncates it, a
-        # backtick runs it, and this job holds a token that can push to main.
-        # changeArgs is already shell-quoted by pr-to-changelog.mjs.
+        env:
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if git rev-parse --quiet --verify "$MERGE_SHA^2" > /dev/null; then
+            before="$MERGE_SHA^1"
+          else
+            before="$MERGE_SHA~$PR_COMMITS"
+          fi
+          if git diff --quiet "$before" "$MERGE_SHA" -- . ':(exclude)src/lib/changelog.json'; then
+            echo "::notice::#$PR_NUMBER changed nothing main did not already have, so it records no entry."
+            echo "record=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "record=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Back-to-back merges each start a run from the same main, so whichever
+      # pushes second is rejected. Each attempt rebuilds the entry on the
+      # current main, so the version is bumped from whatever is newest by then
+      # rather than colliding with the run that won.
+      #
+      # The title goes through the environment, not into the script text. A
+      # PR title is anyone's to write: interpolated, a quote truncates it, a
+      # backtick runs it, and this job holds a token that can push to main.
+      # changeArgs is already shell-quoted by pr-to-changelog.mjs.
+      - name: Record it
+        if: steps.changed.outputs.record == 'true'
         env:
           ENTRY_TYPE: ${{ steps.entry.outputs.type }}
           ENTRY_TITLE: ${{ steps.entry.outputs.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          node scripts/changelog.mjs add \
-            --type "$ENTRY_TYPE" \
-            --title "$ENTRY_TITLE" \
-            ${{ steps.entry.outputs.changeArgs }}
-
-      - name: Commit
-        if: steps.entry.outputs.skip != 'true'
-        run: |
-          if git diff --quiet -- src/lib/changelog.json; then
-            echo "Changelog unchanged; nothing to commit."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/changelog.json
-          git commit -m "chore(changelog): record $(node -p "require('./src/lib/changelog.json')[0].version") from #${{ github.event.pull_request.number }}"
-          git push origin main
+
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+            git reset --quiet --hard origin/main
+
+            # A re-run, or a second run for the same merge, must not record it twice.
+            recorded=$(git log -1 --format=%h -E --grep="^chore\(changelog\): record [0-9.]+ from #$PR_NUMBER\$" origin/main)
+            if [ -n "$recorded" ]; then
+              echo "::notice::#$PR_NUMBER already has a changelog entry."
+              exit 0
+            fi
+
+            node scripts/changelog.mjs add \
+              --type "$ENTRY_TYPE" \
+              --title "$ENTRY_TITLE" \
+              ${{ steps.entry.outputs.changeArgs }}
+
+            if git diff --quiet -- src/lib/changelog.json; then
+              echo "Changelog unchanged; nothing to commit."
+              exit 0
+            fi
+
+            version=$(node -p "require('./src/lib/changelog.json')[0].version")
+            git add src/lib/changelog.json
+            git commit --quiet -m "chore(changelog): record $version from #$PR_NUMBER"
+            if git push --quiet origin HEAD:main; then
+              echo "Recorded $version."
+              exit 0
+            fi
+
+            # Only a push that lost to a newer main is worth another try. If
+            # main is still where this attempt started, the refusal was
+            # something else — a protected branch, a read-only token — and
+            # trying again cannot help.
+            git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+            if [ "$(git rev-parse origin/main)" = "$(git rev-parse HEAD^)" ]; then
+              echo "::error::The push to main was refused, and not because main moved. See the git error above."
+              exit 1
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              echo "main moved while recording (attempt $attempt of 5); trying again on the new main."
+              sleep $((attempt * 5))
+            fi
+          done
+
+          echo "::error::main kept moving; the entry could not be pushed after 5 attempts."
+          exit 1
 
       # A silently missing release note is the failure mode this whole workflow
       # exists to prevent, so say so on the pull request that caused it.

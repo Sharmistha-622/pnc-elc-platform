@@ -14,8 +14,11 @@ import {
   updateEmailProviderConfig,
   sendTestEmailVerification,
   pingEmailProvider,
-  type EmailPingResult,
 } from '@/lib/settings/service'
+// Type-only, so nothing from the server module reaches the browser bundle. A
+// 'use server' file may export only async functions, which is why the type
+// is not re-exported from the settings service.
+import type { EmailPingResult } from '@/lib/email/sendEmail'
 import {
   type NotificationSettings,
   type EmailDeliveryLog,

@@ -17,18 +17,6 @@ export default async function MyFormsPage({
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch employees list for linking options
-  const { data: employeeRows } = await supabase
-    .from('employees')
-    .select('id, name, email')
-    .order('name', { ascending: true })
-
-  const allEmployees = (employeeRows ?? []).map((e: any) => ({
-    id: e.id,
-    name: e.name,
-    email: e.email ?? null,
-  }))
-
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
       <PageBanner
@@ -47,7 +35,6 @@ export default async function MyFormsPage({
         signedInEmail={user?.email ?? null}
         employee={employee}
         items={items}
-        allEmployees={allEmployees}
       />
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAuditTrail } from '@/lib/audit/service'
+import { guard } from '@/lib/rbac/guard'
 
 export interface UserAuditItem {
   id: string
@@ -15,6 +16,12 @@ export interface UserAuditItem {
 }
 
 export async function getUserAuditHistory(targetEmail: string, targetUserId?: string): Promise<UserAuditItem[]> {
+  // A server action, so callable with any email from the browser. The history
+  // of who granted whom which role belongs to the Users & Roles screen; the
+  // in-process audit mirror below is not filtered by RLS at all.
+  const allowed = await guard('manageUsers')
+  if (!allowed.ok) return []
+
   const cleanEmail = targetEmail.trim().toLowerCase()
   const items: UserAuditItem[] = []
 

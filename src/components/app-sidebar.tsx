@@ -1,10 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { BookOpen, LifeBuoy, Send } from "lucide-react"
 
 import { NavMain, type RenderedItem } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
 import {
   Sidebar,
   SidebarContent,
@@ -28,12 +26,6 @@ import {
   type NavSection,
 } from "@/lib/navigation/sidebar-nav"
 
-const navSecondary = [
-  { title: "Documentation", url: "#", icon: BookOpen },
-  { title: "Support", url: "#", icon: LifeBuoy },
-  { title: "Feedback", url: "#", icon: Send },
-]
-
 /** Attach the current-path state the renderer needs to a pruned section. */
 function render(section: NavSection, pathname: string): RenderedItem[] {
   return section.items.map((item) => ({
@@ -49,12 +41,20 @@ function render(section: NavSection, pathname: string): RenderedItem[] {
 
 export function AppSidebar({
   userRole,
+  hasReports,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { userRole?: UserRole | null }) {
+}: React.ComponentProps<typeof Sidebar> & {
+  userRole?: UserRole | null
+  /** False hides My Team. Undefined leaves it to the role. */
+  hasReports?: boolean
+}) {
   const { setOpenMobile, isMobile } = useSidebar()
   const pathname = usePathname()
 
-  const sections = React.useMemo(() => visibleSections(userRole), [userRole])
+  const sections = React.useMemo(
+    () => visibleSections(userRole, { hasReports }),
+    [userRole, hasReports]
+  )
 
   // One parent open across the whole sidebar, not one per section.
   const openFromPath =
@@ -121,7 +121,6 @@ export function AppSidebar({
             />
           </React.Fragment>
         ))}
-        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter className="p-0">
         <SidebarVersionFooter />

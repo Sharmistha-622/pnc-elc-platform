@@ -1,4 +1,7 @@
-import { createClient } from '@/lib/supabase/client';
+// The server client, bound to the caller's session. These run inside API
+// route handlers, where the browser client has no session and was querying
+// as the anonymous role — which the database no longer serves.
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Location, LocationType, CreateLocationInput, UpdateLocationInput } from './types';
 
 export const DEFAULT_LOCATIONS: Location[] = [
@@ -91,7 +94,7 @@ let memoryLocations: Location[] = [...DEFAULT_LOCATIONS];
 export async function getLocations(options: { includeClosed?: boolean; type?: LocationType } = {}): Promise<Location[]> {
   const { includeClosed = true, type } = options;
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     let query = supabase.from('ng_locations').select('*').order('name');
     if (!includeClosed) {
       query = query.eq('status', 'active');
@@ -128,7 +131,7 @@ export async function createLocation(input: CreateLocationInput): Promise<Locati
   };
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from('ng_locations').insert(newLocation).select().single();
     if (!error && data) {
       memoryLocations = [data as Location, ...memoryLocations];
@@ -144,7 +147,7 @@ export async function createLocation(input: CreateLocationInput): Promise<Locati
 
 export async function updateLocation(id: string, updates: UpdateLocationInput): Promise<Location | null> {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('ng_locations')
       .update(updates)

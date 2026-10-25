@@ -1,4 +1,7 @@
-import { createClient } from '@/lib/supabase/client';
+// The server client, bound to the caller's session. These run inside API
+// route handlers, where the browser client has no session and was querying
+// as the anonymous role — which the database no longer serves.
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Campus, CreateCampusInput, UpdateCampusInput } from './types';
 
 export const DEFAULT_CAMPUSES: Campus[] = [
@@ -16,7 +19,7 @@ let memoryCampuses: Campus[] = [...DEFAULT_CAMPUSES];
 
 export async function getCampuses(includeClosed: boolean = true): Promise<Campus[]> {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     let query = supabase.from('ng_campuses').select('*').order('name');
     if (!includeClosed) {
       query = query.eq('status', 'active');
@@ -43,7 +46,7 @@ export async function createCampus(input: CreateCampusInput): Promise<Campus> {
   };
 
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.from('ng_campuses').insert(newCampus).select().single();
     if (!error && data) {
       memoryCampuses = [data as Campus, ...memoryCampuses];
@@ -59,7 +62,7 @@ export async function createCampus(input: CreateCampusInput): Promise<Campus> {
 
 export async function updateCampus(id: string, updates: UpdateCampusInput): Promise<Campus | null> {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('ng_campuses')
       .update(updates)
