@@ -66,3 +66,13 @@ jobs:
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
+
+      # The vault's walls: every table, sequence and function service-role
+      # only, the payroll audit trail append-only, locked runs immutable.
+      - name: Vault probe
+        run: scripts/vault-probe.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres

@@ -41,22 +41,28 @@ only other member will be the break-glass owner in step 5.
 ## 2. Apply the schema
 
 From this repository, on your machine, with each project's connection string
-(Project Settings → Database). Apply all three files, in order:
+(Project Settings → Database). Apply all four files, in order:
 
 ```bash
 # dev first, always
-for f in supabase/vault/migrations/000{1,2,3}_*.sql; do
+for f in supabase/vault/migrations/000{1,2,3,4}_*.sql; do
   psql "$ELC_VAULT_DEV_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 
 # then production
-for f in supabase/vault/migrations/000{1,2,3}_*.sql; do
+for f in supabase/vault/migrations/000{1,2,3,4}_*.sql; do
   psql "$ELC_VAULT_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 ```
 
 Pasting each file into the SQL editor, in the same order, works as well.
 Re-running them is safe; they are idempotent.
+
+`0004` adds the payroll tables (PAN and UAN, runs, payments, payslips,
+letters, the payroll audit trail). It is safe to apply before payroll is
+built: the tables stay empty, and service-role only, until it is.
+`scripts/vault-probe.sh` builds a scratch vault from all four files and checks
+the walls; CI runs it on every change.
 
 `0003` is not optional. Without it, every function in the vault is callable by
 anyone holding the vault's anon key, and three of them run with the owner's
