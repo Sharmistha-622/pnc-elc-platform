@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.03.00",
+    "date": "2026-10-26",
+    "title": "Payroll tables for Phase 0",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "The vault's sequences are no longer granted to the public API roles."
+      },
+      {
+        "category": "Improvements",
+        "description": "The vault has its payroll tables, guarded by the database and checked in CI."
+      }
+    ]
+  },
+  {
     "version": "2.02.00",
     "date": "2026-10-26",
     "title": "Confirmation and appraisal review cycles, end to end",
