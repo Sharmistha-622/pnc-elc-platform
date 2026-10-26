@@ -28,8 +28,7 @@ flowchart LR
     ENG2[Same engine,<br/>bundled]
   end
 
-  SAM[Samyarth<br/>attendance]
-  REIM[Reimbursement<br/>system]
+  SAM[STUB<br/>attendance]
   BANK[IDFC / SBI<br/>bulk upload]
   STAT[EPFO ECR, ESIC,<br/>PT, TDS files]
   ACC[Accounting JV]
@@ -43,7 +42,6 @@ flowchart LR
   VF --- ENG2
   ENG1 -. "CI drift check" .- ENG2
   SAM -- "API or monthly file" --> CDB
-  REIM -. "API, optional" .-> VF
   VF --> BANK & STAT & ACC
   UI --> MAIL & SLK
 ```
@@ -154,7 +152,7 @@ erDiagram
     numeric payable_days
     numeric payable_hours
     numeric lwp_days
-    text source "samyarth_api | file | manual"
+    text source "stub_api | file | manual"
     text signed_off_by
   }
   ALLOCATION {
@@ -308,7 +306,7 @@ flowchart TB
   subgraph PNC["P&C path"]
     P1[Record events<br/>joiners, conversions, exits,<br/>appraisals, holds]
     P2[Verify employee data<br/>PAN, UAN, bank, state]
-    P3[Import attendance<br/>Samyarth API or file]
+    P3[Import attendance<br/>STUB API or file]
     P4[Sign off payable days<br/>and LWP]
     P5[Compensation changes<br/>appraisals, corrections]
   end
@@ -415,7 +413,7 @@ the vault.
 | Conversion | `employees.conversion_date` → close engagement, open next | Two run lines in the conversion month |
 | Appraisal | New vault `compensation` row, `reason = appraisal` | Approved after freeze → paid next month with arrears |
 | Arrears | Payroll event with months covered | More than one month needs Finance sign-off |
-| LWP | Attendance import (Samyarth), signed off by P&C | |
+| LWP | Attendance import (STUB), signed off by P&C | |
 | Exit initiated | `offboarding_cases` created | |
 | Last working day | `offboarding_cases` LWD | Triggers FnF |
 | No work / No invoice | Payroll event | Consultants; invoices later (D-20) |
@@ -460,8 +458,7 @@ reviewed diff of [`../rbac.md`](../rbac.md).
 
 | Integration | Direction | Status in ELC | Notes |
 |---|---|---|---|
-| Samyarth attendance | In | Mock interface in `src/lib/integrations/attendance.ts` | API adapter and file import, same staging table (D-14) |
-| Reimbursements | In | None | Optional API pull into vault pay items (D-20) |
+| STUB attendance | In | Mock interface in `src/lib/integrations/attendance.ts` | API adapter and file import, same staging table (D-14) |
 | Gmail | Out | `src/lib/email/sendEmail.ts` | Reminders, payslip notices, payment confirmations |
 | Slack | Out | Token exists, no adapter | Payroll channel; never amounts in messages |
 | Cron | — | `src/app/api/cron/*`, `vercel.json` | Freeze reminders, FnF ageing |

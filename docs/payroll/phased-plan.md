@@ -12,8 +12,9 @@ depends on.
 
 | Item | Detail | Depends on |
 |---|---|---|
-| Residency | Create `elc-vault-dev` in Mumbai now; production vault in Mumbai; move core from Singapore to Mumbai before real data | D-01 |
-| Vault base | Apply `0001_vault_schema.sql` and `0002_sealed_records.sql`; build `sync-person`, `submit-bank`, `approve-bank` | Vault decision #3 in `../vault-setup.md` |
+| Vault tables | The vault project is created in Mumbai; create its tables: apply `0001_vault_schema.sql` and `0002_sealed_records.sql`, then the payroll tables from `design.md` §2.2 (identity, advances, pay items, TDS declarations, fee YTD, run lines and components, payments, output files, payslips, letters, payroll audit) | D-01 |
+| Vault functions | `sync-person`, `submit-bank`, `approve-bank` | Vault decision #3 in `../vault-setup.md` |
+| Core residency | Move core from Singapore to Mumbai before any real data is loaded | D-01 |
 | Person and engagement | `person` over `employees`; `engagement` with type, pay basis, dates, location, work state, grade; backfill from `employees` | D-10, D-11, O-01 |
 | Locations | `ng_locations.state` (backfilled from the address), a `state` master, and closing the `to public` write policies | D-25 |
 | Fix `department_id` | Add the column `updateUserAllocations.ts` already writes, or stop writing it | — |
@@ -24,8 +25,8 @@ depends on.
 | Libraries and adapters | xlsx library; Slack adapter | O-06 |
 
 **Exit:** a dummy person can be offered, provisioned and converted, with
-compensation, PAN, UAN and bank in `elc-vault-dev`, and no amount anywhere in
-core.
+compensation, PAN, UAN and bank in the Mumbai vault (dummy data only), and no
+amount anywhere in core.
 
 ## Phase 1 — Run and pay a month
 
@@ -34,7 +35,7 @@ core.
 | 1.1 Masters | Projects, donors, sources, NG bank accounts, allocation basis by role; preview → confirm import per `../../rules/data-import.md` |
 | 1.2 Rate tables | Schema, the values in `rule-tables.md` §1.2, settings screen, effective-dating |
 | 1.3 Engine | `src/lib/payroll/`: proration, PF, ESIC, PT, consultant and salary TDS, arrears, advances, bonus, 50% cap; sample replay test |
-| 1.4 Inputs | Events (controlled list); Samyarth attendance by API or file; P&C sign-off of payable days; allocation table |
+| 1.4 Inputs | Events (controlled list); STUB attendance by API or file; P&C sign-off of payable days; allocation table |
 | 1.5 Vault compute | `payroll-compute` Edge Function with the bundled engine and the drift check; run lines and components; run status and exceptions in core |
 | 1.6 Validation | V-01 – V-29, overrides with reason, exception screen |
 | 1.7 Sign-off and lock | Configurable chain, segregation of duties, lock, adjustment run and carry-forward |
@@ -60,10 +61,9 @@ sheet is retired.
 | Provisions | Monthly gratuity and leave liability |
 | Donor / project / FCRA reports | From allocation and run lines |
 | Accounting JV export | Format per F-10 |
-| Reimbursements | Pull from the reimbursement system by API, if wanted (D-20) |
 | Exports | Sheets export, if O-05 allows |
 
-## The first PR
+## Out of scope
 
-This design set, the decisions log, the fixture, and the `vault-setup.md`
-region fix. No code, no migrations.
+Reimbursements stay outside payroll. If extra data points are ever needed,
+the reimbursement dashboard's API can be read to show them.

@@ -134,8 +134,8 @@ by days:   fee = ROUND(monthly_fee × payable_days / days_in_month)
 by hours:  fee = ROUND(hourly_rate × payable_hours)
 ```
 
-Reimbursements are separate lines, outside the fee base, unless Finance flags
-otherwise (V-11).
+Reimbursements are out of scope for payroll. When a consultant's invoice
+includes one, it is excluded from the fee base and from TDS (V-11).
 
 ### 3.3 PF
 
