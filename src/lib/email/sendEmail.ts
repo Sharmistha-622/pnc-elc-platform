@@ -90,7 +90,6 @@ export async function sendEmail(
   const to = headerValue(recipient)
   const cc = data.cc ? headerValue(data.cc) : undefined
   const htmlBody = data.body || `<p>You have a new notification: ${template}</p>`
-  const newLogId = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
   const category = getCategoryFromTemplate(template)
   const notificationType = template
     .replace(/_/g, ' ')
@@ -107,13 +106,13 @@ export async function sendEmail(
 
     const messageId = response.data.id || 'msg-sent'
 
-    // Automatically record real successful dispatch in database
+    // Automatically record real successful dispatch in database. The id is the
+    // table's own (a uuid default); a made-up text id made every insert fail.
     try {
       // Service-role when available: reminders are sent from cron runs, which
       // have no session, and the database refuses the anonymous role.
       const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
       await supabase.from('email_delivery_logs').insert({
-        id: newLogId,
         recipient_name: data.recipient_name || to.split('@')[0],
         recipient_email: to,
         recipient_role: data.recipient_role || null,
@@ -150,7 +149,6 @@ export async function sendEmail(
       // have no session, and the database refuses the anonymous role.
       const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
       await supabase.from('email_delivery_logs').insert({
-        id: newLogId,
         recipient_name: data.recipient_name || to.split('@')[0],
         recipient_email: to,
         recipient_role: data.recipient_role || null,
@@ -175,6 +173,80 @@ export async function sendEmail(
 
     return { success: false, error: errorMsg }
   }
+}
+
+/**
+ * Sends one meeting invitation to several people: an HTML note plus an
+ * iCalendar REQUEST, which Gmail and Outlook render with Yes / No / Maybe and
+ * add to the calendar. Each recipient is logged as a delivery, like any mail.
+ */
+export async function sendCalendarInvite(opts: {
+  template: string
+  subject: string
+  html: string
+  ics: string
+  to: { name: string; email: string }[]
+}) {
+  const subject = headerValue(opts.subject)
+  const to = opts.to.map((r) => headerValue(r.email)).filter(Boolean)
+  if (to.length === 0) return { success: false, error: 'No recipients' }
+  const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+  const boundary = `elc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const message = [
+    `From: ${senderEmail}`,
+    `To: ${to.join(', ')}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    opts.html,
+    `--${boundary}`,
+    'Content-Type: text/calendar; charset=utf-8; method=REQUEST',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    opts.ics,
+    `--${boundary}--`,
+    '',
+  ].join('\r\n')
+  const raw = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+  let result: { success: true; messageId: string } | { success: false; error: string }
+  try {
+    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
+    const response = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+    result = { success: true, messageId: response.data.id || 'msg-sent' }
+  } catch (error: any) {
+    const errorMsg = error?.message || 'Unknown error'
+    console.error('Error sending calendar invite:', errorMsg, error?.code ?? '')
+    result = { success: false, error: errorMsg }
+  }
+
+  try {
+    const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
+    const now = new Date().toISOString()
+    await supabase.from('email_delivery_logs').insert(
+      opts.to.map((r) => ({
+        recipient_name: r.name || r.email.split('@')[0],
+        recipient_email: r.email,
+        recipient_role: null,
+        category: getCategoryFromTemplate(opts.template),
+        notification_type: opts.template.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        subject,
+        body_preview: opts.html.replace(/<[^>]*>?/gm, '').substring(0, 200),
+        status: result.success ? 'delivered' : 'failed',
+        error_message: result.success ? null : result.error,
+        sent_at: now,
+        created_at: now,
+      }))
+    )
+  } catch {
+    // A failed log never fails the invitation.
+  }
+
+  return result
 }
 
 export type EmailPingResult = {

@@ -24,8 +24,11 @@ export function SiteHeader({
   const { toggleSidebar } = useSidebar()
   const pathname = usePathname()
 
+  // A record id says nothing to a reader: on a detail page, name the section
+  // it sits in instead ("/reviews/<id>" reads "Reviews").
+  const segments = pathname.split('/').filter((s) => s && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(s))
   const activePage = pathname === "/" ? "Dashboard" :
-    pathname.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || "Dashboard"
+    segments.pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || "Dashboard"
 
   return (
     <header className="bg-sidebar sticky top-0 z-50 flex w-full items-center border-b">

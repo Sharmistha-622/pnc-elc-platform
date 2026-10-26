@@ -67,6 +67,7 @@ it; **Not built** means neither exists yet.
 | Full ID number, typed at verification | never stored in core; passes through | `identity_documents.document_number` | the same verification | last four characters | **Built**. Read only via `read_identity_number` (logs; refuses Exec View) |
 | Peer feedback text | the confirmation cycle is open, in `peer_feedback.feedback_text` | `feedback` | the cycle closes | who was asked, whether they responded | **Built** (`seal-feedback`). Budget: 30 days |
 | Confirmation and appraisal **form answers** | the cycle is open, in `form_answers.value` | `feedback` (kind `appraisal`) | the cycle closes | submission status | **Not built.** Same mechanism as peer feedback; add a `SealableKind` |
+| Review-cycle **decision note** (the manager's reasoning) and PnC's note | the review cycle is open, in `review_decisions.note` and `pnc_note` | `feedback` | the cycle closes | the decision itself, who decided, when | **Not built.** Readable in core by Super Admin, PnC Admin, Exec View and the manager only (`202610261000_review_cycles.sql`) |
 
 Every staged record still sitting in core appears in the `exposed_records`
 view. A row in `seal_failed` is worse than one in `staged`: the move was tried,
@@ -99,6 +100,7 @@ as the weaker one.
 | `employee_profiles.id_proof_number`, `address_proof_number` | full ID numbers of current employees | `identity_documents.document_number` | Core keeps the last four |
 | `peer_feedback.feedback_text` | feedback text | `feedback` | Already sealing |
 | `form_answers.value`, for confirmation and appraisal forms | performance answers | `feedback` | Sealing not built yet |
+| `review_decisions.note`, `pnc_note` | the manager's and PnC's written reasoning | `feedback` | Sealing not built yet; staged while the review runs |
 | `offboarding_fnf.net_payable_estimate`, `payment_reference` | full-and-final pay | vault | Core keeps F&F status |
 | `email_delivery_logs.body_html`, `body_preview` | email bodies | — | Must never contain a figure. Check every template that renders salary, and stop storing `body_html` |
 | `employee_audit_log.description`, `metadata` | event text | — | Must never carry an amount or an ID number. The audit API now hides details from the platform roles; fix the events that write reasons and amounts into `description` |

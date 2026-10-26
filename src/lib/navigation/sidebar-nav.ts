@@ -18,6 +18,7 @@
 import {
   BarChart3,
   BadgeCheck,
+  ClipboardCheck,
   ClipboardList,
   Compass,
   DatabaseBackup,
@@ -113,6 +114,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "My Profile", url: "/profile", icon: User },
       { title: "My Forms", url: "/my-forms", icon: Inbox },
+      { title: "My Reviews", url: "/my-reviews", icon: ClipboardCheck },
       // Hidden by `visibleSections` for anyone with no direct reports, however
       // senior: an empty team page is a dead end, not a feature.
       { title: "My Team", url: "/my-team", icon: Users2 },
@@ -144,6 +146,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: "Employees", url: "/employees", icon: Users },
       { title: "Confirmations", url: "/confirmations", icon: ClipboardList },
       { title: "Appraisals", url: "/appraisals", icon: TrendingUp },
+      { title: "Reviews", url: "/reviews", icon: ClipboardCheck },
       { title: "Offboarding", url: "/offboarding", icon: UserMinus },
       {
         // One entry rather than three: the letters, the templates they are
