@@ -53,10 +53,10 @@ it; **Not built** means neither exists yet.
 | Compensation: CTC and every component, effective-dated, with a reason (`offer`, `increment`, `correction`) | `compensation` | PnC Admin or Fin Admin, in the vault | Super Admin, PnC Admin, Fin Admin, Exec View (vault session); Fin Ops (payroll export only); the employee (letter) | Schema + `read-salary` built; **no write path yet** |
 | Bank details: account name, number, IFSC, bank | `bank_details` (one active row per person, approval step) | Pre-joiner submits (insert-only); Fin Admin approves | Super Admin, Fin Admin (edit); PnC Admin, Fin Ops (view); the employee (own, via logged function) | Schema only. `submit-bank` and `approve-bank` **not built** |
 | Bank-proof scan (cancelled cheque or passbook) | `identity-documents` bucket | With the bank submission | As bank details | **Not built.** Today it is uploaded to **core** (see below) |
-| PAN, UAN | *new*, in a payroll identity table | Finance import, or the pre-joiner | Fin Admin, Fin Ops, Super Admin | **Not built.** Payroll design, next phase |
-| Payroll runs: run lines, components, approvals, lock | *new*, payroll tables | `payroll-compute` Edge Function | Fin Ops (maker), Fin Admin (checker), the CEO approver | **Not built.** Payroll design, next phase |
-| Advances, consultant fee year-to-date | *new* | Payroll | Finance | **Not built** |
-| Payslips, bank files, statutory files (ECR, ESIC, PT, TDS) | *new*, payroll output tables and bucket | Payroll | Finance; the employee for their own payslip (letter route) | **Not built** |
+| PAN, UAN | *new*, in a payroll identity table | Finance import, or the pre-joiner | Fin Admin, Fin Ops, Super Admin | **Schema only** (`payroll_identity`, vault `0004`) |
+| Payroll runs: run lines, components, approvals, lock | *new*, payroll tables | `payroll-compute` Edge Function | Fin Ops (maker), Fin Admin (checker), the CEO approver | **Schema only** (`run_lines`, `run_line_components`, `run_locks`, vault `0004`). Sign-offs stay in core, without amounts |
+| Advances, consultant fee year-to-date | `advances`, `advance_recoveries`, `fee_ytd` | Payroll | Finance | **Schema only** (vault `0004`) |
+| Payslips, bank files, statutory files (ECR, ESIC, PT, TDS) | *new*, payroll output tables and bucket | Payroll | Finance; the employee for their own payslip (letter route) | **Schema only** (`payments`, `output_files`, `payslips`, `payroll-files` bucket, vault `0004`) |
 | Full-and-final amounts: net payable, payment reference | *new*, or `compensation`-linked | Fin Admin | Super Admin, PnC Admin, Fin Admin | **Not built.** Today in **core** (`offboarding_fnf`) |
 
 ### Staged (core while the work runs, then sealed)

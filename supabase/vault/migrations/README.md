@@ -13,3 +13,6 @@ See [`docs/vault-setup.md`](../../../docs/vault-setup.md).
 | `0001_vault_schema.sql` | roles, people, compensation, bank details, identity documents, feedback, the append-only access log, break-glass log, private storage, and service-role-only RLS |
 | `0002_sealed_records.sql` | document numbers, provenance for records sealed from core, and `read_identity_number` — the only read path for a full number, which logs and refuses Exec View |
 | `0003_lock_functions.sql` | revokes EXECUTE on every function from `anon` and `authenticated` — without it the vault's anon key could call `read_identity_number` and `log_access` directly |
+| `0004_payroll_tables.sql` | payroll: PAN and UAN, compensation extended for engagements and fee rates, advances, one-off pay, TDS declarations and proofs, consultant fees year-to-date, run lines and components, run locks (a locked run cannot change, except its payment status), payments, output files, payslips, letters, the append-only payroll audit trail (a change needs a reason), and the private `payroll-files` bucket. Also revokes every sequence from the API roles |
+
+Check the walls with `scripts/vault-probe.sh` against a scratch Postgres.
