@@ -144,7 +144,7 @@ sample, or a second fixture.
   2. each of the 41 cases raises exactly the expected rule and severity;
   3. no other BLOCK is raised.
 - **Vault parity** — the same replay runs against the bundled engine in the
-  `payroll-compute` function on `elc-vault-dev`, and the two outputs must be
+  `payroll-compute` function in the Mumbai vault (dummy data), and the two outputs must be
   identical.
 - **Drift check** — CI fails if the vault's bundled engine differs from
   `src/lib/payroll/`.

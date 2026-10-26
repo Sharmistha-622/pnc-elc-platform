@@ -101,9 +101,9 @@ These exist today and have to be closed before, or as part of, Phase 0.
 5. **No engagement history.** A conversion overwrites `employee_type`; payroll
    needs the old and new engagement side by side in the conversion month.
 6. **`ftc` means "Full-Time Consultant"** in ELC screens, and "Fixed-term" to
-   Finance (decision D-08).
-7. **Attendance and leave are mocks.** The real source is the attendance
-   platform (Samyarth), by API or by monthly file.
+   Finance (open question O-01).
+7. **Attendance and leave are mocks.** The real source is STUB, NG's
+   attendance system, by API or by monthly file.
 8. **No xlsx library**, no Slack adapter (the bot token exists), and the vault
    functions `submit-bank`, `approve-bank`, `sync-person` and `payroll-export`
    are not built.
@@ -112,9 +112,10 @@ These exist today and have to be closed before, or as part of, Phase 0.
 10. **`ng_locations` and `ng_campuses` RLS policies are `to public` with
     insert / update / delete `using (true)`.** Once a payroll-critical field
     (state) lives there, anonymous writes have to be closed.
-11. **Neither Supabase project is in India.** Core is in Singapore; the vault
-    does not exist yet. Both have to be in `ap-south-1` (Mumbai) before real
-    data is loaded (decision D-01).
+11. **The vault has no tables yet.** The vault project now exists in
+    `ap-south-1` (Mumbai), but none of its tables have been created. Core is
+    still in Singapore and has to move to Mumbai before real data is loaded
+    (decision D-01).
 
 ## What lives where
 
@@ -136,12 +137,12 @@ These exist today and have to be closed before, or as part of, Phase 0.
 
 ## Residency
 
-Finance's scope requires India-hosted storage. Today core is in Singapore and
-the vault does not exist. The plan:
+Finance's scope requires India-hosted storage.
 
-1. Create `elc-vault-dev` in `ap-south-1` now, with dummy data only, to build
-   against.
-2. Create the production vault in `ap-south-1`.
+1. **Done:** the vault project is created in `ap-south-1` (Mumbai).
+2. **Next (Phase 0):** create the vault's tables there — the existing vault
+   schema plus the payroll tables in [`design.md`](./design.md) §2.2. Build
+   and test against dummy data only.
 3. Move core to `ap-south-1` before any real payroll data is loaded. This is
    an ELC-wide move (onboarding, documents and auth all live in core), so it
    is tracked as its own piece of work, not as a payroll task.
@@ -166,5 +167,5 @@ region (`bom1`), so amounts are not processed in transit elsewhere.
 | FnF | Full and final settlement for a leaver |
 | BLOCK / FLAG / CHECK | Validation severities: stops the run / needs a reason to pass / needs a human look |
 | Maker, checker, approver | The three distinct people a run passes through before lock |
-| Samyarth | NG's attendance platform; the scope document calls the in-house tracker STUB |
+| STUB | NG's in-house attendance system: attendance, leave and project hours |
 | ECR | PF Electronic Challan cum Return, the EPFO upload file |
