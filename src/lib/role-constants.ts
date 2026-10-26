@@ -107,6 +107,7 @@ export type Feature =
   | "confirmations"
   | "confirmationsInitiate"
   | "appraisals"
+  | "reviews"
   | "offboarding"
   | "reports"
   | "dataManagement"
@@ -188,6 +189,13 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // only review it.
   confirmationsInitiate: ["super_admin", "pnc_admin", "pnc_ops", "manager"],
   appraisals: ["super_admin", "pnc_admin", "fin_admin", "exec_view", "manager"],
+  // The review-cycle dashboard: every confirmation and appraisal in flight,
+  // org-wide. The people who run it (PnC Admin, PnC Ops) and leadership.
+  // `manager` is NOT here: a line manager works their own reports' reviews
+  // from My Reviews (`self`), scoped by the reporting line, because most
+  // managers hold `employee`. Fin Admin's performance access is outcomes
+  // only, and the dashboard is a working screen, not an outcome report.
+  reviews: ["super_admin", "pnc_admin", "pnc_ops", "exec_view"],
   // Fin Admin is here for full-and-final settlement. `manager` is NOT: the
   // screen loads every case in the organisation (`getAllOffboardingCases`),
   // with no team filter to scope it to their own reports.
@@ -239,6 +247,9 @@ const ROUTE_FEATURE: [string, Feature][] = [
   // them, not the gate.
   ["/profile", "self"],
   ["/my-forms", "self"],
+  // Your own reviews, and your direct reports'. Scoped by the data layer
+  // (`getMyReviews`, `getCycleDetail`), like My Forms.
+  ["/my-reviews", "self"],
   ["/changelog", "self"],
   // A nominated peer is usually an ordinary employee, so this cannot sit
   // behind `confirmations`, which excludes them.
@@ -267,6 +278,7 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/confirmations", "confirmations"],
   ["/confirmations/new", "confirmationsInitiate"],
   ["/appraisals", "appraisals"],
+  ["/reviews", "reviews"],
   ["/offboarding", "offboarding"],
   ["/reports", "reports"],
 

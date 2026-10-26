@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   UserMinus,
   Eye,
+  ClipboardCheck,
 } from 'lucide-react'
 
 const settingsTabs = [
@@ -26,6 +27,7 @@ const settingsTabs = [
   { label: 'Confirmation', href: '/manage/settings/confirmation', icon: UserCheck },
   { label: 'Appraisal', href: '/manage/settings/appraisal', icon: TrendingUp },
   { label: 'Peer Feedback', href: '/manage/settings/peer-feedback', icon: MessageSquare },
+  { label: 'Reviews', href: '/manage/settings/reviews', icon: ClipboardCheck },
   { label: 'Documents', href: '/manage/settings/documents', icon: FileText },
   { label: 'Offboarding', href: '/manage/settings/offboarding', icon: UserMinus },
   { label: 'Audit Log', href: '/manage/settings/audit', icon: History },

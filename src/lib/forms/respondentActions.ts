@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { validateSubmission } from '@/lib/forms/validateSubmission'
+import { defaultCtx, onFormSubmitted, selfSubmitBlocker } from '@/lib/reviews/service'
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`)
@@ -87,6 +88,11 @@ export async function saveSubmission(formData: FormData): Promise<void> {
   if (answerError) fail(path, answerError.message)
 
   if (intent === 'submit') {
+    // A self-reflection goes in with the employee's peer nominations: the
+    // peers are emailed the moment it is submitted.
+    const blocker = await selfSubmitBlocker(supabase, requestId)
+    if (blocker) fail(path, blocker)
+
     const { data: updated, error: submitError } = await supabase
       .from('form_submissions')
       .update({ status: 'submitted' })
@@ -94,6 +100,14 @@ export async function saveSubmission(formData: FormData): Promise<void> {
       .select('id')
     if (submitError) fail(path, submitError.message)
     if (!updated || updated.length === 0) fail(path, 'Could not submit the form. Please try again.')
+
+    // If this form belongs to a review cycle, move the cycle on: record it,
+    // send peers their forms after a self-reflection, and check whether the
+    // meeting can be set up. The respondent has just been verified as the
+    // owner of this request above; the cycle work runs as the service.
+    const ctx = defaultCtx(employee.name)
+    if (ctx) await onFormSubmitted(ctx, requestId)
+    revalidatePath('/my-reviews')
 
     revalidatePath('/my-forms')
     revalidatePath(path)

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/peer-reminders",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/review-cycles",
+      "schedule": "0 3 * * *"
     }
   ]
 }

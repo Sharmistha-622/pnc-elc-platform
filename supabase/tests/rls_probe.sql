@@ -44,6 +44,18 @@ insert into public.candidate_letters (candidate_name, template_name, letter_type
 
 insert into public.email_provider_config (id) values ('probe') on conflict do nothing;
 
+-- A review cycle for R: R reflects, M (R's manager) reviews, X is a peer.
+insert into public.review_cycles (id, kind, employee_id, manager_id, period_key, stage)
+  values ('00000000-0000-0000-0000-0000000000d1', 'confirmation', '00000000-0000-0000-0000-00000000000b',
+          '00000000-0000-0000-0000-00000000000a', 'confirmation', 'decision_recorded');
+insert into public.review_participants (cycle_id, role, employee_id, status) values
+  ('00000000-0000-0000-0000-0000000000d1', 'self',    '00000000-0000-0000-0000-00000000000b', 'submitted'),
+  ('00000000-0000-0000-0000-0000000000d1', 'manager', '00000000-0000-0000-0000-00000000000a', 'submitted'),
+  ('00000000-0000-0000-0000-0000000000d1', 'peer',    '00000000-0000-0000-0000-00000000000c', 'submitted');
+insert into public.review_decisions (cycle_id, decision, note)
+  values ('00000000-0000-0000-0000-0000000000d1', 'confirm', 'manager note about R');
+insert into public.review_events (cycle_id, kind) values ('00000000-0000-0000-0000-0000000000d1', 'opened');
+
 insert into public.audit_log (table_name, record_id, action)
   values ('employees', '00000000-0000-0000-0000-00000000000b', 'update');
 
@@ -139,7 +151,18 @@ insert into pg_temp.expectations values
   ('candidate_letters',      '{pnc_admin,fin_admin,super_admin}'),
   -- Provider secrets: config editors.
   ('email_provider_config',  '{platform_admin,super_admin}'),
-  ('audit_log',              '{pnc_admin,platform_admin,platform_ops,super_admin}');
+  ('audit_log',              '{pnc_admin,platform_admin,platform_ops,super_admin}'),
+  -- Review cycles: the review roles, R's manager and R. Not the peer: a peer
+  -- sees only their own form. Not Finance, not the platform team.
+  ('review_cycles',          '{"employee (R)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  -- Who was asked and whether they answered: as the cycle, plus each
+  -- participant for their own row.
+  ('review_participants',    '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  -- The decision and the manager's note: written feedback. Never R, never the
+  -- peer, never PnC Ops (status only).
+  ('review_decisions',       '{"manager (M)",pnc_admin,exec_view,super_admin}'),
+  ('review_events',          '{"manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  ('review_cycle_settings',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
 
 -------------------------------------------------------------------------
 -- Run it
@@ -181,6 +204,36 @@ begin
     insert into pg_temp.failures values ('peer (X)', 'employees', 'cannot rewrite a colleague''s email', 1);
   end if;
 end $$;
+
+-- No session moves a review: R cannot mark their own decision accepted, or
+-- their manager's form answered, or reset a reminder clock.
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('r@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$
+begin
+  update public.review_cycles set stage = 'closed' where id = '00000000-0000-0000-0000-0000000000d1';
+  insert into pg_temp.failures values ('employee (R)', 'review_cycles', 'update refused', 1);
+exception when insufficient_privilege then
+  null;
+end $$;
+do $$
+begin
+  update public.review_participants set status = 'submitted', reminder_count = 0;
+  insert into pg_temp.failures values ('employee (R)', 'review_participants', 'update refused', 1);
+exception when insufficient_privilege then
+  null;
+end $$;
+reset role;
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('pa@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$
+begin
+  insert into public.review_decisions (cycle_id, decision, note) values ('00000000-0000-0000-0000-0000000000d1', 'confirm', 'x');
+  insert into pg_temp.failures values ('pnc_admin', 'review_decisions', 'insert refused (writes go through the app)', 1);
+exception when insufficient_privilege or unique_violation then
+  null;
+end $$;
+reset role;
 
 -- anon cannot create a candidate.
 do $$ begin perform set_config('request.jwt.claims', '', false); end $$;
