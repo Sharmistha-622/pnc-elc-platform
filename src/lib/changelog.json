@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.01.01",
+    "date": "2026-10-26",
+    "title": "STUB attendance, vault tables in Phase 0, decision owners",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "The payroll design now names STUB as the attendance system, plans vault table creation in Phase 0, and records decision owners."
+      }
+    ]
+  },
+  {
     "version": "2.01.00",
     "date": "2026-10-25",
     "title": "Segment the sidenav into role-aware groups and register the unmapped routes",
