@@ -1,5 +1,25 @@
 [
   {
+    "version": "2.02.00",
+    "date": "2026-10-26",
+    "title": "Confirmation and appraisal review cycles, end to end",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Confirmation and appraisal reviews run end to end: due reviews open automatically, the employee nominates peers and reflects, peers and the manager are asked for their reviews, reminders go out every 24 hours, PnC is told when someone stops responding, the meeting is booked with a calendar invitation, and the manager's decision goes to PnC to accept or send back."
+      },
+      {
+        "category": "Features",
+        "description": "A Reviews dashboard for PnC, My Reviews for every employee and their direct reports, and a Reviews tab in Settings."
+      },
+      {
+        "category": "Fixes",
+        "description": "The Email Center now records sent and failed emails."
+      }
+    ]
+  },
+  {
     "version": "2.01.01",
     "date": "2026-10-26",
     "title": "STUB attendance, vault tables in Phase 0, decision owners",
