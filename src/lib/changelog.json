@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.04.00",
+    "date": "2026-10-29",
+    "title": "Real calendar free/busy for review meetings, employee can reschedule",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Review meeting slots now check the manager's real Google Calendar availability."
+      },
+      {
+        "category": "Features",
+        "description": "Employees can reschedule their own booked review meeting."
+      }
+    ]
+  },
+  {
     "version": "2.03.04",
     "date": "2026-10-29",
     "title": "Let PnC Admin and Fin Admin grant their own group's roles",
