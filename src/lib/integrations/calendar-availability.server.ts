@@ -79,7 +79,7 @@ export class FallbackCalendarAvailabilityService implements ICalendarAvailabilit
   }
 }
 
-function useGoogleCalendar(): boolean {
+function shouldUseGoogleCalendar(): boolean {
   if (process.env.NODE_ENV === 'test') return false;
   if (process.env.CALENDAR_AVAILABILITY === 'mock') return false;
   return Boolean(
@@ -87,7 +87,7 @@ function useGoogleCalendar(): boolean {
   );
 }
 
-export const calendarAvailabilityService: ICalendarAvailabilityService = useGoogleCalendar()
+export const calendarAvailabilityService: ICalendarAvailabilityService = shouldUseGoogleCalendar()
   ? new FallbackCalendarAvailabilityService(
       new GoogleCalendarAvailabilityService(),
       new MockCalendarAvailabilityService()
