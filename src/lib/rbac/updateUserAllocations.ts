@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
 import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { recordAuditEvent } from '@/lib/audit/service'
-import { canGrantRole, isRoleCode } from '@/lib/rbac/roles'
+import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
 
 const GRANT_REFUSALS: Record<string, string> = {
@@ -16,6 +16,8 @@ const GRANT_REFUSALS: Record<string, string> = {
   only_super_admin_may_grant: 'Only a Super Admin can grant this role.',
   platform_admin_may_grant_platform_ops_only:
     'Platform Admin can grant Platform Ops only, and can never grant access to sensitive data.',
+  may_grant_own_group_roles_only:
+    'PnC Admin can grant PnC Admin and PnC Ops only; Fin Admin can grant Fin Admin and Fin Ops only.',
   owner_role_is_not_grantable: 'The owner role cannot be granted in the app.',
   cannot_change_own_role: "You can't change your own role.",
 }
@@ -149,6 +151,10 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
         error: `${cleanTargetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
       }
     }
+  }
+
+  if (teamChanged && !canSetDepartment(caller.originalRole)) {
+    return { success: false, error: 'Your role can change a user’s role, not their department.' }
   }
 
   // Changing anything about a person — role or department — needs authority

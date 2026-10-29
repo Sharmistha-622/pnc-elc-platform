@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { UserRole, assignableRoles, roleLabel } from "@/lib/role-constants";
+import { canSetDepartment } from "@/lib/rbac/roles";
 import { updateUserAllocations } from "@/lib/rbac/updateUserAllocations";
 import {
   Dialog,
@@ -265,7 +266,8 @@ export function EditUserDialog({
               <Select
                 value={team}
                 onValueChange={(val: string) => setTeam(val)}
-                disabled={isSubmitting}
+                // Fin Admin sets roles only; the server refuses a move anyway.
+                disabled={isSubmitting || !canSetDepartment(callerRole)}
               >
                 <SelectTrigger
                   id="user-edit-team"

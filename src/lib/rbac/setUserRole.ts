@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
-import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
+import { guard } from '@/lib/rbac/guard'
 import { normalizeRole, type UserRole } from '@/lib/role-constants'
 import { canGrantRole, isRoleCode } from '@/lib/rbac/roles'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
@@ -13,12 +13,17 @@ const REFUSALS: Record<string, string> = {
   only_super_admin_may_grant: 'Only a Super Admin can grant this role.',
   platform_admin_may_grant_platform_ops_only:
     'Platform Admin can grant Platform Ops only, and can never grant access to sensitive data.',
+  may_grant_own_group_roles_only:
+    'PnC Admin can grant PnC Admin and PnC Ops only; Fin Admin can grant Fin Admin and Fin Ops only.',
   owner_role_is_not_grantable: 'The owner role cannot be granted in the app.',
   cannot_change_own_role: "You can't change your own role.",
 }
 
 export async function setUserRole(targetUserId: string, role: UserRole) {
-  const caller = await getCurrentUserRole()
+  // The users screen's own gate, checked on both roles, before anything else.
+  const allowed = await guard('manageUsers')
+  if (!allowed.ok) return { success: false, error: allowed.error }
+  const caller = allowed.caller
 
   if (!isRoleCode(role)) return { success: false, error: 'Invalid role' }
 

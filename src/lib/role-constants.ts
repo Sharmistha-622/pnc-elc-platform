@@ -218,10 +218,11 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // enforce that with `canWrite(role, 'config')`. Route access is not edit
   // access.
   platformConfig: ["super_admin", "platform_admin", "pnc_admin"],
-  // Granting roles is Super Admin's alone; Platform Admin reaches the screen
-  // to manage core accounts, and `canGrantRole` still refuses it everything
-  // but Platform Ops.
-  manageUsers: ["super_admin", "platform_admin"],
+  // Super Admin grants every role. Platform Admin reaches the screen to manage
+  // core accounts, and `canGrantRole` refuses it everything but Platform Ops.
+  // PnC Admin and Fin Admin reach it to staff their own group: `canGrantRole`
+  // limits them to the PnC and the Finance roles respectively.
+  manageUsers: ["super_admin", "platform_admin", "pnc_admin", "fin_admin"],
 };
 
 /**

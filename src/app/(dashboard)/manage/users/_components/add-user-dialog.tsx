@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { assignableRoles, roleLabel, UserRole } from "@/lib/role-constants";
+import { canSetDepartment } from "@/lib/rbac/roles";
+import { createUserWithRole } from "@/lib/rbac/createUserWithRole";
+import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
 import type { Department } from "@/lib/departments/types";
 import {
   Dialog,
@@ -26,7 +29,7 @@ import { UserPlus, Loader2, Mail, User, Shield, Users } from "lucide-react";
 interface AddUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUserAdded?: (user: any) => void;
+  onUserAdded?: (user: UserRow) => void;
   departments?: Department[];
   /**
    * The signed-in user's own role. The picker offers only what they may
@@ -44,10 +47,13 @@ export function AddUserDialog({
 }: AddUserDialogProps) {
   // Lifecycle roles are absent on purpose: a candidate, pre-joiner or employee
   // is created by the joiner flow, never by someone picking from a list here.
+  // Anyone on an allowed domain signs in as an Employee without being added.
   const roleOptions = assignableRoles(callerRole);
+  const firstRole = roleOptions[0] ?? null;
+  const mayPickTeam = canSetDepartment(callerRole);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<UserRole>("employee");
+  const [role, setRole] = useState<UserRole | null>(firstRole);
   const [team, setTeam] = useState<string>("None");
   const [deptList, setDeptList] = useState<Department[]>(departments);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,7 +74,7 @@ export function AddUserDialog({
   const resetForm = () => {
     setEmail("");
     setFullName("");
-    setRole("employee");
+    setRole(firstRole);
     setTeam("None");
   };
 
@@ -87,26 +93,30 @@ export function AddUserDialog({
       return;
     }
 
+    if (!role) {
+      toast.error("Choose a role.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const newUser = {
-        id: "user-" + Math.random().toString(36).substring(2, 9),
-        email: email.trim().toLowerCase(),
-        user_metadata: {
-          full_name: fullName.trim() || email.split("@")[0],
-          role,
-          team,
-          last_active_at: new Date().toISOString(),
-        },
-        created_at: new Date().toISOString(),
-      };
+      const res = await createUserWithRole({
+        email,
+        fullName,
+        role,
+        team: mayPickTeam ? team : "None",
+      });
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
 
-      toast.success(`User ${email} added successfully!`);
-      if (onUserAdded) onUserAdded(newUser);
+      toast.success(`User ${res.user.email} added as ${roleLabel(res.user.role)}.`);
+      if (onUserAdded) onUserAdded(res.user);
       resetForm();
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create user.");
+    } catch {
+      toast.error("Failed to create user.");
     } finally {
       setIsSubmitting(false);
     }
@@ -170,7 +180,11 @@ export function AddUserDialog({
                 <Shield className="h-3 w-3 text-muted-foreground" />
                 Assign Role
               </label>
-              <Select value={role} onValueChange={(val: UserRole) => setRole(val)} disabled={isSubmitting}>
+              <Select
+                value={role ?? undefined}
+                onValueChange={(val: UserRole) => setRole(val)}
+                disabled={isSubmitting || roleOptions.length === 0}
+              >
                 <SelectTrigger id="new-role-select" className="w-full h-8 rounded-lg text-xs">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -190,7 +204,11 @@ export function AddUserDialog({
                 <Users className="h-3 w-3 text-muted-foreground" />
                 Assign Team
               </label>
-              <Select value={team} onValueChange={(val: string) => setTeam(val)} disabled={isSubmitting}>
+              <Select
+                value={team}
+                onValueChange={(val: string) => setTeam(val)}
+                disabled={isSubmitting || !mayPickTeam}
+              >
                 <SelectTrigger id="new-team-select" className="w-full h-8 rounded-lg text-xs">
                   <SelectValue placeholder="Select team / department" />
                 </SelectTrigger>
@@ -220,7 +238,7 @@ export function AddUserDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !role}
               className="rounded-lg h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 flex items-center gap-1.5"
             >
               {isSubmitting ? (

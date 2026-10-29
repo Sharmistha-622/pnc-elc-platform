@@ -30,11 +30,11 @@ Two things are deliberately separate:
 | **Owner** | | | | | | | | | |
 | Super Admin `super_admin` | 10 | core+vault | Edit | Edit | Edit | Edit | Edit | Edit | Owner (Nitin) |
 | **PnC** | | | | | | | | | |
-| PnC Admin `pnc_admin` | 8 | core+vault | Edit | Edit | View | Edit | Edit | View | Super Admin |
-| PnC Ops `pnc_ops` | 6 | core | Edit | Edit | — | — | View (status only) | — | Super Admin |
+| PnC Admin `pnc_admin` | 8 | core+vault | Edit | Edit | View | Edit | Edit | View | Super Admin, PnC Admin |
+| PnC Ops `pnc_ops` | 6 | core | Edit | Edit | — | — | View (status only) | — | Super Admin, PnC Admin |
 | **Finance** | | | | | | | | | |
-| Fin Admin `fin_admin` | 8 | core+vault | View | — | Edit | Edit | View (outcomes) | — | Super Admin |
-| Fin Ops `fin_ops` | 6 | core+vault | View | — | View | View (payroll export) | — | — | Super Admin |
+| Fin Admin `fin_admin` | 8 | core+vault | View | — | Edit | Edit | View (outcomes) | — | Super Admin, Fin Admin |
+| Fin Ops `fin_ops` | 6 | core+vault | View | — | View | View (payroll export) | — | — | Super Admin, Fin Admin |
 | **Leadership** | | | | | | | | | |
 | Exec View `exec_view` | 7 | core+vault | View | — | — | View | View | — | Super Admin |
 | **Platform** | | | | | | | | | |
@@ -101,8 +101,16 @@ pending submission without ever being able to read it.
 
 ## Granting
 
-- **Only Super Admin grants sensitive roles.** PnC, Finance and Exec roles can
-  be granted by Super Admin alone.
+- **Super Admin grants every sensitive role.** Exec View and Platform Admin
+  are Super Admin's alone.
+- **A group's admin staffs their own group.** PnC Admin may grant PnC Admin
+  and PnC Ops; Fin Admin may grant Fin Admin and Fin Ops. Neither may grant
+  the other group's roles, and neither may change their own role. Changing a
+  person's role also needs authority over the role they hold now, so PnC Admin
+  cannot touch a Finance role holder, nor Fin Admin a PnC one. Fin Admin holds
+  `general: view` and so changes roles only, never a department. A role changed
+  in core grants nothing in the vault: vault membership is still a separate
+  invite.
 - **Platform Admin can never widen sight of sensitive data** — not for others,
   and not for itself. It may grant Platform Ops and nothing else.
 - **Lifecycle and line roles assign themselves.** No one may set them by hand;
