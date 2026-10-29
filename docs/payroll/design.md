@@ -98,7 +98,7 @@ erDiagram
 
   PERSON {
     uuid id PK
-    text code "NG-0444, editable"
+    text code "NG-0669, editable"
     uuid employee_id FK "employees.id"
     text legal_name
     text gender
@@ -107,7 +107,7 @@ erDiagram
   ENGAGEMENT {
     uuid id PK
     uuid person_id FK
-    text engagement_code "NG-0444-E02"
+    text engagement_code "NG-0669-E02"
     text type_code FK
     text pay_basis "month | day | hour"
     date start_date

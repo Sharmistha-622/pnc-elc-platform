@@ -16,9 +16,10 @@ depends on.
 | Vault functions | `sync-person`, `submit-bank`, `approve-bank` | Vault decision #3 in `../vault-setup.md` |
 | Core residency | Move core from Singapore to Mumbai before any real data is loaded | D-01 |
 | Person and engagement | `person` over `employees`; `engagement` with type, pay basis, dates, location, work state, grade; backfill from `employees` | D-10, D-11, O-01 |
+| Employee ID | Issue `NG-0669`-style IDs from one sequence when a candidate reaches Pre-Joinee, written to `employees.employee_code` (added in #59); retire onboarding's `NG-<year>-` codes | D-34, P-09 |
 | Locations | `ng_locations.state` (backfilled from the address), a `state` master, and closing the `to public` write policies | D-25 |
-| Fix `department_id` | Add the column `updateUserAllocations.ts` already writes, or stop writing it | — |
-| Split variations | Versioned variations in core replacing the `salary_rules` default; Fin Admin edits, PnC Admin approves; picker on offers and employee records | D-06 – D-09 |
+| ~~Fix `department_id`~~ | Done in #58: `updateUserAllocations.ts` writes only `team` and `team_id` | — |
+| Split variations | Versioned variations in core replacing the `salary_rules` default; Fin Admin edits, PnC Admin approves; picker on offers and employee records. Seeded with `standard` and `esic_band` from P&C's calculator; PF opt-out refused at Basic ≤ ₹25,000 | D-06 – D-09, D-29, D-30, P-01 – P-05 |
 | Amounts out of core | Offer letter rendering moves to a vault function; `salary_structures` migrated to vault `compensation`, then its amount columns dropped | D-02, D-03 |
 | Roles | Widen Fin Ops; write-only salary path for PnC Ops and Fin Ops; approver role; sign-off-chain table; shared segregation-of-duties check (retrofitted to confirmations) | D-05, D-16, O-02 |
 | Audit | `payroll_audit` in the vault; `payroll` module in `employee_audit_log`; merged, permission-filtered audit view | D-04 |

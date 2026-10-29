@@ -131,6 +131,14 @@ sample, or a second fixture.
 | X-15 | Punjab with 5 employees and no PT | S-07 |
 | X-16 | Split-variation edit: existing person keeps old version, new joiner gets new | D-08 |
 | X-17 | Same person tries to sign two steps | V-29 |
+| X-18 | `standard` split, CTC ₹6,80,000: P&C's annexure to the rupee | D-29, P-10 |
+| X-19 | `standard` split, CTC ₹45,000 a month: employer PF 2,747, not the calculator's fixed 3,250 | P-02 |
+| X-20 | `esic_band` split, CTC ₹12,000 a month: the calculator's 12K column | P-01, P-04 |
+| X-21 | Offer with Basic ≤ ₹25,000 and PF opt-out ticked: refused | V-30 |
+| X-22 | Two candidates reach Pre-Joinee at once: two consecutive, different IDs | D-34 |
+
+X-18 to X-22 come from P&C's CTC calculator, not the payroll sample; the
+expected figures are in [`pnc-rules.md`](./pnc-rules.md) §7.
 
 ## 5. Harness
 

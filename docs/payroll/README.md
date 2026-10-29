@@ -56,6 +56,7 @@ vault session, render them, and keep nothing.
 | 2 | [`rule-tables.md`](./rule-tables.md) | Rate tables, split variations, every formula, worked examples, and the validation catalogue |
 | 3 | [`test-plan.md`](./test-plan.md) | Acceptance criteria, baseline totals from the sample, all 41 planted test cases, the harness and the shadow run |
 | 4 | [`phased-plan.md`](./phased-plan.md) | Phases with entry and exit criteria, and the PR slices |
+| 5 | [`pnc-rules.md`](./pnc-rules.md) | P&C's rules for offers and compensation (components, PF, PT, TDS, employee ID), what the CTC calculator does, and the questions it raises |
 | — | [`decisions.md`](./decisions.md) | Decisions taken, and the inputs still owed |
 
 The synthetic sample workbook is committed at
