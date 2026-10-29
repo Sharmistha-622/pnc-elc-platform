@@ -14,12 +14,12 @@
 # but the Supabase CLI deploys from <workdir>/supabase/functions. They are
 # copied, with _shared, into a temporary directory laid out that way.
 #
-# Why three functions are deployed with --no-verify-jwt: core calls
-# submit-documents, seal-document and seal-feedback with the shared
+# Why four functions are deployed with --no-verify-jwt: core calls
+# submit-documents, seal-document, seal-feedback and submit-bank with the shared
 # x-core-signature header, not a vault login. Supabase's gateway rejects a
-# call without a valid vault JWT before it reaches the code, so those three
-# check the signature themselves. read-salary and read-feedback keep the
-# gateway check: only a signed-in vault user may call them.
+# call without a valid vault JWT before it reaches the code, so those four
+# check the signature themselves. read-salary, read-feedback and approve-bank
+# keep the gateway check: only a signed-in vault user may call them.
 set -euo pipefail
 
 REF="${1:-}"
@@ -35,8 +35,8 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SUPABASE="npx -y supabase@2.20.12"
 URL="https://${REF}.supabase.co"
-SIGNED_IN_ONLY=(read-salary read-feedback)
-CALLED_BY_CORE=(submit-documents seal-document seal-feedback)
+SIGNED_IN_ONLY=(read-salary read-feedback approve-bank)
+CALLED_BY_CORE=(submit-documents seal-document seal-feedback submit-bank)
 
 run() {
   if [ -n "$DRY_RUN" ]; then printf '  would run: %s\n' "$*"; else "$@"; fi
@@ -101,6 +101,8 @@ check "read-feedback with no vault login"       401 -X POST "$URL/functions/v1/r
 check "seal-document without core's signature"  401 -X POST "$URL/functions/v1/seal-document"
 check "seal-feedback without core's signature"  401 -X POST "$URL/functions/v1/seal-feedback" -H 'content-type: application/json' -d '{}'
 check "submit-documents with a wrong signature" 401 -X POST "$URL/functions/v1/submit-documents" -H 'x-core-signature: not-the-secret'
+check "submit-bank with a wrong signature"      401 -X POST "$URL/functions/v1/submit-bank" -H 'x-core-signature: not-the-secret'
+check "approve-bank with no vault login"        401 -X POST "$URL/functions/v1/approve-bank" -H 'content-type: application/json' -d '{"action":"list"}'
 
 if [ -n "$FAILED" ]; then
   echo "Some checks failed. Do not connect core until they pass." >&2

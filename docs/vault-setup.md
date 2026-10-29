@@ -39,16 +39,16 @@ only other member will be the break-glass owner in step 5.
 ## 2. Apply the schema
 
 From this repository, on your machine, with each project's connection string
-(Project Settings → Database). Apply all four files, in order:
+(Project Settings → Database). Apply every file, in order (0001 to 0005 so far):
 
 ```bash
 # dev first, always
-for f in supabase/vault/migrations/000{1,2,3,4}_*.sql; do
+for f in supabase/vault/migrations/0*.sql; do
   psql "$ELC_VAULT_DEV_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 
 # then production
-for f in supabase/vault/migrations/000{1,2,3,4}_*.sql; do
+for f in supabase/vault/migrations/0*.sql; do
   psql "$ELC_VAULT_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 ```
@@ -59,7 +59,7 @@ Re-running them is safe; they are idempotent.
 `0004` adds the payroll tables (PAN and UAN, runs, payments, payslips,
 letters, the payroll audit trail). It is safe to apply before payroll is
 built: the tables stay empty, and service-role only, until it is.
-`scripts/vault-probe.sh` builds a scratch vault from all four files and checks
+`scripts/vault-probe.sh` builds a scratch vault from every file and checks
 the walls; CI runs it on every change.
 
 `0003` is not optional. Without it, every function in the vault is callable by
@@ -98,7 +98,7 @@ scripts/vault-deploy.sh <dev-vault-ref>
 scripts/vault-deploy.sh <production-vault-ref>
 ```
 
-The script deploys the five functions, generates `CORE_SUBMISSION_SECRET` and
+The script deploys the seven functions, generates `CORE_SUBMISSION_SECRET` and
 stores it in the vault's function secrets (printing it once, for your password
 manager), then checks that each function refuses what it must. Two things it
 handles that a plain `supabase functions deploy` from the repo root does not:
@@ -106,12 +106,12 @@ handles that a plain `supabase functions deploy` from the repo root does not:
 - **Layout.** The functions live in `supabase/vault/functions`; the CLI
   deploys from `<workdir>/supabase/functions`. The script stages a copy laid
   out that way.
-- **`--no-verify-jwt` on the three functions core calls**
-  (`submit-documents`, `seal-document`, `seal-feedback`). Core proves itself
+- **`--no-verify-jwt` on the four functions core calls**
+  (`submit-documents`, `seal-document`, `seal-feedback`, `submit-bank`). Core proves itself
   with the `x-core-signature` header, not a vault login, and Supabase's
   gateway would reject those calls before the function's own check ran.
-  `read-salary` and `read-feedback` keep the gateway check: only a signed-in
-  vault user reaches them.
+  `read-salary`, `read-feedback` and `approve-bank` keep the gateway check:
+  only a signed-in vault user reaches them.
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into the function
 runtime by Supabase. You do not set them, and they do not leave that runtime.
@@ -263,13 +263,21 @@ Built and tested:
   half-finished move returns the same vault id rather than filing a duplicate.
 - `read_identity_number` — the only path to a full document number. Logs, and
   refuses Exec View.
+- `submit-bank` (core → vault, insert-only) and `approve-bank` (list, approve,
+  reject; vault login). The rules are in the database
+  (`0005_bank_approval.sql`, tested by the vault probe): nothing is live until
+  approved; only Super Admin and Fin Admin decide; nobody decides their own
+  submission; an account already active for someone else is refused (V-01);
+  the IFSC and account number formats are enforced (V-03); every decision is
+  in `payroll_audit`, with the last four digits only. Like `seal-document`,
+  `submit-bank` needs the person in `people` first, so end to end it waits on
+  `sync-person`.
 
 Not built, and deliberately so — each is blocked on a decision in
 [`rbac.md`](./rbac.md):
 
 | Needed | Blocked on |
 |---|---|
-| `submit-bank`, `approve-bank` | nothing |
 | `payroll-export` | needs the Super Admin alert channel decided |
 | `sync-person` (core → vault, one way) | #3 — whether a candidate is a Supabase user at all |
 
