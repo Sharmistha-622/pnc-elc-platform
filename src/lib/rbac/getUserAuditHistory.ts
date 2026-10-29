@@ -3,17 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAuditTrail } from '@/lib/audit/service'
 import { guard } from '@/lib/rbac/guard'
-
-export interface UserAuditItem {
-  id: string
-  timestamp: string
-  actorEmail: string
-  actorRole?: string
-  action: string
-  description?: string
-  changes: { field: string; label?: string; from: any; to: any }[]
-  reason?: string
-}
+import { mergeUserAuditHistory, type UserAuditItem } from '@/lib/rbac/userAuditHistoryMerge'
 
 export async function getUserAuditHistory(targetEmail: string, targetUserId?: string): Promise<UserAuditItem[]> {
   // A server action, so callable with any email from the browser. The history
@@ -52,6 +42,7 @@ export async function getUserAuditHistory(targetEmail: string, targetUserId?: st
             description: payload.description,
             changes: payload.changes || [],
             reason: payload.reason || undefined,
+            allocationId: payload.allocation_id || undefined,
           })
         }
       })
@@ -70,29 +61,22 @@ export async function getUserAuditHistory(targetEmail: string, targetUserId?: st
     unifiedEvents
       .filter((ev) => ev.module === 'access' || ev.action.startsWith('access.'))
       .forEach((ev) => {
-        // Only add if not already captured from dbLogs
-        const alreadyExists = items.some(
-          (it) => it.timestamp === ev.occurred_at || (it.changes.length > 0 && it.id === ev.id)
-        )
-        if (!alreadyExists) {
-          items.push({
-            id: ev.id,
-            timestamp: ev.occurred_at,
-            actorEmail: ev.actor_email || ev.actor_name || 'Admin',
-            actorRole: (ev.metadata?.actor_role as string) || 'Admin',
-            action: ev.action,
-            description: ev.description,
-            changes: (ev.changes as any) || [],
-            reason: (ev.metadata?.reason as string) || undefined,
-          })
-        }
+        items.push({
+          id: ev.id,
+          timestamp: ev.occurred_at,
+          actorEmail: ev.actor_email || ev.actor_name || 'Admin',
+          actorRole: (ev.metadata?.actor_role as string) || 'Admin',
+          action: ev.action,
+          description: ev.description,
+          changes: (ev.changes as any) || [],
+          reason: (ev.metadata?.reason as string) || undefined,
+          allocationId: (ev.metadata?.allocation_id as string) || undefined,
+        })
       })
   } catch (err) {
     console.warn('Error reading from unified audit trail:', err)
   }
 
-  // Sort descending by timestamp
-  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-  return items
+  // Each save is in both sources; show it once, newest first.
+  return mergeUserAuditHistory(items)
 }

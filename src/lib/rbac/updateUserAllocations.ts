@@ -116,31 +116,6 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   const cleanTargetEmail = target.email
   const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
 
-  // One authority decides who may grant what. The caller's real role is used,
-  // never an emulated one, so impersonating a Super Admin cannot grant like one.
-  const decision = canGrantRole(caller.originalRole, newRole, {
-    isSelf:
-      cleanTargetEmail === caller.email?.toLowerCase() ||
-      (Boolean(target.authUser?.id) && target.authUser?.id === caller.userId),
-  })
-  if (!decision.ok) {
-    return { success: false, error: GRANT_REFUSALS[decision.reason] ?? 'Not allowed' }
-  }
-
-  if (isImmutable && newRole !== 'super_admin') {
-    return {
-      success: false,
-      error: `${cleanTargetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
-    }
-  }
-
-  // Removing a sensitive role is as restricted as granting one, judged on the
-  // role the target actually holds.
-  const overCurrent = canGrantRole(caller.originalRole, target.role, {})
-  if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic') {
-    return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
-  }
-
   const normalizedCurrentTeam = target.team
   const normalizedNewTeam = newTeam || 'None'
   const normalizedCurrentRole = target.role
@@ -150,6 +125,43 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
 
   if (!roleChanged && !teamChanged) {
     return { success: true, message: 'No allocation changes detected' }
+  }
+
+  // The grant rules apply to a role change only. A department move with the
+  // role left as it is grants nothing, so it is not refused as "changing your
+  // own role" — which is what stopped a Super Admin moving their own department.
+  if (roleChanged) {
+    // One authority decides who may grant what. The caller's real role is
+    // used, never an emulated one, so impersonating a Super Admin cannot
+    // grant like one.
+    const decision = canGrantRole(caller.originalRole, newRole, {
+      isSelf:
+        cleanTargetEmail === caller.email?.toLowerCase() ||
+        (Boolean(target.authUser?.id) && target.authUser?.id === caller.userId),
+    })
+    if (!decision.ok) {
+      return { success: false, error: GRANT_REFUSALS[decision.reason] ?? 'Not allowed' }
+    }
+
+    if (isImmutable) {
+      return {
+        success: false,
+        error: `${cleanTargetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
+      }
+    }
+  }
+
+  // Changing anything about a person — role or department — needs authority
+  // over the role they hold now, so a Platform Admin cannot move a PnC Admin
+  // either. Super Admin is the owner role and never grantable, so that check
+  // alone would also refuse a Super Admin moving a Super Admin's department.
+  const overCurrent = canGrantRole(caller.originalRole, target.role, {})
+  const superAdminOverSuperAdmin =
+    !overCurrent.ok &&
+    overCurrent.reason === 'owner_role_is_not_grantable' &&
+    caller.originalRole === 'super_admin'
+  if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic' && !superAdminOverSuperAdmin) {
+    return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
   }
 
   const diffs: { field: string; label: string; from: string; to: string }[] = []
@@ -169,6 +181,10 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
       to: normalizedNewTeam,
     })
   }
+
+  // One id for this save, written into both audit records below so the
+  // history shows the save once (see mergeUserAuditHistory).
+  const allocationId = randomUUID()
 
   // 1. Update Supabase Auth metadata (if auth account exists)
   const authUserRecord = target.authUser
@@ -190,47 +206,36 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   // write by the database — and an update refused by RLS changes zero rows
   // without an error, which reported success while the team never moved. The
   // `manageUsers` guard and `canGrantRole` above decide who gets this far.
+  let employeeSyncError: string | null = null
   try {
     const supabase = admin
 
+    // `employees` has `team` (the department's name) and `team_id`; it has no
+    // `department` or `department_id`. Writing those made PostgREST refuse the
+    // whole update, unchecked, so the directory never saw a department change.
     let teamId: string | null = null
-    let departmentId: string | null = null
     if (normalizedNewTeam !== 'None') {
-      try {
-        const { data: deptRecord } = await supabase
-          .from('departments')
-          .select('id')
-          .ilike('name', normalizedNewTeam.trim())
-          .maybeSingle()
-        if (deptRecord) departmentId = deptRecord.id
-      } catch {}
-
-      try {
-        const { data: teamRecord } = await supabase
-          .from('teams')
-          .select('id')
-          .ilike('name', normalizedNewTeam.trim())
-          .maybeSingle()
-        if (teamRecord) teamId = teamRecord.id
-      } catch {}
+      const { data: teamRecord } = await supabase
+        .from('teams')
+        .select('id')
+        .ilike('name', normalizedNewTeam.trim())
+        .maybeSingle()
+      teamId = teamRecord?.id ?? null
     }
 
-    const cleanTeamValue = normalizedNewTeam === 'None' ? null : normalizedNewTeam
-    const updatePayload: Record<string, any> = {
-      team: cleanTeamValue,
-      department: cleanTeamValue,
-      updated_at: new Date().toISOString(),
-    }
-    if (teamId) updatePayload.team_id = teamId
-    if (departmentId) updatePayload.department_id = departmentId
-
-    await supabase
+    const { error: employeeError } = await supabase
       .from('employees')
-      .update(updatePayload)
+      .update({
+        team: normalizedNewTeam === 'None' ? null : normalizedNewTeam,
+        team_id: teamId,
+        updated_at: new Date().toISOString(),
+      })
       .or(`email.ilike.${cleanTargetEmail}${isValidUuid(targetUserId) ? `,id.eq.${targetUserId}` : ''}`)
+    if (employeeError) employeeSyncError = employeeError.message
   } catch (err) {
-    console.warn('Employees table sync non-fatal error:', err)
+    employeeSyncError = err instanceof Error ? err.message : String(err)
   }
+  if (employeeSyncError) console.error('Employees table sync failed:', employeeSyncError)
 
   // 3. Write Audit Log to public.audit_log
   try {
@@ -245,6 +250,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
       changed_by: callerId,
       changed_data: {
         event: 'user_allocations_updated',
+        allocation_id: allocationId,
         target_email: cleanTargetEmail,
         target_name: targetName || cleanTargetEmail,
         target_id: targetUserId,
@@ -282,6 +288,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
       metadata: {
         reason: reason?.trim() || null,
         actor_role: caller.role,
+        allocation_id: allocationId,
       },
     })
   } catch (err) {
@@ -291,6 +298,13 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   revalidatePath('/manage/users')
   revalidatePath('/manage/roles')
   revalidatePath('/employees')
+
+  if (employeeSyncError && teamChanged) {
+    return {
+      success: false,
+      error: `The role and account were updated, but the employee record's department was not (${employeeSyncError}). Try again.`,
+    }
+  }
 
   return { success: true, changes: diffs }
 }
