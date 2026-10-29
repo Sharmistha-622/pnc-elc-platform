@@ -1,5 +1,25 @@
 [
   {
+    "version": "2.03.02",
+    "date": "2026-10-29",
+    "title": "Let an admin move their own department; one audit entry per save",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Admins can change their own department on Users & Roles; only role changes to yourself are refused."
+      },
+      {
+        "category": "Fixes",
+        "description": "The user allocation audit trail shows each save once instead of two or three times."
+      },
+      {
+        "category": "Fixes",
+        "description": "A department change on Users & Roles now updates the employee record, not just the account."
+      }
+    ]
+  },
+  {
     "version": "2.03.01",
     "date": "2026-10-29",
     "title": "Make the employee import work, with employee IDs",
