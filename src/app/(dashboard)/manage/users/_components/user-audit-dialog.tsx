@@ -22,10 +22,8 @@ import {
   Users,
 } from "lucide-react";
 import type { UserRow } from "@/lib/rbac/listUsersWithRoles";
-import {
-  getUserAuditHistory,
-  type UserAuditItem,
-} from "@/lib/rbac/getUserAuditHistory";
+import { getUserAuditHistory } from "@/lib/rbac/getUserAuditHistory";
+import type { UserAuditItem } from "@/lib/rbac/userAuditHistoryMerge";
 
 interface UserAuditDialogProps {
   user: UserRow | null;

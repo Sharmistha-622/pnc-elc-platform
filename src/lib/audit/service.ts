@@ -97,6 +97,9 @@ function toRow(event: AuditEvent) {
     event.employee_id && !asUuidOrNull(event.employee_id) ? event.employee_id : null;
 
   return {
+    // The event's own id, so the database row and the in-memory copy are
+    // recognised as one event on read instead of shown twice.
+    ...(asUuidOrNull(event.id) ? { id: event.id } : {}),
     employee_id: asUuidOrNull(event.employee_id),
     employee_email: event.employee_email,
     employee_name: event.employee_name,
