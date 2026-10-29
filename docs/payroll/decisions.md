@@ -64,7 +64,7 @@ inputs still owed.
 | D-22 | Employee self-view | Monthly payslips, current salary structure, Form 16, and raising a payroll query. | Nitin |
 | D-23 | Totals views are toggled per role | Org-wide totals (cost, headcount by project or donor) are shown to roles the Super Admin switches on — candidates are Exec View, PnC Admin, managers (own team total), Finance. No individual amounts in any totals view. | Nitin |
 | D-24 | Notifications | Email, a payroll Slack channel, and an in-app task list. | Nitin |
-| D-25 | PT state comes from the core location table | `ng_locations` gets a `state` column; remote staff carry a work state on their engagement. | Pranjali |
+| D-25 | PT state comes from the core location table | `ng_locations.state_code`, referencing the `indian_states` master (ISO 3166-2:IN codes); remote staff carry a work state on their engagement. | Pranjali |
 
 ### P&C rules for offers and compensation
 

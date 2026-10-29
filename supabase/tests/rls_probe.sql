@@ -162,7 +162,10 @@ insert into pg_temp.expectations values
   -- peer, never PnC Ops (status only).
   ('review_decisions',       '{"manager (M)",pnc_admin,exec_view,super_admin}'),
   ('review_events',          '{"manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
-  ('review_cycle_settings',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
+  ('review_cycle_settings',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- Lookups: staff read; the internet and outsiders do not.
+  ('ng_locations',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('indian_states',          '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
 
 -------------------------------------------------------------------------
 -- Run it
@@ -234,6 +237,37 @@ exception when insufficient_privilege or unique_violation then
   null;
 end $$;
 reset role;
+
+-- A location's state is data management's to set: Platform Ops cannot move a
+-- location to another state (it would change everyone's PT there), PnC Admin
+-- can. Nobody edits the states themselves; that is a migration's job.
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('plops@navgurukul.org'), false); end $$;
+set role authenticated;
+update public.ng_locations set state_code = 'GA' where name = 'Pune';
+reset role;
+do $$
+begin
+  if (select state_code from public.ng_locations where name = 'Pune') is distinct from 'MH' then
+    insert into pg_temp.failures values ('platform_ops', 'ng_locations', 'cannot change a location''s state', 1);
+  end if;
+end $$;
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('pa@navgurukul.org'), false); end $$;
+set role authenticated;
+update public.ng_locations set state_code = 'GA' where name = 'Navigo Pune';
+do $$
+begin
+  insert into public.indian_states (code, name, kind) values ('ZZ', 'Injected', 'state');
+  insert into pg_temp.failures values ('pnc_admin', 'indian_states', 'insert refused', 1);
+exception when insufficient_privilege then
+  null;
+end $$;
+reset role;
+do $$
+begin
+  if (select state_code from public.ng_locations where name = 'Navigo Pune') is distinct from 'GA' then
+    insert into pg_temp.failures values ('pnc_admin', 'ng_locations', 'can set a location''s state', 0);
+  end if;
+end $$;
 
 -- anon cannot create a candidate.
 do $$ begin perform set_config('request.jwt.claims', '', false); end $$;

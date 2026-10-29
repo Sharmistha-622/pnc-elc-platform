@@ -183,7 +183,7 @@ erDiagram
 
 New compared with today: `person` (a thin layer over `employees` so that a
 candidate, an intern and a converted employee are one person), `engagement`,
-`state` and `ng_locations.state`, split variations (replacing the single
+`indian_states` and `ng_locations.state_code` (built), split variations (replacing the single
 `salary_rules` default), events, attendance months, project / donor / source /
 NG bank masters, allocation basis and allocations, rate tables, and the run's
 workflow tables.
