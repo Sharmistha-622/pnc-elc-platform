@@ -39,7 +39,7 @@ inputs still owed.
 
 | # | Decision | Detail | Owner |
 |---|---|---|---|
-| D-10 | Person code | `NG-0444` style, held as an editable display code on top of an internal UUID, so the format can still change while the data is dummy. | Pranjali |
+| D-10 | Person code | `NG-` + 4 digits (e.g. `NG-0669`), held as an editable display code on top of an internal UUID, so the format can still change while the data is dummy. Kept in `employees.employee_code`. Issuance rules: D-34. | Pranjali |
 | D-11 | Engagement types | Full-time employee, Fixed-term employee, Consultant (full-time), Consultant (part-time), Intern (stipend), Apprentice. The list is a master and grows as types are added. Pay basis (month / day / hour) is a separate field. ELC's `ftc` label is fixed to match (see O-01). | Ashwini |
 
 ### The run
@@ -65,6 +65,20 @@ inputs still owed.
 | D-23 | Totals views are toggled per role | Org-wide totals (cost, headcount by project or donor) are shown to roles the Super Admin switches on — candidates are Exec View, PnC Admin, managers (own team total), Finance. No individual amounts in any totals view. | Nitin |
 | D-24 | Notifications | Email, a payroll Slack channel, and an in-app task list. | Nitin |
 | D-25 | PT state comes from the core location table | `ng_locations` gets a `state` column; remote staff carry a work state on their engagement. | Pranjali |
+
+### P&C rules for offers and compensation
+
+From Pranjali's note *Payroll & Statutory Rules for Automation* and its CTC
+calculator; detail and worked examples in [`pnc-rules.md`](./pnc-rules.md).
+
+| # | Decision | Detail | Owner |
+|---|---|---|---|
+| D-29 | Three components | Every structure is Basic, HRA and one allowance (name: P-05). The calculator is the reference logic, subject to P-01 – P-04. | Pranjali |
+| D-30 | PF on offers | Employee PF = `ROUND(MIN(Basic, 25,000) × 12%)`, at most ₹3,000 a month. No PF opt-out is offered where Basic ≤ ₹25,000 (V-30). Employer PF is shown on the annexure. | Pranjali |
+| D-31 | PT | ₹200 a month by work state, as each state's law sets it (the state slabs in `rule-tables.md` §1.2 apply; P-06). | Pranjali |
+| D-32 | Consultant TDS | A flat 10% of the fee when PAN is submitted (no-PAN rate: P-07). | Pranjali |
+| D-33 | Employee TDS starts manual | Only above the taxable slab. To begin with, the monthly figure is entered by hand from the Income Tax Department calculator; the engine's projection (§3.7) runs alongside as a check. Who enters it: P-08. | Pranjali |
+| D-34 | Employee ID issuance | Sequential, issued when a candidate reaches Pre-Joinee (not before); the starting number is set at go-live (P-09). | Pranjali |
 
 ### Delivery
 
@@ -102,6 +116,25 @@ inputs still owed.
 | F-08 | IDFC and SBI bank upload formats (anonymised samples) | Promised |
 | F-09 | PF ECR and ESIC samples (anonymised) | Promised |
 | F-10 | Tally in use? Which JV format? | Owed |
+
+## Open — P&C (from the CTC calculator)
+
+Owner: Pranjali. Each is explained in [`pnc-rules.md`](./pnc-rules.md) §6.
+
+| # | Question | Status |
+|---|---|---|
+| P-01 | Employer PF 12% (ESIC tab) or 13% (main tab, payroll sample)? | Open |
+| P-02 | Employer PF = 13% × MIN(Basic, 25,000) everywhere, replacing the fixed ₹3,250 that misstates ₹40,000–53,250 a month | Open |
+| P-03 | Rule for Method B's typed-in Basic, or move those offers to `standard` | Open |
+| P-04 | Switch to the ESIC variation on gross ≤ ₹21,000 rather than CTC ≤ ₹22,366 | Open |
+| P-05 | "Other Allowance" or "Special Allowance" | Open |
+| P-06 | PT: flat ₹200 or the state slabs | Open |
+| P-07 | Consultant TDS without PAN; does the ₹50,000 threshold still apply | Open |
+| P-08 | Who enters and approves the manual monthly TDS | Open |
+| P-09 | Employee ID: start number, after `NG-9999`, existing IDs, withdrawn pre-joinees | Open |
+| P-10 | Rounding master for offers: annual ÷ 12 or monthly per component | Open |
+| P-11 | ESIC tab's ₹11,000 and ₹18,585 columns don't add up — scratch? | Open |
+| P-12 | PF opt-out above Basic ₹25,000 for never-members | Open |
 
 ## Questions raised by the sample
 

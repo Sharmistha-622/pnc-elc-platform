@@ -30,7 +30,7 @@ month that spans a change is **day-prorated** across the two rows.
 | PF wage ceiling | 15,000 | 2014-09-01 | 2026-09-16 | Prorate by days in the month of change |
 | PF wage ceiling | 25,000 | 2026-09-17 | — | Sep-26: 16 days @ 15,000 + 14 days @ 25,000 |
 | PF employee rate | 12% | — | — | |
-| PF employer rate (incl. EDLI / admin, as shown in CTC) | 13% | — | — | Split into EPS / EPF / EDLI / admin for the ECR is open (S-03) |
+| PF employer rate (incl. EDLI / admin, as shown in CTC) | 13% | — | — | Split into EPS / EPF / EDLI / admin for the ECR is open (S-03). The CTC calculator's ESIC tab uses 12% (P-01) |
 | ESIC wage ceiling | 21,000 | — | — | |
 | ESIC employee rate | 0.75% | — | — | Placeholder; replace with ESI-portal-verified rate (S-02) |
 | ESIC employer rate | 3.25% | — | — | Placeholder; as above |
@@ -38,8 +38,8 @@ month that spans a change is **day-prorated** across the two rows.
 | PT Maharashtra, female | 0 up to 25,000; 200 above; 300 in February | — | — | |
 | PT Karnataka | 200 if gross ≥ 25,000; 300 in February | — | — | |
 | PT NG rule | States with fewer than 5 employees are treated as remote from the Gurgaon HO: no PT | — | — | Needs CA sign-off; Finance can override per state |
-| TDS consultants (s.393(1)) | 10% | 2026-04-01 | — | Threshold 50,000 per payee per tax year; category open (F-03) |
-| TDS salary (s.392) | New-regime slabs; standard deduction 75,000; nil tax up to 12 lakh taxable | 2026-04-01 | — | Effective nil-tax gross 12.75 lakh |
+| TDS consultants (s.393(1)) | 10% | 2026-04-01 | — | With PAN (D-32). Threshold 50,000 per payee per tax year; category open (F-03); no-PAN rate open (P-07) |
+| TDS salary (s.392) | New-regime slabs; standard deduction 75,000; nil tax up to 12 lakh taxable | 2026-04-01 | — | Effective nil-tax gross 12.75 lakh. Paid from a manual monthly figure at first (D-33) |
 
 Still to be populated (owed by Finance):
 
@@ -83,18 +83,25 @@ only shows where the NG rule's threshold is met.
 
 A split variation turns one CTC into components. It replaces the single
 `salary_rules` default in `src/lib/onboarding/salary.ts`, keeping its
-derivation (backwards from CTC, PF ceiling, special allowance absorbs the
-rounding remainder).
+derivation (backwards from CTC, PF ceiling, the allowance absorbs the
+rounding remainder). Every variation has the same three components: Basic,
+HRA and one allowance (D-29).
+
+The first two variations, `standard` and `esic_band`, come from P&C's CTC
+calculator; their formulas are in [`pnc-rules.md`](./pnc-rules.md) §4. They
+are seeded once P-01 – P-04 are answered. They replace today's
+`fte_standard` default (Basic 51.0638% of gross, employer PF 12% on a ₹15,000
+ceiling), which matches neither.
 
 | Field | Notes |
 |---|---|
 | `code`, `label` | e.g. `fte_standard` |
 | Tags | employment type, grade / band, location / state, or individual — for filtering the picker only (D-07: never auto-matched) |
-| `basic_pct_of_gross` | e.g. 51.0638 in today's FTE default |
+| `basic_pct` and `basic_basis` | The share, and what it is a share of: `gross` (`standard`: 50) or `ctc` (`esic_band`: 60). Today's default has `basic_pct_of_gross` 51.0638 only |
 | `hra_pct_of_basic` | e.g. 40 |
 | `other_components` | Named components with a percentage or a fixed share |
 | `pf_applicable`, `employer_pf_pct_of_basic`, `pf_wage_ceiling_ref` | Ceiling is read from the rate table, not copied |
-| `ctc_includes_employer_pf` | |
+| `ctc_includes_employer_pf`, `ctc_includes_employer_esic` | Both true in P&C's calculator |
 | `gratuity_pct_of_basic` | |
 | `version`, `status`, `edited_by`, `approved_by`, `usable_from` | Fin Admin edits, PnC Admin approves (D-09) |
 
@@ -295,6 +302,7 @@ record the outcome. Every override is in the vault's payroll audit.
 | V-27 | Hours-basis person with no hours this month falls back to defined % | FLAG | — |
 | V-28 | Crèche allowance for eligible employees, if the route is adopted (S-05) | CHECK | — |
 | V-29 | No person signs two steps of a run; the maker signs none | BLOCK | — |
+| V-30 | No PF opt-out at offer or assignment where Basic ≤ ₹25,000 (D-30) | BLOCK | X-21 |
 
 Rows marked "—" have no planted test case yet; [`test-plan.md`](./test-plan.md)
 lists the synthetic cases to request for them.
