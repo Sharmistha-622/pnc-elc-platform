@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.03.04",
+    "date": "2026-10-29",
+    "title": "Let PnC Admin and Fin Admin grant their own group's roles",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Let PnC Admin and Fin Admin grant their own group's roles"
+      }
+    ]
+  },
+  {
     "version": "2.03.03",
     "date": "2026-10-29",
     "title": "Fold in P&C's offer and compensation rules",
