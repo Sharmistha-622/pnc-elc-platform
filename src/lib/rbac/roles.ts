@@ -546,6 +546,17 @@ export function canGrantRole(
   return { ok: false, reason: 'only_super_admin_may_grant' }
 }
 
+/**
+ * Whether `actor` may set a person's department on the users screen.
+ *
+ * A department is a `general` write. Fin Admin reaches the screen to grant the
+ * Finance roles and holds `general: view`, so it sets roles only. Platform
+ * Admin, also `general: view`, has always set departments there and still does.
+ */
+export function canSetDepartment(actor: RoleCode | null): boolean {
+  return actor === 'platform_admin' || (actor !== null && canWrite(actor, 'general'))
+}
+
 /** Roles an actor can offer in a role picker. */
 export function grantableRoles(actor: RoleCode | null): RoleCode[] {
   return ROLE_CODES.filter((code) => canGrantRole(actor, code).ok)

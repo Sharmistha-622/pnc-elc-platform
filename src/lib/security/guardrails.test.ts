@@ -78,7 +78,6 @@ describe('server actions', () => {
     'src/lib/forms/respondentActions.ts:saveSubmission': 'RLS: own submission only',
     // Guarded, but by a check specific to them rather than a shared helper.
     'src/lib/documents/uploadDocument.ts:uploadDocument': 'checks canHandleDocuments(originalRole) itself',
-    'src/lib/rbac/setUserRole.ts:setUserRole': 'checks canGrantRole against the stored role itself',
     'src/lib/settings/access.ts:canEditPlatformConfig': 'is the guard',
     // Self-scoped: the caller's own record, their manager and their reports.
     'src/lib/profile/profileActions.ts:getMyProfileData': 'self-scoped by session',

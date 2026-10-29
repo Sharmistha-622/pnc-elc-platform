@@ -209,19 +209,8 @@ export function UsersRolesTable({
     setCurrentPage(1);
   };
 
-  const handleUserAdded = (newUser: any) => {
-    setUsers((prev) => [
-      {
-        id: newUser.id || `usr-${Date.now()}`,
-        name: newUser.fullName || newUser.name || "",
-        email: newUser.email,
-        role: newUser.role || "Employee",
-        team: newUser.team || "None",
-        status: "active",
-        created_at: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  const handleUserAdded = (newUser: UserRow) => {
+    setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id)]);
   };
 
   const getInitials = (name?: string, email?: string) => {

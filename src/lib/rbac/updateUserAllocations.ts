@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
 import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { recordAuditEvent } from '@/lib/audit/service'
-import { canGrantRole, canWrite, isRoleCode } from '@/lib/rbac/roles'
+import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
 
 const GRANT_REFUSALS: Record<string, string> = {
@@ -153,15 +153,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
     }
   }
 
-  // Moving a department is a `general` write. Fin Admin reaches this screen to
-  // grant the Finance roles and holds `general: view`, so it changes roles
-  // only. Platform Admin, also `general: view`, has always moved departments
-  // here and still does.
-  if (
-    teamChanged &&
-    caller.originalRole !== 'platform_admin' &&
-    !canWrite(caller.originalRole, 'general')
-  ) {
+  if (teamChanged && !canSetDepartment(caller.originalRole)) {
     return { success: false, error: 'Your role can change a user’s role, not their department.' }
   }
 
