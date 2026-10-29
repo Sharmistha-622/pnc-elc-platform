@@ -64,8 +64,12 @@ docker run -d --name elc-review-e2e-postgrest --network host \
 for _ in $(seq 1 30); do curl -sf "http://localhost:${PORT}/" >/dev/null && break; sleep 0.5; done
 
 status=0
-REVIEW_E2E_PGRST="http://localhost:${PORT}" REVIEW_E2E_SECRET="${SECRET}" \
-  npx vitest run src/lib/reviews/e2e.integration.test.ts || status=$?
+# One file at a time: the import test adds people the review test would
+# otherwise count as due.
+for t in src/lib/reviews/e2e.integration.test.ts src/lib/employees/import.integration.test.ts; do
+  REVIEW_E2E_PGRST="http://localhost:${PORT}" REVIEW_E2E_SECRET="${SECRET}" \
+    npx vitest run "$t" || status=$?
+done
 
 # REVIEW_E2E_KEEP=1 leaves the database and PostgREST running, to look at
 # the screens against the finished flow.
