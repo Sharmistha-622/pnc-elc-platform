@@ -251,12 +251,12 @@ export async function remindEveryonePending(): Promise<Outcome> {
 // The meeting, the decision, the close
 // ----------------------------------------------------------------------------
 
-/** Books or moves the meeting. PnC, or the manager. `start` is ISO 8601. */
+/** Books or moves the meeting. PnC, the manager, or the employee being reviewed. `start` is ISO 8601. */
 export async function scheduleReviewMeeting(cycleId: string, start: string): Promise<Outcome> {
   const allowed = await guard('self')
   if (!allowed.ok) return { ok: false, error: allowed.error }
   const s = await standing(allowed.caller, cycleId)
-  if (!s || !(s.rel.operator || s.rel.isManager)) return { ok: false, error: NOT_ALLOWED }
+  if (!s || !(s.rel.operator || s.rel.isManager || s.rel.isSubject)) return { ok: false, error: NOT_ALLOWED }
   const when = new Date(start)
   if (typeof start !== 'string' || Number.isNaN(when.getTime())) return { ok: false, error: 'Choose a date and time.' }
 

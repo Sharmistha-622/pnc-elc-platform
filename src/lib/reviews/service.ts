@@ -17,7 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { sendCalendarInvite, sendEmail } from '@/lib/email/sendEmail'
-import { calendarAvailabilityService } from '@/lib/integrations/calendar-availability'
+import { calendarAvailabilityService } from '@/lib/integrations/calendar-availability.server'
 import { auditEvent } from '@/lib/audit/events'
 import {
   DEFAULT_APPRAISAL_CYCLES,
