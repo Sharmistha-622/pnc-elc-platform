@@ -206,47 +206,36 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   // write by the database — and an update refused by RLS changes zero rows
   // without an error, which reported success while the team never moved. The
   // `manageUsers` guard and `canGrantRole` above decide who gets this far.
+  let employeeSyncError: string | null = null
   try {
     const supabase = admin
 
+    // `employees` has `team` (the department's name) and `team_id`; it has no
+    // `department` or `department_id`. Writing those made PostgREST refuse the
+    // whole update, unchecked, so the directory never saw a department change.
     let teamId: string | null = null
-    let departmentId: string | null = null
     if (normalizedNewTeam !== 'None') {
-      try {
-        const { data: deptRecord } = await supabase
-          .from('departments')
-          .select('id')
-          .ilike('name', normalizedNewTeam.trim())
-          .maybeSingle()
-        if (deptRecord) departmentId = deptRecord.id
-      } catch {}
-
-      try {
-        const { data: teamRecord } = await supabase
-          .from('teams')
-          .select('id')
-          .ilike('name', normalizedNewTeam.trim())
-          .maybeSingle()
-        if (teamRecord) teamId = teamRecord.id
-      } catch {}
+      const { data: teamRecord } = await supabase
+        .from('teams')
+        .select('id')
+        .ilike('name', normalizedNewTeam.trim())
+        .maybeSingle()
+      teamId = teamRecord?.id ?? null
     }
 
-    const cleanTeamValue = normalizedNewTeam === 'None' ? null : normalizedNewTeam
-    const updatePayload: Record<string, any> = {
-      team: cleanTeamValue,
-      department: cleanTeamValue,
-      updated_at: new Date().toISOString(),
-    }
-    if (teamId) updatePayload.team_id = teamId
-    if (departmentId) updatePayload.department_id = departmentId
-
-    await supabase
+    const { error: employeeError } = await supabase
       .from('employees')
-      .update(updatePayload)
+      .update({
+        team: normalizedNewTeam === 'None' ? null : normalizedNewTeam,
+        team_id: teamId,
+        updated_at: new Date().toISOString(),
+      })
       .or(`email.ilike.${cleanTargetEmail}${isValidUuid(targetUserId) ? `,id.eq.${targetUserId}` : ''}`)
+    if (employeeError) employeeSyncError = employeeError.message
   } catch (err) {
-    console.warn('Employees table sync non-fatal error:', err)
+    employeeSyncError = err instanceof Error ? err.message : String(err)
   }
+  if (employeeSyncError) console.error('Employees table sync failed:', employeeSyncError)
 
   // 3. Write Audit Log to public.audit_log
   try {
@@ -309,6 +298,13 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   revalidatePath('/manage/users')
   revalidatePath('/manage/roles')
   revalidatePath('/employees')
+
+  if (employeeSyncError && teamChanged) {
+    return {
+      success: false,
+      error: `The role and account were updated, but the employee record's department was not (${employeeSyncError}). Try again.`,
+    }
+  }
 
   return { success: true, changes: diffs }
 }

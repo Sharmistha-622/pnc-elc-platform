@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   updatedAuth: [] as string[],
   audit: [] as any[],
   trail: [] as any[],
+  employeeUpdates: [] as any[],
+  employeeError: null as null | { message: string },
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -25,7 +27,7 @@ vi.mock('@/lib/audit/service', () => ({
   }),
 }))
 
-function table() {
+function table(name: string) {
   const q: any = {
     select: () => q,
     ilike: () => q,
@@ -33,12 +35,15 @@ function table() {
     or: () => q,
     limit: async () => ({ data: [] }),
     maybeSingle: async () => ({ data: null }),
-    update: () => q,
+    update: (payload: any) => {
+      if (name === 'employees') state.employeeUpdates.push(payload)
+      return q
+    },
     insert: async (row: any) => {
       state.audit.push(row)
       return { error: null }
     },
-    then: (resolve: any) => resolve({ data: null, error: null }),
+    then: (resolve: any) => resolve({ data: null, error: name === 'employees' ? state.employeeError : null }),
   }
   return q
 }
@@ -84,6 +89,8 @@ beforeEach(() => {
   state.updatedAuth = []
   state.audit = []
   state.trail = []
+  state.employeeUpdates = []
+  state.employeeError = null
   account(ids.root, ROOT, 'super_admin')
   account(ids.pnc, 'pnc@navgurukul.org', 'pnc_admin')
   account(ids.emp, 'emp@navgurukul.org', 'employee')
@@ -121,6 +128,21 @@ describe('updateUserAllocations', () => {
     const res = await move(ids.pnc, 'pnc_admin', 'CEO Office')
     expect(res.success).toBe(false)
     expect(state.updatedAuth).toEqual([])
+  })
+
+  it("moves the employee record's department, using only columns the table has", async () => {
+    as(ids.root, 'super_admin')
+    expect((await move(ids.emp, 'employee', 'CEO Office')).success).toBe(true)
+    expect(state.employeeUpdates).toHaveLength(1)
+    expect(Object.keys(state.employeeUpdates[0]).sort()).toEqual(['team', 'team_id', 'updated_at'])
+    expect(state.employeeUpdates[0].team).toBe('CEO Office')
+  })
+
+  it('says so when the employee record could not be moved', async () => {
+    as(ids.root, 'super_admin')
+    state.employeeError = { message: 'boom' }
+    const res = await move(ids.emp, 'employee', 'CEO Office')
+    expect(res).toMatchObject({ success: false, error: expect.stringContaining('department was not') })
   })
 
   it('writes one allocation id into both audit records of a save', async () => {
