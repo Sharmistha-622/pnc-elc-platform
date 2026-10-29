@@ -81,7 +81,9 @@ export function CycleDetailView({ detail, backHref, backLabel }: { detail: Cycle
   const selfP = detail.participants.find((p) => p.role === 'self')
   const peers = detail.participants.filter((p) => p.role === 'peer')
   const open = ['self_review', 'in_review', 'ready_for_meeting', 'meeting_scheduled'].includes(detail.stage)
-  const canSchedule = (rel.operator || rel.isManager) && ['in_review', 'ready_for_meeting', 'meeting_scheduled', 'decision_recorded'].includes(detail.stage)
+  const canSchedule =
+    ((rel.operator || rel.isManager) && ['in_review', 'ready_for_meeting', 'meeting_scheduled', 'decision_recorded'].includes(detail.stage)) ||
+    (rel.isSubject && detail.stage === 'meeting_scheduled')
   const canDecide =
     (rel.isManager || rel.closer) &&
     ['ready_for_meeting', 'meeting_scheduled', 'decision_recorded'].includes(detail.stage) &&

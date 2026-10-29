@@ -22,6 +22,8 @@ export interface FreeBusyResponse {
   window_start: string;
   window_end: string;
   busy: BusyBlock[];
+  /** True when the real calendar could not be read and the mock pattern was used instead. */
+  degraded?: boolean;
 }
 
 export interface ICalendarAvailabilityService {
