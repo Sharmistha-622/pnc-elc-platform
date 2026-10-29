@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.03.03",
+    "date": "2026-10-29",
+    "title": "Fold in P&C's offer and compensation rules",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "The payroll design now includes P&C's rules for offers and compensation, and the open questions raised by the CTC calculator."
+      }
+    ]
+  },
+  {
     "version": "2.03.02",
     "date": "2026-10-29",
     "title": "Let an admin move their own department; one audit entry per save",
