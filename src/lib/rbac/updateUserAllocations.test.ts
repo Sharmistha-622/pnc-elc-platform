@@ -74,6 +74,7 @@ const ids = {
   pnc: '00000000-0000-4000-8000-000000000002',
   emp: '00000000-0000-4000-8000-000000000003',
   plat: '00000000-0000-4000-8000-000000000004',
+  fin: '00000000-0000-4000-8000-000000000005',
 }
 
 function account(id: string, email: string, role: string, team = 'None') {
@@ -95,6 +96,7 @@ beforeEach(() => {
   account(ids.pnc, 'pnc@navgurukul.org', 'pnc_admin')
   account(ids.emp, 'emp@navgurukul.org', 'employee')
   account(ids.plat, 'plat@navgurukul.org', 'platform_admin')
+  account(ids.fin, 'fin@navgurukul.org', 'fin_admin')
 })
 
 const move = (targetUserId: string, newRole: any, newTeam: string) =>
@@ -126,6 +128,41 @@ describe('updateUserAllocations', () => {
   it("refuses a Platform Admin moving a PnC Admin's department", async () => {
     as(ids.plat, 'platform_admin')
     const res = await move(ids.pnc, 'pnc_admin', 'CEO Office')
+    expect(res.success).toBe(false)
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('lets a PnC Admin make an employee PnC Admin or PnC Ops', async () => {
+    as(ids.pnc, 'pnc_admin')
+    expect((await move(ids.emp, 'pnc_ops', 'None')).success).toBe(true)
+    account(ids.emp, 'emp@navgurukul.org', 'pnc_ops')
+    expect((await move(ids.emp, 'pnc_admin', 'None')).success).toBe(true)
+  })
+
+  it('refuses a PnC Admin granting a Finance role, or changing a Fin Admin', async () => {
+    as(ids.pnc, 'pnc_admin')
+    expect((await move(ids.emp, 'fin_admin', 'None')).success).toBe(false)
+    expect((await move(ids.fin, 'pnc_ops', 'None')).success).toBe(false)
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('lets a Fin Admin make an employee Fin Admin or Fin Ops', async () => {
+    as(ids.fin, 'fin_admin')
+    expect((await move(ids.emp, 'fin_ops', 'None')).success).toBe(true)
+    account(ids.emp, 'emp@navgurukul.org', 'fin_ops')
+    expect((await move(ids.emp, 'fin_admin', 'None')).success).toBe(true)
+  })
+
+  it('refuses a Fin Admin granting a PnC role, or changing a PnC Admin', async () => {
+    as(ids.fin, 'fin_admin')
+    expect((await move(ids.emp, 'pnc_ops', 'None')).success).toBe(false)
+    expect((await move(ids.pnc, 'fin_ops', 'None')).success).toBe(false)
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it("refuses a Fin Admin moving anyone's department", async () => {
+    as(ids.fin, 'fin_admin')
+    const res = await move(ids.emp, 'fin_ops', 'CEO Office')
     expect(res.success).toBe(false)
     expect(state.updatedAuth).toEqual([])
   })

@@ -13,6 +13,8 @@ const REFUSALS: Record<string, string> = {
   only_super_admin_may_grant: 'Only a Super Admin can grant this role.',
   platform_admin_may_grant_platform_ops_only:
     'Platform Admin can grant Platform Ops only, and can never grant access to sensitive data.',
+  may_grant_own_group_roles_only:
+    'PnC Admin can grant PnC Admin and PnC Ops only; Fin Admin can grant Fin Admin and Fin Ops only.',
   owner_role_is_not_grantable: 'The owner role cannot be granted in the app.',
   cannot_change_own_role: "You can't change your own role.",
 }

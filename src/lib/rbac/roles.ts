@@ -99,6 +99,12 @@ export interface RoleDefinition {
   rank: number
   login: LoginSurface
   grantedBy: GrantedBy
+  /**
+   * Roles that may also grant this one, besides `grantedBy`. A group's admin
+   * staffs their own team: PnC Admin grants the PnC roles, Fin Admin the
+   * Finance ones. Never Platform Admin for a sensitive role.
+   */
+  alsoGrantedBy?: readonly RoleCode[]
   access: Record<Resource, Access>
 }
 
@@ -124,6 +130,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
     rank: 8,
     login: 'core+vault',
     grantedBy: 'super_admin',
+    alsoGrantedBy: ['pnc_admin'],
     access: {
       general: edit,
       identity: edit,
@@ -143,6 +150,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
     rank: 6,
     login: 'core',
     grantedBy: 'super_admin',
+    alsoGrantedBy: ['pnc_admin'],
     access: {
       general: edit,
       identity: edit,
@@ -161,6 +169,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
     rank: 8,
     login: 'core+vault',
     grantedBy: 'super_admin',
+    alsoGrantedBy: ['fin_admin'],
     access: {
       general: view,
       identity: none,
@@ -178,6 +187,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
     rank: 6,
     login: 'core+vault',
     grantedBy: 'super_admin',
+    alsoGrantedBy: ['fin_admin'],
     access: {
       general: view,
       identity: none,
@@ -487,10 +497,16 @@ export type GrantRefusal =
   | 'role_is_automatic'
   | 'only_super_admin_may_grant'
   | 'platform_admin_may_grant_platform_ops_only'
+  | 'may_grant_own_group_roles_only'
   | 'owner_role_is_not_grantable'
   | 'cannot_change_own_role'
 
 export type GrantDecision = { ok: true } | { ok: false; reason: GrantRefusal }
+
+/** Roles named in some role's `alsoGrantedBy`: PnC Admin and Fin Admin. */
+function isDelegatedGranter(actor: RoleCode): boolean {
+  return ROLE_CODES.some((code) => ROLES[code].alsoGrantedBy?.includes(actor))
+}
 
 /**
  * Whether `actor` may put someone into `role`.
@@ -498,6 +514,9 @@ export type GrantDecision = { ok: true } | { ok: false; reason: GrantRefusal }
  * The rule that matters most: Platform Admin can never grant access to
  * sensitive data. Whoever builds the platform cannot widen their own sight of
  * it, and cannot widen anyone else's either.
+ *
+ * PnC Admin and Fin Admin may grant their own group's roles (`alsoGrantedBy`)
+ * and nothing else, so neither can reach into the other's data.
  */
 export function canGrantRole(
   actor: RoleCode | null,
@@ -514,11 +533,15 @@ export function canGrantRole(
 
   if (actor === 'super_admin') return { ok: true }
 
+  if (target.alsoGrantedBy?.includes(actor)) return { ok: true }
+
   if (actor === 'platform_admin') {
     return target.grantedBy === 'platform_admin'
       ? { ok: true }
       : { ok: false, reason: 'platform_admin_may_grant_platform_ops_only' }
   }
+
+  if (isDelegatedGranter(actor)) return { ok: false, reason: 'may_grant_own_group_roles_only' }
 
   return { ok: false, reason: 'only_super_admin_may_grant' }
 }

@@ -106,8 +106,13 @@ describe('FEATURE_ACCESS', () => {
     }
   })
 
-  it('lets only Super Admin and Platform Admin manage users', () => {
-    expect(FEATURE_ACCESS.manageUsers.sort()).toEqual(['platform_admin', 'super_admin'])
+  it('lets only Super Admin, Platform Admin and the PnC and Finance admins manage users', () => {
+    expect(FEATURE_ACCESS.manageUsers.sort()).toEqual([
+      'fin_admin',
+      'platform_admin',
+      'pnc_admin',
+      'super_admin',
+    ])
   })
 })
 
@@ -124,7 +129,10 @@ describe('canAccessRoute', () => {
   it('keeps the letter screens out of manage-users', () => {
     expect(canAccessRoute('pnc_admin', '/manage/letter-templates')).toBe(true)
     expect(canAccessRoute('fin_admin', '/manage/letters')).toBe(true)
-    expect(canAccessRoute('pnc_admin', '/manage/users')).toBe(false)
+    // Platform Admin manages users but has no letters: the letters entry, not
+    // the general /manage one, decides.
+    expect(canAccessRoute('platform_admin', '/manage/users')).toBe(true)
+    expect(canAccessRoute('platform_admin', '/manage/letters')).toBe(false)
   })
 
   // Every issued letter quotes a CTC. A role that may not read salary may not

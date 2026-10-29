@@ -274,8 +274,31 @@ describe('canGrantRole', () => {
     })
   })
 
+  it('lets PnC Admin grant the PnC roles and nothing else', () => {
+    expect(grantableRoles('pnc_admin')).toEqual(['pnc_admin', 'pnc_ops'])
+    expect(canGrantRole('pnc_admin', 'fin_admin')).toEqual({
+      ok: false,
+      reason: 'may_grant_own_group_roles_only',
+    })
+  })
+
+  it('lets Fin Admin grant the Finance roles and nothing else', () => {
+    expect(grantableRoles('fin_admin')).toEqual(['fin_admin', 'fin_ops'])
+    expect(canGrantRole('fin_admin', 'pnc_admin')).toEqual({
+      ok: false,
+      reason: 'may_grant_own_group_roles_only',
+    })
+  })
+
+  it('refuses a group admin their own role change', () => {
+    expect(canGrantRole('pnc_admin', 'pnc_ops', { isSelf: true })).toEqual({
+      ok: false,
+      reason: 'cannot_change_own_role',
+    })
+  })
+
   it('refuses every ordinary role', () => {
-    for (const actor of ['pnc_admin', 'fin_admin', 'exec_view', 'manager', 'employee'] as RoleCode[]) {
+    for (const actor of ['pnc_ops', 'fin_ops', 'exec_view', 'manager', 'employee'] as RoleCode[]) {
       expect(grantableRoles(actor), actor).toEqual([])
     }
     expect(grantableRoles(null)).toEqual([])

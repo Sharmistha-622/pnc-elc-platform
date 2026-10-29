@@ -57,6 +57,16 @@ const GRANT_LABELS = {
   auto: 'Auto',
 }
 
+const ROLE_LABELS = {
+  pnc_admin: 'PnC Admin',
+  fin_admin: 'Fin Admin',
+}
+
+function grantedBy(role) {
+  const also = (role.alsoGrantedBy ?? []).map((code) => ROLE_LABELS[code] ?? code)
+  return [GRANT_LABELS[role.grantedBy], ...also].join(', ')
+}
+
 function cell(access) {
   if (access.level === 'none') return '—'
   const level = access.level === 'edit' ? 'Edit' : 'View'
@@ -87,7 +97,7 @@ export function renderMatrix(roles) {
         Object.keys(RESOURCE_LABELS)
           .map((r) => cell(role.access[r]))
           .join(' | ') +
-        ` | ${GRANT_LABELS[role.grantedBy]} |`
+        ` | ${grantedBy(role)} |`
     )
   }
   return lines.join('\n')
