@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.03.01",
+    "date": "2026-10-29",
+    "title": "Make the employee import work, with employee IDs",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Data Management → Import now really imports employees: matched by email, with managers, departments and employee IDs, everything checked before saving, and nothing saved while any row has an error."
+      },
+      {
+        "category": "Features",
+        "description": "Employees have an Employee ID (e.g. NG-0669), set by import."
+      }
+    ]
+  },
+  {
     "version": "2.03.00",
     "date": "2026-10-26",
     "title": "Payroll tables for Phase 0",
