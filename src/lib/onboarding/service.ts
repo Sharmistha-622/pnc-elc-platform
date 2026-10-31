@@ -315,6 +315,9 @@ export async function createOnboardingRecord(
    */
   customLetters?: Partial<Record<GeneratedDocumentType, string>>
 ): Promise<FullOnboardingData> {
+  if (typeof payload.is_alumni !== 'boolean') {
+    throw new Error('Say whether the candidate is a NavGurukul alumnus (yes or no).');
+  }
   const db = onboardingDb();
   const token = generateInvitationToken(payload.candidate_name);
 
@@ -339,7 +342,7 @@ export async function createOnboardingRecord(
       ctc: payload.ctc ?? null,
       ctc_amount: payload.ctc_amount ?? null,
       ctc_frequency: payload.ctc_frequency ?? null,
-      is_alumni: payload.is_alumni ?? false,
+      is_alumni: payload.is_alumni,
       role_responsibilities: payload.role_responsibilities ?? null,
       status: 'draft',
       progress_percentage: 0,

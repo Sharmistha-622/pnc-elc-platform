@@ -36,6 +36,14 @@ export async function POST(req: NextRequest) {
     if (!access.ok) return NextResponse.json({ success: false, error: access.error }, { status: 403 });
 
     const { custom_letters: customLetters, ...payload } = await req.json();
+    // Mandatory: it becomes the employee's alumni status, which reporting
+    // splits on. Checked here because the form's own check can be skipped.
+    if (typeof payload.is_alumni !== 'boolean') {
+      return NextResponse.json(
+        { success: false, error: 'Say whether the candidate is a NavGurukul alumnus (yes or no).' },
+        { status: 400 }
+      );
+    }
     const created = await createOnboardingRecord(payload, customLetters);
     return NextResponse.json({ success: true, data: created });
   } catch (error: any) {
