@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { UserRole, assignableRoles, roleLabel } from "@/lib/role-constants";
-import { canSetDepartment } from "@/lib/rbac/roles";
+import { canSetDepartment, ROLE_CODES } from "@/lib/rbac/roles";
+import { BREAK_GLASS_GRANTABLE_ROLES } from "@/lib/rbac/breakGlass";
 import { updateUserAllocations } from "@/lib/rbac/updateUserAllocations";
 import {
   Dialog,
@@ -50,6 +51,12 @@ interface EditUserDialogProps {
    * lifecycle roles are never offered to anyone. The server re-checks.
    */
   callerRole?: UserRole | null;
+  /**
+   * The caller holds break-glass access: every role but Super Admin (and the
+   * portal roles) is offered, and the department can be set. The server
+   * re-checks, and refuses any change to a Super Admin.
+   */
+  breakGlass?: boolean;
 }
 
 export function EditUserDialog({
@@ -59,8 +66,13 @@ export function EditUserDialog({
   onUserUpdated,
   departments = [],
   callerRole = null,
+  breakGlass = false,
 }: EditUserDialogProps) {
-  const roleOptions = assignableRoles(callerRole);
+  const ordinaryOptions = assignableRoles(callerRole);
+  const roleOptions = breakGlass
+    ? ROLE_CODES.filter((r) => ordinaryOptions.includes(r) || BREAK_GLASS_GRANTABLE_ROLES.includes(r))
+    : ordinaryOptions;
+  const maySetDepartment = breakGlass || canSetDepartment(callerRole);
   const [role, setRole] = useState<UserRole>("employee");
   const [team, setTeam] = useState<string>("None");
   const [deptList, setDeptList] = useState<Department[]>(departments);
@@ -267,7 +279,7 @@ export function EditUserDialog({
                 value={team}
                 onValueChange={(val: string) => setTeam(val)}
                 // Fin Admin sets roles only; the server refuses a move anyway.
-                disabled={isSubmitting || !canSetDepartment(callerRole)}
+                disabled={isSubmitting || !maySetDepartment}
               >
                 <SelectTrigger
                   id="user-edit-team"

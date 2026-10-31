@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { checkSettingsTableExists } from '@/lib/settings/service'
 import { canEditPlatformConfig } from '@/lib/settings/access'
+import { canManageBreakGlass } from '@/lib/settings/breakGlass'
 import { PageBanner } from '@/components/shared/page-banner'
 import {
   Globe,
@@ -20,6 +21,7 @@ import {
   UserMinus,
   Eye,
   ClipboardCheck,
+  ShieldAlert,
 } from 'lucide-react'
 
 const settingsTabs = [
@@ -33,14 +35,19 @@ const settingsTabs = [
   { label: 'Audit Log', href: '/manage/settings/audit', icon: History },
 ]
 
+// Shown to Super Admin only. The page and its actions check for themselves.
+const superAdminTab = { label: 'Super Admin', href: '/manage/settings/super-admin', icon: ShieldAlert }
+
 export function SettingsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [tablesExist, setTablesExist] = useState<boolean | null>(null)
   const [canEdit, setCanEdit] = useState<boolean | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
     checkSettingsTableExists().then((exists) => setTablesExist(exists))
     canEditPlatformConfig().then((allowed) => setCanEdit(allowed))
+    canManageBreakGlass().then((allowed) => setIsSuperAdmin(allowed))
   }, [])
 
   return (
@@ -90,8 +97,8 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* 2. Card-Style Step Navigation matching Onboarding Design */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {settingsTabs.map((tab, idx) => {
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3">
+        {(isSuperAdmin ? [...settingsTabs, superAdminTab] : settingsTabs).map((tab, idx) => {
           const isActive =
             tab.href === '/manage/settings'
               ? pathname === '/manage/settings'

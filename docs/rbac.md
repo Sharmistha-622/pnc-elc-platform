@@ -116,6 +116,15 @@ pending submission without ever being able to read it.
 - **Lifecycle and line roles assign themselves.** No one may set them by hand;
   `canGrantRole` refuses them to every actor, Super Admin included.
 - **The owner role is not grantable in-app** at all.
+- **Break-glass (temporary).** Two named accounts, listed in
+  `src/lib/rbac/breakGlass.ts`, can open Users & Roles whatever role they hold
+  and change anyone's role or department, their own included, to any role but
+  Super Admin and the two portal roles (Manager and Employee included, which
+  nobody else may set by hand). They can never grant Super Admin or change
+  anything about a Super Admin. Every such change is marked `break_glass` in
+  the audit trail. A Super Admin turns it off under Settings → Super Admin; it
+  is on by default. It is an exception by account, not by role, so it does not
+  appear in the matrix above.
 
 ## The lifecycle
 

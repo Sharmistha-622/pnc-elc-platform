@@ -129,6 +129,14 @@ original role to be able to write.
   change their own role, and the role must appear in `ASSIGNABLE_ROLES`.
 - Writing a role uses the service-role client, so it is server-only — never
   call it from a Client Component (see `security.md`).
+- **Break-glass** (`src/lib/rbac/breakGlass.ts`) is the one exception, and it is
+  by account, not by role. The named accounts reach `/manage/users` whatever
+  role they hold (middleware lets them through for that route only; the layout
+  uses `requireFeatureOrBreakGlass`), and `updateUserAllocations` falls back to
+  `canBreakGlassChange` when the ordinary rules refuse them. Never Super Admin,
+  in either direction. Its switch lives in `break_glass_settings`, a table
+  closed to sessions, and only `guard(['super_admin'])` writes it. It does not
+  reach `setUserRole`, `createUserWithRole` or any other screen.
 
 ## Enforcement boundary
 

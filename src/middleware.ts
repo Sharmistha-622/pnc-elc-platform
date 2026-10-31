@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createMiddlewareSupabaseClient } from '@/lib/supabase/middleware'
 import { resolveRole } from '@/lib/rbac/resolveRole'
 import { canAccessRoute, isPortalOnlyRole } from '@/lib/role-constants'
+import { isBreakGlassEmail, isBreakGlassRoute } from '@/lib/rbac/breakGlass'
 
 /**
  * Routes reachable without a signed-in session.
@@ -70,7 +71,10 @@ export async function middleware(request: NextRequest) {
     // Authenticated, but not necessarily entitled to this route. `canAccessRoute`
     // is the same map the sidebar hides links with, applied here so hiding a link
     // is not the only thing standing between a Viewer and /manage.
-    const { role } = resolveRole(user, request.cookies.get('dev-role-override')?.value)
+    const { role, email, isEmulating } = resolveRole(
+      user,
+      request.cookies.get('dev-role-override')?.value
+    )
 
     // Signed in, but with no role at all: an account outside the
     // organisation's domains. Every route would refuse it and the refusals
@@ -89,7 +93,13 @@ export async function middleware(request: NextRequest) {
     // is meant to reach, and sending them there again from there would loop.
     if (pathname === '/portal-notice') return response
 
-    if (!canAccessRoute(role, pathname)) {
+    // Break-glass accounts reach the users screen whatever role they hold
+    // (src/lib/rbac/breakGlass.ts). Only that screen, and never while
+    // emulating. The Super Admin switch is not read here: the screen's layout
+    // and `updateUserAllocations` check it on every request.
+    const breakGlassScreen = !isEmulating && isBreakGlassEmail(email) && isBreakGlassRoute(pathname)
+
+    if (!canAccessRoute(role, pathname) && !breakGlassScreen) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
           { success: false, error: 'You do not have access to this resource.' },
