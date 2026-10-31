@@ -62,6 +62,10 @@ interface UsersRolesTableProps {
   isConfigured?: boolean;
   /** The signed-in user's real role, used to scope the role picker. */
   callerRole?: UserRole | null;
+  /** The caller holds break-glass access (src/lib/rbac/breakGlass.ts). */
+  breakGlass?: boolean;
+  /** Whether the caller may add users and read audit history (`manageUsers`). */
+  canManageAccounts?: boolean;
 }
 
 // One tab per RBAC v1 group, built from the role definitions so a new role
@@ -102,6 +106,8 @@ export function UsersRolesTable({
   initialDepartments = [],
   isConfigured = true,
   callerRole = null,
+  breakGlass = false,
+  canManageAccounts = true,
 }: UsersRolesTableProps) {
   const [users, setUsers] = useState<UserRow[]>(initialUsers || []);
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);
@@ -348,14 +354,16 @@ export function UsersRolesTable({
           )}
 
           {/* Add User Button */}
-          <Button
-            size="sm"
-            onClick={() => setIsAddUserOpen(true)}
-            className="h-8 px-3 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 shrink-0"
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Add User</span>
-          </Button>
+          {canManageAccounts && (
+            <Button
+              size="sm"
+              onClick={() => setIsAddUserOpen(true)}
+              className="h-8 px-3 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 shrink-0"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Add User</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -506,6 +514,7 @@ export function UsersRolesTable({
                             <Edit3 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                             <span>Edit Allocations</span>
                           </DropdownMenuItem>
+                          {canManageAccounts && (
                           <DropdownMenuItem
                             onClick={() => setAuditingUser(user)}
                             className="rounded-lg text-xs cursor-pointer flex items-center gap-2"
@@ -513,6 +522,7 @@ export function UsersRolesTable({
                             <History className="h-3.5 w-3.5 text-slate-500" />
                             <span>View Audit Trail</span>
                           </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -541,6 +551,7 @@ export function UsersRolesTable({
       {/* Edit User & Allocations Dialog */}
       <EditUserDialog
         callerRole={callerRole}
+        breakGlass={breakGlass}
         user={editingUser}
         departments={departments}
         open={Boolean(editingUser)}

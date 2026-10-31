@@ -9,6 +9,8 @@ import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants
 import { recordAuditEvent } from '@/lib/audit/service'
 import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
+import { breakGlassCaller } from '@/lib/rbac/breakGlassAccess'
+import { BREAK_GLASS_REFUSALS, canBreakGlassChange } from '@/lib/rbac/breakGlass'
 
 const GRANT_REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -28,7 +30,8 @@ export interface UpdateAllocationsInput {
   targetEmail: string
   targetName?: string
   newRole: UserRole
-  newTeam: string
+  /** Omit to keep the department the target has now. */
+  newTeam?: string
   /** Ignored: the target's current role is looked up from `targetUserId`. */
   currentRole?: UserRole | null
   /** Ignored: the target's current team is looked up from `targetUserId`. */
@@ -97,13 +100,66 @@ async function lookUpTarget(
   return { authUser, email, role, team }
 }
 
+/**
+ * Why the ordinary grant rules refuse this change, or null when they allow it.
+ * Exactly the checks this action has always made, gathered so a break-glass
+ * account can fall back to its own rules when these refuse.
+ */
+function ordinaryRefusal(c: {
+  callerRole: UserRole
+  isSelf: boolean
+  isImmutable: boolean
+  targetRole: UserRole
+  newRole: UserRole
+  roleChanged: boolean
+  teamChanged: boolean
+  targetEmail: string
+}): string | null {
+  // The grant rules apply to a role change only. A department move with the
+  // role left as it is grants nothing, so it is not refused as "changing your
+  // own role" — which is what stopped a Super Admin moving their own department.
+  if (c.roleChanged) {
+    // One authority decides who may grant what. The caller's real role is
+    // used, never an emulated one, so impersonating a Super Admin cannot
+    // grant like one.
+    const decision = canGrantRole(c.callerRole, c.newRole, { isSelf: c.isSelf })
+    if (!decision.ok) return GRANT_REFUSALS[decision.reason] ?? 'Not allowed'
+
+    if (c.isImmutable) {
+      return `${c.targetEmail} is an immutable Root Super Admin. Role cannot be modified.`
+    }
+  }
+
+  if (c.teamChanged && !canSetDepartment(c.callerRole)) {
+    return 'Your role can change a user’s role, not their department.'
+  }
+
+  // Changing anything about a person — role or department — needs authority
+  // over the role they hold now, so a Platform Admin cannot move a PnC Admin
+  // either. Super Admin is the owner role and never grantable, so that check
+  // alone would also refuse a Super Admin moving a Super Admin's department.
+  const overCurrent = canGrantRole(c.callerRole, c.targetRole, {})
+  const superAdminOverSuperAdmin =
+    !overCurrent.ok &&
+    overCurrent.reason === 'owner_role_is_not_grantable' &&
+    c.callerRole === 'super_admin'
+  if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic' && !superAdminOverSuperAdmin) {
+    return 'Only a Super Admin can alter this user’s role.'
+  }
+
+  return null
+}
+
 export async function updateUserAllocations(input: UpdateAllocationsInput) {
   const { targetUserId, targetName, newRole, newTeam, reason } = input
 
-  // The users screen's own gate, checked on both roles.
+  // The users screen's own gate, checked on both roles. A break-glass account
+  // (src/lib/rbac/breakGlass.ts) passes too while the Super Admin switch is on,
+  // whatever role it holds, and is held to the break-glass rules below.
   const allowed = await guard('manageUsers')
-  if (!allowed.ok) return { success: false, error: allowed.error }
-  const caller = allowed.caller
+  const breakGlass = await breakGlassCaller()
+  if (!allowed.ok && !breakGlass) return { success: false, error: allowed.error }
+  const caller = allowed.ok ? allowed.caller : breakGlass!
 
   if (!isRoleCode(newRole)) {
     return { success: false, error: 'Invalid role selected' }
@@ -119,7 +175,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
 
   const normalizedCurrentTeam = target.team
-  const normalizedNewTeam = newTeam || 'None'
+  const normalizedNewTeam = newTeam === undefined ? normalizedCurrentTeam : newTeam || 'None'
   const normalizedCurrentRole = target.role
 
   const roleChanged = normalizedCurrentRole !== newRole
@@ -129,45 +185,33 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
     return { success: true, message: 'No allocation changes detected' }
   }
 
-  // The grant rules apply to a role change only. A department move with the
-  // role left as it is grants nothing, so it is not refused as "changing your
-  // own role" — which is what stopped a Super Admin moving their own department.
-  if (roleChanged) {
-    // One authority decides who may grant what. The caller's real role is
-    // used, never an emulated one, so impersonating a Super Admin cannot
-    // grant like one.
-    const decision = canGrantRole(caller.originalRole, newRole, {
-      isSelf:
-        cleanTargetEmail === caller.email?.toLowerCase() ||
-        (Boolean(target.authUser?.id) && target.authUser?.id === caller.userId),
-    })
-    if (!decision.ok) {
-      return { success: false, error: GRANT_REFUSALS[decision.reason] ?? 'Not allowed' }
-    }
+  // The ordinary rules first. When they refuse a break-glass account, the
+  // break-glass rules decide instead: any role but Super Admin, for anyone
+  // but a Super Admin, themselves included.
+  const refusal = ordinaryRefusal({
+    callerRole: caller.originalRole,
+    isSelf:
+      cleanTargetEmail === caller.email?.toLowerCase() ||
+      (Boolean(target.authUser?.id) && target.authUser?.id === caller.userId),
+    isImmutable,
+    targetRole: normalizedCurrentRole,
+    newRole,
+    roleChanged,
+    teamChanged,
+    targetEmail: cleanTargetEmail,
+  })
 
+  // Someone who reached here only through break-glass is held to its rules
+  // whatever the ordinary ones would say for the role they hold.
+  let usedBreakGlass = false
+  if (refusal || !allowed.ok) {
+    if (!breakGlass) return { success: false, error: refusal ?? 'Not allowed' }
     if (isImmutable) {
-      return {
-        success: false,
-        error: `${cleanTargetEmail} is an immutable Root Super Admin. Role cannot be modified.`,
-      }
+      return { success: false, error: BREAK_GLASS_REFUSALS.target_is_super_admin }
     }
-  }
-
-  if (teamChanged && !canSetDepartment(caller.originalRole)) {
-    return { success: false, error: 'Your role can change a user’s role, not their department.' }
-  }
-
-  // Changing anything about a person — role or department — needs authority
-  // over the role they hold now, so a Platform Admin cannot move a PnC Admin
-  // either. Super Admin is the owner role and never grantable, so that check
-  // alone would also refuse a Super Admin moving a Super Admin's department.
-  const overCurrent = canGrantRole(caller.originalRole, target.role, {})
-  const superAdminOverSuperAdmin =
-    !overCurrent.ok &&
-    overCurrent.reason === 'owner_role_is_not_grantable' &&
-    caller.originalRole === 'super_admin'
-  if (!overCurrent.ok && overCurrent.reason !== 'role_is_automatic' && !superAdminOverSuperAdmin) {
-    return { success: false, error: 'Only a Super Admin can alter this user’s role.' }
+    const decision = canBreakGlassChange(normalizedCurrentRole, newRole)
+    if (!decision.ok) return { success: false, error: BREAK_GLASS_REFUSALS[decision.reason] }
+    usedBreakGlass = true
   }
 
   const diffs: { field: string; label: string; from: string; to: string }[] = []
@@ -262,6 +306,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
         target_id: targetUserId,
         actor_email: caller.email || 'Admin',
         actor_role: caller.role,
+        break_glass: usedBreakGlass,
         changes: diffs,
         reason: reason?.trim() || null,
         timestamp: new Date().toISOString(),
@@ -287,7 +332,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
       },
       module: 'access',
       action: 'access.user.allocated',
-      description: `Updated allocations for ${targetName || cleanTargetEmail}: ${summaryStr}${
+      description: `${usedBreakGlass ? '[Break-glass] ' : ''}Updated allocations for ${targetName || cleanTargetEmail}: ${summaryStr}${
         reason ? ` (Reason: ${reason})` : ''
       }`,
       changes: diffs.map((d) => ({ field: d.field, label: d.label, from: d.from, to: d.to })),
@@ -295,6 +340,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
         reason: reason?.trim() || null,
         actor_role: caller.role,
         allocation_id: allocationId,
+        break_glass: usedBreakGlass,
       },
     })
   } catch (err) {

@@ -1,5 +1,6 @@
 import React from "react";
-import { requireFeature } from "@/lib/rbac/requireFeature";
+import { requireFeatureOrBreakGlass } from "@/lib/rbac/breakGlassAccess";
+import { FEATURE_ACCESS } from "@/lib/role-constants";
 import { isAdminClientConfigured } from "@/lib/supabase/admin";
 import { listUsersWithRoles } from "@/lib/rbac/listUsersWithRoles";
 import { getDepartments } from "@/lib/departments/service";
@@ -8,7 +9,12 @@ import { PageBanner } from "@/components/shared/page-banner";
 import { Users } from "lucide-react";
 
 export default async function ManageUsersPage() {
-  const caller = await requireFeature("manageUsers");
+  const caller = await requireFeatureOrBreakGlass("manageUsers");
+  // A break-glass account holding an ordinary role can edit roles and
+  // departments here, and nothing else on the screen.
+  const canManageAccounts =
+    FEATURE_ACCESS.manageUsers.includes(caller.role) &&
+    FEATURE_ACCESS.manageUsers.includes(caller.originalRole);
   const isConfigured = isAdminClientConfigured();
   const [users, departments] = await Promise.all([
     listUsersWithRoles(),
@@ -28,6 +34,8 @@ export default async function ManageUsersPage() {
         initialDepartments={departments}
         isConfigured={isConfigured}
         callerRole={caller.originalRole}
+        breakGlass={caller.breakGlass}
+        canManageAccounts={canManageAccounts}
       />
     </div>
   );

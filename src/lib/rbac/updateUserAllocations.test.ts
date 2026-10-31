@@ -13,12 +13,21 @@ const state = vi.hoisted(() => ({
   trail: [] as any[],
   employeeUpdates: [] as any[],
   employeeError: null as null | { message: string },
+  guardOk: true,
+  breakGlass: null as any,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/rbac/getCurrentUserRole', () => ({ IMMUTABLE_SUPER_ADMIN_EMAILS: ['root@navgurukul.org'] }))
 vi.mock('@/lib/rbac/guard', () => ({
-  guard: vi.fn(async () => ({ ok: true, caller: state.caller })),
+  guard: vi.fn(async () =>
+    state.guardOk ? { ok: true, caller: state.caller } : { ok: false, error: 'You do not have access to do that.' }
+  ),
+}))
+// The switch and the account list are read in breakGlassAccess; here a test
+// says directly whether the caller holds break-glass access.
+vi.mock('@/lib/rbac/breakGlassAccess', () => ({
+  breakGlassCaller: vi.fn(async () => state.breakGlass),
 }))
 vi.mock('@/lib/audit/service', () => ({
   recordAuditEvent: vi.fn(async (e: any) => {
@@ -92,6 +101,8 @@ beforeEach(() => {
   state.trail = []
   state.employeeUpdates = []
   state.employeeError = null
+  state.guardOk = true
+  state.breakGlass = null
   account(ids.root, ROOT, 'super_admin')
   account(ids.pnc, 'pnc@navgurukul.org', 'pnc_admin')
   account(ids.emp, 'emp@navgurukul.org', 'employee')
@@ -192,5 +203,89 @@ describe('updateUserAllocations', () => {
     expect(id).toMatch(/^[0-9a-f-]{36}$/)
     expect(state.trail[0].metadata.allocation_id).toBe(id)
     expect(state.audit[0].changed_data.changes).toHaveLength(2)
+  })
+})
+
+describe('updateUserAllocations, break-glass', () => {
+  const bg = '00000000-0000-4000-8000-000000000009'
+
+  /** A break-glass account holding `role`; `onScreen` is whether that role has `manageUsers`. */
+  function breakGlassAs(role: string, onScreen = false) {
+    account(bg, 'bg@navgurukul.org', role)
+    as(bg, role)
+    state.guardOk = onScreen
+    state.breakGlass = state.caller
+  }
+
+  it('lets a break-glass employee change their own role', async () => {
+    breakGlassAs('employee')
+    const res = await move(bg, 'pnc_admin', 'None')
+    expect(res.success).toBe(true)
+    expect(state.updatedAuth).toEqual([bg])
+    expect(state.audit[0].changed_data.break_glass).toBe(true)
+    expect(state.trail[0].metadata.break_glass).toBe(true)
+  })
+
+  it('lets a break-glass account promote, demote and move anyone else', async () => {
+    breakGlassAs('employee')
+    expect((await move(ids.emp, 'platform_admin', 'Engineering')).success).toBe(true)
+    expect((await move(ids.pnc, 'employee', 'None')).success).toBe(true)
+    expect(state.updatedAuth).toEqual([ids.emp, ids.pnc])
+  })
+
+  it('goes past what the role it holds could grant', async () => {
+    // Platform Admin may grant Platform Ops only, and cannot touch a PnC Admin.
+    breakGlassAs('platform_admin', true)
+    const res = await move(ids.pnc, 'fin_admin', 'Finance')
+    expect(res.success).toBe(true)
+    expect(state.audit[0].changed_data.break_glass).toBe(true)
+  })
+
+  it('never grants Super Admin, to themselves or anyone', async () => {
+    breakGlassAs('employee')
+    expect(await move(bg, 'super_admin', 'None')).toMatchObject({ success: false })
+    expect(await move(ids.emp, 'super_admin', 'None')).toMatchObject({ success: false })
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('never changes a Super Admin, role or department', async () => {
+    account(ids.pnc, 'pnc@navgurukul.org', 'super_admin')
+    breakGlassAs('employee')
+    expect(await move(ids.pnc, 'employee', 'None')).toMatchObject({
+      success: false,
+      error: 'Break-glass access cannot change a Super Admin.',
+    })
+    expect(await move(ids.pnc, 'super_admin', 'Engineering')).toMatchObject({ success: false })
+    expect(await move(ids.root, 'employee', 'None')).toMatchObject({ success: false })
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('does not offer the portal roles', async () => {
+    breakGlassAs('employee')
+    expect(await move(ids.emp, 'candidate', 'None')).toMatchObject({ success: false })
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('refuses the same account once the switch is off', async () => {
+    breakGlassAs('employee')
+    state.breakGlass = null
+    expect(await move(bg, 'pnc_admin', 'None')).toMatchObject({ success: false })
+    expect(state.updatedAuth).toEqual([])
+  })
+
+  it('keeps the department when none is given (the header switch)', async () => {
+    breakGlassAs('employee')
+    state.users[bg].user_metadata.team = 'Engineering'
+    const res = await updateUserAllocations({ targetUserId: bg, targetEmail: '', newRole: 'pnc_ops' })
+    expect(res.success).toBe(true)
+    expect(state.audit[0].changed_data.changes).toEqual([
+      { field: 'role', label: 'System Role', from: 'employee', to: 'pnc_ops' },
+    ])
+  })
+
+  it('leaves an ordinary change unmarked', async () => {
+    as(ids.root, 'super_admin')
+    expect((await move(ids.emp, 'pnc_ops', 'None')).success).toBe(true)
+    expect(state.audit[0].changed_data.break_glass).toBe(false)
   })
 })

@@ -14,7 +14,9 @@ import { ROLE_CODES } from '@/lib/rbac/roles'
 // ============================================================================
 
 const DASHBOARD = path.join(process.cwd(), 'src/app/(dashboard)')
-const GATE = /requireFeature\(\s*['"](\w+)['"]\s*\)/g
+// `requireFeatureOrBreakGlass` gates on the same feature; the accounts it also
+// admits are named, not roles, so the role comparison below still holds.
+const GATE = /requireFeature(?:OrBreakGlass)?\(\s*['"](\w+)['"]\s*\)/g
 
 function pages(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
