@@ -206,12 +206,13 @@ describe('planEmployeeImport', () => {
   it('stops on a file without an email column, and names ignored columns', () => {
     expect(planEmployeeImport('name,team\nA,Finance', ctx()).fileErrors).toEqual(['The header row has no "email" column.'])
     const p = planEmployeeImport('Email,Full Name,Name,Employee Type,Joining Date,Is Alumni,PAN\na@navgurukul.org,x,A,fte,2026-01-01,N,ABCDE1234F', ctx())
-    expect(p.fileWarnings).toEqual(['Ignored columns: full_name, pan.'])
+    expect(p.fileWarnings).toContain('Ignored columns: full_name, pan.')
     expect(p.rows[0].action).toBe('create')
   })
 
   it('refuses a new person when the file has no is_alumni column at all', () => {
     const p = planEmployeeImport('email,name,employee_type,joining_date\na@navgurukul.org,A,fte,2026-01-01', ctx())
+    expect(p.fileWarnings[0]).toBe('Missing column: is_alumni. Everyone new needs it, so new people in this file cannot be added.')
     expect(p.rows[0].errors).toEqual(['is_alumni is needed for someone new.'])
     expect(p.canImport).toBe(false)
   })
@@ -229,6 +230,38 @@ describe('planEmployeeImport', () => {
 
     const same = planEmployeeImport('email,is_alumni\nknown@navgurukul.org,Y', ctx(existing))
     expect(same.rows[0].action).toBe('unchanged')
+  })
+})
+
+describe('planEmployeeImport: flags what is missing', () => {
+  it('names columns the file lacks, and says new people cannot be added without the required ones', () => {
+    const p = planEmployeeImport('email,name,employee_type\na@navgurukul.org,A,fte', ctx())
+    expect(p.fileWarnings).toEqual([
+      'Missing columns: joining_date, is_alumni. Everyone new needs them, so new people in this file cannot be added.',
+      'Not in this file, so left as they are: employee_code, manager_email, team, status, confirmation_date, conversion_date.',
+    ])
+    expect(planEmployeeImport(IMPORT_TEMPLATE_CSV, ctx()).fileWarnings).toEqual([])
+  })
+
+  it('warns, without blocking, when a new person would have no employee ID or team', () => {
+    const p = plan('a@navgurukul.org,A,fte,2026-01-01,,,,,,no')
+    expect(p.rows[0].warnings).toContain('Not filled in: employee_code, team.')
+    expect(p.rows[0].action).toBe('create')
+    expect(p.canImport).toBe(true)
+  })
+
+  it('warns when someone already in the directory stays without alumni status, ID or team', () => {
+    const existing = [
+      person({ id: 'l', email: 'legacy@navgurukul.org' }),
+      person({ id: 'k', email: 'known@navgurukul.org', employee_code: 'NG-0001', team: 'Finance', is_alumni: false }),
+    ]
+    const p = planEmployeeImport('email,team\nlegacy@navgurukul.org,Finance\nknown@navgurukul.org,Finance', ctx(existing))
+    expect(p.rows[0].warnings).toContain('Still empty in the directory: employee_code, is_alumni.')
+    expect(p.rows[1].warnings).toEqual(['No manager: their reviews cannot be sent until one is set.'])
+
+    // Filling them in clears the flag.
+    const filled = planEmployeeImport('email,employee_code,team,is_alumni\nlegacy@navgurukul.org,NG-0002,Finance,yes', ctx(existing))
+    expect(filled.rows[0].warnings.join(' ')).not.toMatch(/Still empty/)
   })
 })
 

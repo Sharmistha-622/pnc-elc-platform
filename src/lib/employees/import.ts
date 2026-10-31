@@ -30,6 +30,12 @@ export type ImportColumn = (typeof IMPORT_COLUMNS)[number]['key']
 /** For new people these must be filled in; for updates every cell is optional. */
 const REQUIRED_FOR_NEW: ImportColumn[] = ['name', 'employee_type', 'joining_date', 'is_alumni']
 
+/**
+ * Not required, but reporting is thin without them, so the preview flags a
+ * person who would be left without one (as a warning: it does not block).
+ */
+const FLAGGED_IF_EMPTY = ['employee_code', 'team'] as const
+
 /** A sheet larger than this is split: one request carries the whole file twice. */
 export const MAX_IMPORT_ROWS = 2000
 
@@ -236,6 +242,18 @@ export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportP
   if (ignored.length) fileWarnings.push(`Ignored columns: ${ignored.join(', ')}.`)
   if (fileErrors.length) return emptyPlan(fileErrors)
 
+  const absent = IMPORT_COLUMNS.map((c) => c.key).filter((k) => !headers.includes(k))
+  const absentRequired = absent.filter((k) => REQUIRED_FOR_NEW.includes(k))
+  const absentOther = absent.filter((k) => !REQUIRED_FOR_NEW.includes(k))
+  if (absentRequired.length) {
+    fileWarnings.push(
+      `Missing column${absentRequired.length === 1 ? '' : 's'}: ${absentRequired.join(', ')}. Everyone new needs ${absentRequired.length === 1 ? 'it' : 'them'}, so new people in this file cannot be added.`
+    )
+  }
+  if (absentOther.length) {
+    fileWarnings.push(`Not in this file, so left as they are: ${absentOther.join(', ')}.`)
+  }
+
   const existingByEmail = new Map<string, ExistingEmployee[]>()
   for (const e of ctx.existing) {
     const key = e.email?.trim().toLowerCase()
@@ -420,6 +438,20 @@ export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportP
       if (!keepsManager && finalStatus === 'active') {
         r.warnings.push('No manager: their reviews cannot be sent until one is set.')
       }
+    }
+
+    // Anything still empty once this row is in, so PnC sees the gaps now.
+    const empty: string[] = []
+    for (const col of FLAGGED_IF_EMPTY) {
+      if (!r.write[col] && !current?.[col]) empty.push(col)
+    }
+    if (current && r.write.is_alumni === undefined && current.is_alumni == null) empty.push('is_alumni')
+    if (empty.length) {
+      r.warnings.push(
+        current
+          ? `Still empty in the directory: ${empty.join(', ')}.`
+          : `Not filled in: ${empty.join(', ')}.`
+      )
     }
 
     if (r.errors.length) {
