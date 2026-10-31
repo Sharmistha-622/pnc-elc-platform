@@ -120,6 +120,105 @@ begin
 exception when check_violation then null;
 end $$;
 
+-- 9. Bank details: pending until someone else approves; one account, one person.
+insert into public.people (id, core_id, name) values
+  ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b2', 'Probe Two')
+  on conflict (id) do nothing;
+do $$
+declare
+  first_id uuid; second_id uuid; other_id uuid; got text;
+begin
+  first_id := public.submit_bank_details('00000000-0000-0000-0000-0000000000a1', 'Probe Person', '1234 5678 9012', 'hdfc0001234', 'HDFC', 'probe@example.org', null);
+  if (select status || ':' || ifsc || ':' || account_number from public.bank_details where id = first_id) <> 'pending:HDFC0001234:123456789012' then
+    insert into pg_temp.failures values ('bank submit', 'not stored pending, normalised');
+  end if;
+
+  -- A second submission replaces the first pending one.
+  second_id := public.submit_bank_details('00000000-0000-0000-0000-0000000000a1', 'Probe Person', '123456789012', 'HDFC0001234', 'HDFC', 'probe@example.org', null);
+  if (select status from public.bank_details where id = first_id) <> 'superseded' then
+    insert into pg_temp.failures values ('bank submit', 'older pending not superseded');
+  end if;
+
+  -- Nobody decides their own submission, and Fin Ops decides nothing.
+  begin
+    perform public.decide_bank_details(second_id, 'approve', null, 'PROBE@example.org', 'fin_admin');
+    insert into pg_temp.failures values ('bank approve', 'own submission approved');
+  exception when raise_exception then
+    if sqlerrm <> 'own_submission' then insert into pg_temp.failures values ('bank approve', 'own: ' || sqlerrm); end if;
+  end;
+  begin
+    perform public.decide_bank_details(second_id, 'approve', null, 'ops@example.org', 'fin_ops');
+    insert into pg_temp.failures values ('bank approve', 'fin_ops approved');
+  exception when raise_exception then null;
+  end;
+
+  begin
+    got := public.decide_bank_details(second_id, 'approve', null, 'fin@example.org', 'fin_admin');
+  exception when raise_exception then
+    got := sqlerrm;
+  end;
+  if got <> 'active' or (select status from public.bank_details where id = second_id) <> 'active' then
+    insert into pg_temp.failures values ('bank approve', 'not active after approval');
+  end if;
+  begin
+    perform public.decide_bank_details(second_id, 'approve', null, 'fin@example.org', 'fin_admin');
+    insert into pg_temp.failures values ('bank approve', 'approved twice');
+  exception when raise_exception then null;
+  end;
+
+  -- The same account for a different person is refused (V-01).
+  other_id := public.submit_bank_details('00000000-0000-0000-0000-0000000000a2', 'Probe Two', '123456789012', 'HDFC0001234', null, 'two@example.org', null);
+  begin
+    perform public.decide_bank_details(other_id, 'approve', null, 'fin@example.org', 'fin_admin');
+    insert into pg_temp.failures values ('bank approve', 'account approved for a second person');
+  exception when raise_exception then
+    if sqlerrm <> 'account_in_use' then insert into pg_temp.failures values ('bank approve', 'shared: ' || sqlerrm); end if;
+  end;
+
+  -- Rejecting needs a reason.
+  begin
+    perform public.decide_bank_details(other_id, 'reject', null, 'fin@example.org', 'fin_admin', ' ');
+    insert into pg_temp.failures values ('bank reject', 'rejected without a reason');
+  exception when raise_exception then null;
+  end;
+  begin
+    got := public.decide_bank_details(other_id, 'reject', null, 'fin@example.org', 'fin_admin', 'Account belongs to someone else');
+  exception when raise_exception then
+    got := sqlerrm;
+  end;
+  if got <> 'rejected' then
+    insert into pg_temp.failures values ('bank reject', 'not rejected: ' || got);
+  end if;
+
+  -- A new account, approved, retires the old one.
+  first_id := public.submit_bank_details('00000000-0000-0000-0000-0000000000a1', 'Probe Person', '987654321098', 'SBIN0000001', 'SBI', 'probe@example.org', null);
+  perform public.decide_bank_details(first_id, 'approve', null, 'sa@example.org', 'super_admin');
+  if (select status from public.bank_details where id = second_id) <> 'superseded'
+     or (select count(*) from public.bank_details where person_id = '00000000-0000-0000-0000-0000000000a1' and status = 'active') <> 1 then
+    insert into pg_temp.failures values ('bank approve', 'old account not superseded');
+  end if;
+
+  -- Every decision is in the audit trail, with no account number in it.
+  if (select count(*) from public.payroll_audit where entity = 'bank_details') <> 3 then
+    insert into pg_temp.failures values ('bank audit', 'expected 3 decisions audited');
+  end if;
+  if exists (select 1 from public.payroll_audit where entity = 'bank_details' and after::text like '%987654321098%') then
+    insert into pg_temp.failures values ('bank audit', 'full account number in the audit');
+  end if;
+end $$;
+do $$
+begin
+  perform public.submit_bank_details('00000000-0000-0000-0000-0000000000a1', 'Probe Person', '123456789012', 'HDFC1234567', null, 'probe@example.org', null);
+  insert into pg_temp.failures values ('IFSC format', 'accepted an IFSC without the 0');
+exception when check_violation then null;
+end $$;
+do $$
+begin
+  perform public.submit_bank_details('00000000-0000-0000-0000-0000000000a1', 'Probe Person', '12AB', 'HDFC0001234', null, 'probe@example.org', null);
+  insert into pg_temp.failures values ('account number format', 'accepted letters');
+exception when check_violation then null;
+end $$;
+
 select check_name, detail from pg_temp.failures order by 1, 2;
 do $$
 declare n int := (select count(*) from pg_temp.failures);

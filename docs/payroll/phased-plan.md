@@ -13,7 +13,7 @@ depends on.
 | Item | Detail | Depends on |
 |---|---|---|
 | Vault tables | The vault project is created in Mumbai; create its tables: apply `0001_vault_schema.sql` and `0002_sealed_records.sql`, then the payroll tables from `design.md` §2.2 (identity, advances, pay items, TDS declarations, fee YTD, run lines and components, payments, output files, payslips, letters, payroll audit) | D-01 |
-| Vault functions | `sync-person`, `submit-bank`, `approve-bank` | Vault decision #3 in `../vault-setup.md` |
+| Vault functions | `submit-bank` and `approve-bank` built (vault `0005`); `sync-person` remains | Vault decision #3 in `../vault-setup.md` |
 | Core residency | Move core from Singapore to Mumbai before any real data is loaded | D-01 |
 | Person and engagement | `person` over `employees`; `engagement` with type, pay basis, dates, location, work state, grade; backfill from `employees` | D-10, D-11, O-01 |
 | Employee ID | Issue `NG-0669`-style IDs from one sequence when a candidate reaches Pre-Joinee, written to `employees.employee_code` (added in #59); retire onboarding's `NG-<year>-` codes | D-34, P-09 |

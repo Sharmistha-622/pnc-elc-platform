@@ -51,8 +51,8 @@ it; **Not built** means neither exists yet.
 | Data | Vault table | Enters via | Read by (route) | Status |
 |---|---|---|---|---|
 | Compensation: CTC and every component, effective-dated, with a reason (`offer`, `increment`, `correction`) | `compensation` | PnC Admin or Fin Admin, in the vault | Super Admin, PnC Admin, Fin Admin, Exec View (vault session); Fin Ops (payroll export only); the employee (letter) | Schema + `read-salary` built; **no write path yet** |
-| Bank details: account name, number, IFSC, bank | `bank_details` (one active row per person, approval step) | Pre-joiner submits (insert-only); Fin Admin approves | Super Admin, Fin Admin (edit); PnC Admin, Fin Ops (view); the employee (own, via logged function) | Schema only. `submit-bank` and `approve-bank` **not built** |
-| Bank-proof scan (cancelled cheque or passbook) | `identity-documents` bucket | With the bank submission | As bank details | **Not built.** Today it is uploaded to **core** (see below) |
+| Bank details: account name, number, IFSC, bank | `bank_details` (one active row per person, approval step) | Pre-joiner submits (insert-only); Fin Admin approves | Super Admin, Fin Admin (edit); PnC Admin, Fin Ops (view); the employee (own, via logged function) | `submit-bank` and `approve-bank` built (vault `0005`); waits on `sync-person` end to end. The candidate portal still collects bank details in core |
+| Bank-proof scan (cancelled cheque or passbook) | `identity-documents` bucket | With the bank submission | As bank details | `submit-bank` accepts it. Today it is still uploaded to **core** until the portal is pointed at the vault (see below) |
 | PAN, UAN | *new*, in a payroll identity table | Finance import, or the pre-joiner | Fin Admin, Fin Ops, Super Admin | **Schema only** (`payroll_identity`, vault `0004`) |
 | Payroll runs: run lines, components, approvals, lock | *new*, payroll tables | `payroll-compute` Edge Function | Fin Ops (maker), Fin Admin (checker), the CEO approver | **Schema only** (`run_lines`, `run_line_components`, `run_locks`, vault `0004`). Sign-offs stay in core, without amounts |
 | Advances, consultant fee year-to-date | `advances`, `advance_recoveries`, `fee_ytd` | Payroll | Finance | **Schema only** (vault `0004`) |
@@ -96,7 +96,7 @@ as the weaker one.
 | `salary_structures` (every amount column) | Annexure A split | `compensation` | Drop the table once letters render from the vault |
 | `candidate_letters.content`, `onboarding_documents_generated.generated_content` | rendered offer, appointment and agreement letters, which quote the CTC | vault letter storage, delivered through the `letter` route | Core keeps letter type, status, signed date |
 | `candidate-documents` bucket: `aadhaar`, `pan`, passport, address and education proofs | ID scans | `identity-documents` bucket | Already staged and sealing; make sure nothing ever skips the seal |
-| `candidate-documents` bucket: **`bank_proof`** | a scan of a bank account | vault, through `submit-bank` | Needs `submit-bank` built first |
+| `candidate-documents` bucket: **`bank_proof`** | a scan of a bank account | vault, through `submit-bank` | `submit-bank` built; point the candidate portal's bank step at it |
 | `employee_profiles.id_proof_number`, `address_proof_number` | full ID numbers of current employees | `identity_documents.document_number` | Core keeps the last four |
 | `peer_feedback.feedback_text` | feedback text | `feedback` | Already sealing |
 | `form_answers.value`, for confirmation and appraisal forms | performance answers | `feedback` | Sealing not built yet |
@@ -142,8 +142,8 @@ Review these four lists quarterly, alongside `vault_roles`.
       It is blocked on open decision #3 (whether a candidate is a Supabase user).
    2. `read-identity-number`: an Edge Function around the SQL function, so the
       app has a logged path to it.
-   3. `submit-bank` and `approve-bank`. Then point the candidate portal's bank
-      step at them, so `bank_proof` stops landing in core.
+   3. ~~`submit-bank` and `approve-bank`~~ (built). Next: point the candidate
+      portal's bank step at them, so `bank_proof` stops landing in core.
    4. A compensation write path for PnC Admin and Fin Admin.
    5. Sealing for form answers.
 5. **Migrate core** following the table above: one resource at a time, with the

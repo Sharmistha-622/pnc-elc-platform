@@ -15,6 +15,9 @@ therefore no path that skips the access log.
 | `submit-documents` | insert-only submission: writes, never reads back |
 | `seal-document` | receives a verified document from core; idempotent on `core_document_id` |
 | `seal-feedback` | receives feedback when its cycle closes; idempotent on `core_feedback_id` |
+| `submit-bank` | bank details from core, insert-only: lands `pending`, returns the last four digits only |
+| `approve-bank` | lists pending bank details (logged), approves or rejects; the rules are in `decide_bank_details` |
+| `_shared/core.ts`, `_shared/bank.ts` | core's signature check; bank-detail checks and masking (plain TypeScript, tested in `src/lib/vault/bank-input.test.ts`) |
 | `_shared/vault.ts` | role lookup and `logAccess`, which fails closed — a read that cannot be logged does not happen |
 
 See [`docs/vault-setup.md`](../../../docs/vault-setup.md).
