@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.05.00",
+    "date": "2026-10-31",
+    "title": "A state on every location, for professional tax",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Each location has a state, set from its address and editable on the Locations screen; locations missing one are flagged."
+      },
+      {
+        "category": "Fixes",
+        "description": "New locations are saved to the database. Before, they were kept in memory only and disappeared on restart, and their address was dropped."
+      }
+    ]
+  },
+  {
     "version": "2.04.00",
     "date": "2026-10-29",
     "title": "Real calendar free/busy for review meetings, employee can reschedule",
