@@ -46,11 +46,11 @@ const PNC_ADMIN = { sub: '20000000-0000-0000-0000-0000000000f1', email: 'pnc.adm
 const EMPLOYEE = { sub: '20000000-0000-0000-0000-00000000000b', email: 'ravi@navgurukul.org' }
 
 const FILE =
-  'email,employee_code,name,employee_type,joining_date,manager_email,team,status,confirmation_date,conversion_date\n' +
-  'imp.joiner@navgurukul.org,ng-9669,"Joiner, Imported",FTE,05/08/2026,imp.lead@navgurukul.org,CEO Office,,,\n' +
-  'imp.lead@navgurukul.org,NG-9101,Lead Imported,fte,2023-04-01,,CEO Office,,2023-07-01,\n' +
-  'imp.intern@navgurukul.org,,Intern Imported,intern,2026-06-01,imp.lead@navgurukul.org,Finance,,,2026-09-01\n' +
-  'imp.existing@navgurukul.org,NG-9001,,,,,Finance,,2019-04-01,\n'
+  'email,employee_code,name,employee_type,joining_date,manager_email,team,status,confirmation_date,conversion_date,is_alumni\n' +
+  'imp.joiner@navgurukul.org,ng-9669,"Joiner, Imported",FTE,05/08/2026,imp.lead@navgurukul.org,CEO Office,,,,yes\n' +
+  'imp.lead@navgurukul.org,NG-9101,Lead Imported,fte,2023-04-01,,CEO Office,,2023-07-01,,no\n' +
+  'imp.intern@navgurukul.org,,Intern Imported,intern,2026-06-01,imp.lead@navgurukul.org,Finance,,,2026-09-01,yes\n' +
+  'imp.existing@navgurukul.org,NG-9001,,,,,Finance,,2019-04-01,,\n'
 
 describe.skipIf(!PGRST)('employee import, against the database', () => {
   let server: http.Server
@@ -66,7 +66,7 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
   const imported = async () => {
     const { data } = await admin
       .from('employees')
-      .select('id, email, employee_code, name, employee_type, employee_type_id, joining_date, manager_id, team, status, confirmation_date, conversion_date')
+      .select('id, email, employee_code, name, employee_type, employee_type_id, joining_date, manager_id, team, status, confirmation_date, conversion_date, is_alumni')
       .in('email', ['imp.joiner@navgurukul.org', 'imp.lead@navgurukul.org', 'imp.intern@navgurukul.org', 'imp.existing@navgurukul.org'])
     return new Map((data ?? []).map((r) => [r.email as string, r]))
   }
@@ -92,6 +92,7 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
       joining_date: '2019-01-01',
       status: 'active',
       manager_id: '10000000-0000-0000-0000-00000000000a',
+      is_alumni: false,
     })
     if (error) throw new Error(error.message)
     actions = await import('./importActions')
@@ -120,7 +121,7 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
 
   it('writes nothing while any row has an error', async () => {
     as(PNC_ADMIN, 'pnc_admin')
-    const res = await actions.runEmployeeImport(FILE + 'imp.bad@navgurukul.org,Bad,fte,2026-01-01,nobody@navgurukul.org,,,,\n')
+    const res = await actions.runEmployeeImport(FILE + 'imp.bad@navgurukul.org,Bad,fte,2026-01-01,nobody@navgurukul.org,,,,,no\n')
     expect(res).toMatchObject({ ok: false, error: 'Fix the rows marked with errors, then upload again.' })
     expect((await imported()).has('imp.lead@navgurukul.org')).toBe(false)
   })
@@ -144,9 +145,10 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
       team: 'CEO Office',
       status: 'active',
       manager_id: lead.id,
+      is_alumni: true,
     })
     expect(rows.get('imp.joiner@navgurukul.org')!.employee_type_id).toBeTruthy()
-    expect(lead).toMatchObject({ confirmation_date: '2023-07-01', manager_id: null })
+    expect(lead).toMatchObject({ confirmation_date: '2023-07-01', manager_id: null, is_alumni: false })
     expect(rows.get('imp.intern@navgurukul.org')).toMatchObject({ conversion_date: '2026-09-01', manager_id: lead.id })
     // The existing person keeps every value the file left empty.
     expect(rows.get('imp.existing@navgurukul.org')).toMatchObject({
@@ -156,6 +158,7 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
       employee_code: 'NG-9001',
       team: 'Finance',
       confirmation_date: '2019-04-01',
+      is_alumni: false,
     })
     expect(rows.get('imp.intern@navgurukul.org')!.employee_code).toBeNull()
 
@@ -175,9 +178,19 @@ describe.skipIf(!PGRST)('employee import, against the database', () => {
     const insert = (employee_code: string) =>
       admin
         .from('employees')
-        .insert({ name: 'Dup', email: 'imp.dup@navgurukul.org', employee_code, employee_type: 'fte', joining_date: '2026-01-01' })
+        .insert({ name: 'Dup', email: 'imp.dup@navgurukul.org', employee_code, employee_type: 'fte', joining_date: '2026-01-01', is_alumni: false })
     expect((await insert('NG-9669')).error?.message).toMatch(/employees_employee_code_key/)
     expect((await insert('ng-9670')).error?.message).toMatch(/employees_employee_code_format/)
+  })
+
+  it('is refused by the database for a new person without alumni status, or clearing it', async () => {
+    // Every path that adds people is held to it, not only this import.
+    const { error } = await admin
+      .from('employees')
+      .insert({ name: 'No Answer', email: 'imp.noanswer@navgurukul.org', employee_type: 'fte', joining_date: '2026-01-01' })
+    expect(error?.message).toMatch(/is_alumni is required/)
+    const cleared = await admin.from('employees').update({ is_alumni: null }).eq('email', 'imp.existing@navgurukul.org')
+    expect(cleared.error?.message).toMatch(/is_alumni is required/)
   })
 
   it('changes only the manager when only the manager changes', async () => {

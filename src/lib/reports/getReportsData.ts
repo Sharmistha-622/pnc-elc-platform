@@ -34,6 +34,14 @@ export interface EmployeeHeadcountItem {
   employee_type: string
   team_name: string
   location_name: string
+  /** NavGurukul alumnus or external hire. "Not recorded" only for people added before the field existed. */
+  background: EmployeeBackground
+}
+
+export type EmployeeBackground = 'Alumni' | 'External' | 'Not recorded'
+
+export function employeeBackground(isAlumni: boolean | null | undefined): EmployeeBackground {
+  return isAlumni === true ? 'Alumni' : isAlumni === false ? 'External' : 'Not recorded'
 }
 
 export interface EmailDeliveryReportItem {
@@ -71,6 +79,7 @@ export interface UnifiedReportsData {
     byType: Record<string, number>
     byTeam: Record<string, number>
     byLocation: Record<string, number>
+    byBackground: Record<EmployeeBackground, number>
     employees: EmployeeHeadcountItem[]
   }
   emails: {
@@ -187,10 +196,11 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   const byType: Record<string, number> = {}
   const byTeam: Record<string, number> = {}
   const byLocation: Record<string, number> = {}
+  const byBackground: Record<EmployeeBackground, number> = { Alumni: 0, External: 0, 'Not recorded': 0 }
   try {
     const { data: empRows, error } = await supabase
       .from('employees')
-      .select('id, name, email, designation, joining_date, employee_types(name), teams(name), locations(name)')
+      .select('id, name, email, designation, joining_date, is_alumni, employee_types(name), teams(name), locations(name)')
       .order('name', { ascending: true })
 
     if (!error && empRows) {
@@ -202,6 +212,8 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
         byType[typeName] = (byType[typeName] || 0) + 1
         byTeam[teamName] = (byTeam[teamName] || 0) + 1
         byLocation[locationName] = (byLocation[locationName] || 0) + 1
+        const background = employeeBackground(row.is_alumni)
+        byBackground[background]++
 
         headcountEmployees.push({
           id: row.id,
@@ -212,6 +224,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
           employee_type: typeName,
           team_name: teamName,
           location_name: locationName,
+          background,
         })
       }
     }
@@ -274,6 +287,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
       byType,
       byTeam,
       byLocation,
+      byBackground,
       employees: headcountEmployees,
     },
     emails: {

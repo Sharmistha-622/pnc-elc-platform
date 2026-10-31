@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest'
 import {
   parseCsv,
   parseImportDate,
+  parseYesNo,
   planEmployeeImport,
   IMPORT_TEMPLATE_CSV,
   type ExistingEmployee,
   type ImportContext,
 } from './import'
 
-const HEADER = 'email,name,employee_type,joining_date,manager_email,team,status,confirmation_date,conversion_date'
+const HEADER = 'email,name,employee_type,joining_date,manager_email,team,status,confirmation_date,conversion_date,is_alumni'
 
 function person(over: Partial<ExistingEmployee> & { id: string; email: string }): ExistingEmployee {
   return {
@@ -21,6 +22,7 @@ function person(over: Partial<ExistingEmployee> & { id: string; email: string })
     status: 'active',
     confirmation_date: null,
     conversion_date: null,
+    is_alumni: null,
     ...over,
   }
 }
@@ -78,8 +80,8 @@ describe('planEmployeeImport', () => {
 
   it('plans a new person with a manager who is also new, in any order', () => {
     const p = plan(
-      'joiner@navgurukul.org,Joiner,FTE,05/08/2026,boss@navgurukul.org,ceo office,,,\n' +
-        'boss@navgurukul.org,Boss,Full-Time Employee (FTE),2024-04-01,,CEO Office,,2024-07-01,'
+      'joiner@navgurukul.org,Joiner,FTE,05/08/2026,boss@navgurukul.org,ceo office,,,,Yes\n' +
+        'boss@navgurukul.org,Boss,Full-Time Employee (FTE),2024-04-01,,CEO Office,,2024-07-01,,no'
     )
     expect(p.canImport).toBe(true)
     const joiner = p.rows[0]
@@ -91,17 +93,20 @@ describe('planEmployeeImport', () => {
       joining_date: '2026-08-05',
       team: 'CEO Office',
       status: 'active',
+      is_alumni: true,
     })
+    expect(p.rows[1].write.is_alumni).toBe(false)
     expect(joiner.managerEmail).toBe('boss@navgurukul.org')
     expect(p.rows[1].warnings).toContain('No manager: their reviews cannot be sent until one is set.')
   })
 
-  it('needs name, type and joining date only for someone new', () => {
-    const p = plan('new@navgurukul.org,,,,,,,,\nold@navgurukul.org,,,,,Finance,,,', [person({ id: 'o', email: 'old@navgurukul.org' })])
+  it('needs name, type, joining date and alumni status only for someone new', () => {
+    const p = plan('new@navgurukul.org,,,,,,,,,\nold@navgurukul.org,,,,,Finance,,,,', [person({ id: 'o', email: 'old@navgurukul.org' })])
     expect(p.rows[0].errors).toEqual([
       'name is needed for someone new.',
       'employee_type is needed for someone new.',
       'joining_date is needed for someone new.',
+      'is_alumni is needed for someone new.',
     ])
     expect(p.rows[1].action).toBe('update')
     expect(p.rows[1].changes).toEqual([{ field: 'team', from: null, to: 'Finance' }])
@@ -110,7 +115,7 @@ describe('planEmployeeImport', () => {
 
   it('leaves empty cells alone and reports a matching row as no change', () => {
     const boss = person({ id: 'b', email: 'boss@navgurukul.org' })
-    const p = plan('Old@NavGurukul.org,,fte,2024-01-01,boss@navgurukul.org,,,,', [
+    const p = plan('Old@NavGurukul.org,,fte,2024-01-01,boss@navgurukul.org,,,,,', [
       boss,
       person({ id: 'o', email: 'old@navgurukul.org', manager_id: 'b' }),
     ])
@@ -121,15 +126,16 @@ describe('planEmployeeImport', () => {
 
   it('refuses bad cells with a reason for each', () => {
     const p = plan(
-      'a@gmail.com,A,fte,2026-01-01,,,,,\n' +
-        'b@navgurukul.org,B,staff,2026-13-01,,Marketing,left,,\n' +
-        'c@navgurukul.org,C,fte,2026-01-01,c@navgurukul.org,,,,\n' +
-        'd@navgurukul.org,D,fte,2026-01-01,ghost@navgurukul.org,,,,'
+      'a@gmail.com,A,fte,2026-01-01,,,,,,no\n' +
+        'b@navgurukul.org,B,staff,2026-13-01,,Marketing,left,,,maybe\n' +
+        'c@navgurukul.org,C,fte,2026-01-01,c@navgurukul.org,,,,,no\n' +
+        'd@navgurukul.org,D,fte,2026-01-01,ghost@navgurukul.org,,,,,no'
     )
     expect(p.rows[0].errors).toEqual(['Only @navgurukul.org addresses can sign in.'])
     expect(p.rows[1].errors).toEqual([
       'Unknown employee_type "staff".',
       'joining_date "2026-13-01" is not a date (use YYYY-MM-DD or DD/MM/YYYY).',
+      'is_alumni must be yes or no, not "maybe".',
       'status must be active or exited, not "left".',
       'No department called "Marketing". Add it in Data Management → Departments first.',
     ])
@@ -139,7 +145,7 @@ describe('planEmployeeImport', () => {
   })
 
   it('refuses the same email twice in the file, and an email the directory holds twice', () => {
-    const p = plan('a@navgurukul.org,A,fte,2026-01-01,,,,,\nA@navgurukul.org,A2,fte,2026-01-01,,,,,\ndup@navgurukul.org,,,,,,,,', [
+    const p = plan('a@navgurukul.org,A,fte,2026-01-01,,,,,,no\nA@navgurukul.org,A2,fte,2026-01-01,,,,,,no\ndup@navgurukul.org,,,,,,,,,', [
       person({ id: '1', email: 'dup@navgurukul.org' }),
       person({ id: '2', email: 'DUP@navgurukul.org' }),
     ])
@@ -148,13 +154,13 @@ describe('planEmployeeImport', () => {
   })
 
   it('refuses a manager line that loops, through the file or the directory', () => {
-    const inFile = plan('a@navgurukul.org,A,fte,2026-01-01,b@navgurukul.org,,,,\nb@navgurukul.org,B,fte,2026-01-01,a@navgurukul.org,,,,')
+    const inFile = plan('a@navgurukul.org,A,fte,2026-01-01,b@navgurukul.org,,,,,no\nb@navgurukul.org,B,fte,2026-01-01,a@navgurukul.org,,,,,no')
     expect(inFile.rows.map((r) => r.errors)).toEqual([
       ['This manager line loops back to the person.'],
       ['This manager line loops back to the person.'],
     ])
 
-    const viaDirectory = plan('boss@navgurukul.org,,,,worker@navgurukul.org,,,,', [
+    const viaDirectory = plan('boss@navgurukul.org,,,,worker@navgurukul.org,,,,,', [
       person({ id: 'b', email: 'boss@navgurukul.org' }),
       person({ id: 'w', email: 'worker@navgurukul.org', manager_id: 'b' }),
     ])
@@ -163,17 +169,17 @@ describe('planEmployeeImport', () => {
 
   it('takes an employee ID, in capitals, once per person', () => {
     const existing = [person({ id: 'h', email: 'holder@navgurukul.org', name: 'Holder', employee_code: 'NG-0100' })]
-    const run = (body: string) => planEmployeeImport(`email,employee_code,name,employee_type,joining_date\n${body}`, ctx(existing))
+    const run = (body: string) => planEmployeeImport(`email,employee_code,name,employee_type,joining_date,is_alumni\n${body}`, ctx(existing))
 
-    const ok = run('a@navgurukul.org,ng-0669,A,fte,2026-01-01')
+    const ok = run('a@navgurukul.org,ng-0669,A,fte,2026-01-01,no')
     expect(ok.rows[0].write.employee_code).toBe('NG-0669')
     expect(ok.canImport).toBe(true)
 
     const bad = run(
-      'b@navgurukul.org,NG 0670,B,fte,2026-01-01\n' +
-        'c@navgurukul.org,NG-0671,C,fte,2026-01-01\n' +
-        'd@navgurukul.org,ng-0671,D,fte,2026-01-01\n' +
-        'e@navgurukul.org,NG-0100,E,fte,2026-01-01'
+      'b@navgurukul.org,NG 0670,B,fte,2026-01-01,no\n' +
+        'c@navgurukul.org,NG-0671,C,fte,2026-01-01,no\n' +
+        'd@navgurukul.org,ng-0671,D,fte,2026-01-01,no\n' +
+        'e@navgurukul.org,NG-0100,E,fte,2026-01-01,no'
     )
     expect(bad.rows.map((r) => r.errors)).toEqual([
       ['employee_code "NG 0670" may use only capitals, digits and hyphens (2–20 characters).'],
@@ -183,14 +189,14 @@ describe('planEmployeeImport', () => {
     ])
 
     // A person keeping, or newly getting, their own code is fine.
-    const same = run('holder@navgurukul.org,NG-0100,,,')
+    const same = run('holder@navgurukul.org,NG-0100,,,,')
     expect(same.rows[0].action).toBe('unchanged')
-    const changed = run('holder@navgurukul.org,NG-0101,,,')
+    const changed = run('holder@navgurukul.org,NG-0101,,,,')
     expect(changed.rows[0].changes).toEqual([{ field: 'employee_code', from: 'NG-0100', to: 'NG-0101' }])
   })
 
   it('warns on dates that are allowed but look wrong', () => {
-    const p = plan('a@navgurukul.org,A,fte,2026-01-01,,,,2025-12-01,2026-02-01')
+    const p = plan('a@navgurukul.org,A,fte,2026-01-01,,,,2025-12-01,2026-02-01,no')
     expect(p.rows[0].warnings).toEqual(
       expect.arrayContaining(['confirmation_date is before joining_date.', 'conversion_date is only used for interns.'])
     )
@@ -199,8 +205,37 @@ describe('planEmployeeImport', () => {
 
   it('stops on a file without an email column, and names ignored columns', () => {
     expect(planEmployeeImport('name,team\nA,Finance', ctx()).fileErrors).toEqual(['The header row has no "email" column.'])
-    const p = planEmployeeImport('Email,Full Name,Name,Employee Type,Joining Date,PAN\na@navgurukul.org,x,A,fte,2026-01-01,ABCDE1234F', ctx())
+    const p = planEmployeeImport('Email,Full Name,Name,Employee Type,Joining Date,Is Alumni,PAN\na@navgurukul.org,x,A,fte,2026-01-01,N,ABCDE1234F', ctx())
     expect(p.fileWarnings).toEqual(['Ignored columns: full_name, pan.'])
     expect(p.rows[0].action).toBe('create')
+  })
+
+  it('refuses a new person when the file has no is_alumni column at all', () => {
+    const p = planEmployeeImport('email,name,employee_type,joining_date\na@navgurukul.org,A,fte,2026-01-01', ctx())
+    expect(p.rows[0].errors).toEqual(['is_alumni is needed for someone new.'])
+    expect(p.canImport).toBe(false)
+  })
+
+  it('fills in alumni status for people added before it existed, and changes it like any other cell', () => {
+    const existing = [
+      person({ id: 'l', email: 'legacy@navgurukul.org' }),
+      person({ id: 'k', email: 'known@navgurukul.org', is_alumni: true }),
+    ]
+    const p = planEmployeeImport('email,is_alumni\nlegacy@navgurukul.org,yes\nknown@navgurukul.org,no', ctx(existing))
+    expect(p.rows[0].changes).toEqual([{ field: 'is_alumni', from: null, to: 'yes' }])
+    expect(p.rows[0].write).toEqual({ email: 'legacy@navgurukul.org', is_alumni: true })
+    expect(p.rows[1].changes).toEqual([{ field: 'is_alumni', from: 'yes', to: 'no' }])
+    expect(p.canImport).toBe(true)
+
+    const same = planEmployeeImport('email,is_alumni\nknown@navgurukul.org,Y', ctx(existing))
+    expect(same.rows[0].action).toBe('unchanged')
+  })
+})
+
+describe('parseYesNo', () => {
+  it('reads yes and no as sheets write them, and nothing else', () => {
+    expect(['yes', 'Y', 'TRUE', '1'].map(parseYesNo)).toEqual([true, true, true, true])
+    expect(['no', 'N', 'false', '0', ' No '].map(parseYesNo)).toEqual([false, false, false, false, false])
+    expect(['', 'maybe', 'alumni'].map(parseYesNo)).toEqual([null, null, null])
   })
 })

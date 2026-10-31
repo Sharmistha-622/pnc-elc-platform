@@ -1172,6 +1172,10 @@ async function linkEmployeeRecord(
     team_id: record.team_id ?? null,
     manager_id: record.manager_id ?? null,
     status: 'active',
+    // Mandatory on every employee (the database refuses a new one without it).
+    // Yes when either PnC (on the record) or the candidate (in their personal
+    // details) said so, exactly as the onboarding review screen shows it.
+    is_alumni: Boolean(data.personalDetails?.is_alumni || record.is_alumni),
   };
 
   let employeeId = (existing as { id: string } | null)?.id ?? null;

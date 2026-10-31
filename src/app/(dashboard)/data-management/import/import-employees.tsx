@@ -269,7 +269,7 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
                               ))}
                               {r.action === "create" && (
                                 <div className="text-muted-foreground">
-                                  {[r.write.employee_type, r.write.joining_date, r.write.team, r.managerEmail && `manager ${r.managerEmail}`]
+                                  {[r.write.employee_type, r.write.joining_date, r.write.is_alumni !== undefined && (r.write.is_alumni ? "alumni" : "external"), r.write.team, r.managerEmail && `manager ${r.managerEmail}`]
                                     .filter(Boolean)
                                     .join(" · ")}
                                 </div>

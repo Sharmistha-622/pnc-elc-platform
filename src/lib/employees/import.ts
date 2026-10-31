@@ -17,6 +17,7 @@ export const IMPORT_COLUMNS = [
   { key: 'name', required: 'new', help: 'Full name.' },
   { key: 'employee_type', required: 'new', help: 'fte, ftc, intern, apprentice_tech, apprentice_nontech, contractor, part_time or fellow.' },
   { key: 'joining_date', required: 'new', help: 'YYYY-MM-DD or DD/MM/YYYY.' },
+  { key: 'is_alumni', required: 'new', help: 'yes if they studied at a NavGurukul campus before joining, no if hired from outside.' },
   { key: 'manager_email', required: null, help: 'The manager’s official email. They must be in the file or already in the directory.' },
   { key: 'team', required: null, help: 'A department name exactly as in Data Management → Departments.' },
   { key: 'status', required: null, help: 'active (default) or exited.' },
@@ -27,7 +28,7 @@ export const IMPORT_COLUMNS = [
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number]['key']
 
 /** For new people these must be filled in; for updates every cell is optional. */
-const REQUIRED_FOR_NEW: ImportColumn[] = ['name', 'employee_type', 'joining_date']
+const REQUIRED_FOR_NEW: ImportColumn[] = ['name', 'employee_type', 'joining_date', 'is_alumni']
 
 /** A sheet larger than this is split: one request carries the whole file twice. */
 export const MAX_IMPORT_ROWS = 2000
@@ -35,8 +36,8 @@ export const MAX_IMPORT_ROWS = 2000
 export const IMPORT_TEMPLATE_CSV =
   IMPORT_COLUMNS.map((c) => c.key).join(',') +
   '\n' +
-  'manager.one@navgurukul.org,NG-0101,Manager One,fte,2024-04-01,,CEO Office,active,2024-07-01,\n' +
-  'new.joiner@navgurukul.org,NG-0669,New Joiner,fte,2026-08-05,manager.one@navgurukul.org,CEO Office,active,,\n'
+  'manager.one@navgurukul.org,NG-0101,Manager One,fte,2024-04-01,no,,CEO Office,active,2024-07-01,\n' +
+  'new.joiner@navgurukul.org,NG-0669,New Joiner,fte,2026-08-05,yes,manager.one@navgurukul.org,CEO Office,active,,\n'
 
 // ----------------------------------------------------------------------------
 // CSV
@@ -114,6 +115,16 @@ export function parseImportDate(raw: string): string | null {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
+/** yes/no as people type it in a sheet. Null if it is neither. */
+export function parseYesNo(raw: string): boolean | null {
+  const v = raw.trim().toLowerCase()
+  if (['yes', 'y', 'true', '1'].includes(v)) return true
+  if (['no', 'n', 'false', '0'].includes(v)) return false
+  return null
+}
+
+const yesNo = (v: boolean | null | undefined): string | null => (v == null ? null : v ? 'yes' : 'no')
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Same rule as the `employees_employee_code_format` check in the database. */
 export const EMPLOYEE_CODE_RE = /^[A-Z0-9][A-Z0-9-]{1,19}$/
@@ -134,6 +145,8 @@ export type ExistingEmployee = {
   status: string | null
   confirmation_date: string | null
   conversion_date: string | null
+  /** Null for people added before the field existed. */
+  is_alumni: boolean | null
 }
 
 export type ImportContext = {
@@ -158,6 +171,7 @@ export type EmployeeWrite = {
   status?: 'active' | 'exited'
   confirmation_date?: string
   conversion_date?: string
+  is_alumni?: boolean
 }
 
 export type FieldChange = { field: string; from: string | null; to: string | null }
@@ -333,6 +347,13 @@ export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportP
       else plan.write[col] = iso
     }
 
+    const alumniRaw = get('is_alumni')
+    if (alumniRaw) {
+      const alumni = parseYesNo(alumniRaw)
+      if (alumni === null) errors.push(`is_alumni must be yes or no, not "${alumniRaw}".`)
+      else plan.write.is_alumni = alumni
+    }
+
     const statusRaw = get('status').toLowerCase()
     if (statusRaw) {
       if (statusRaw !== 'active' && statusRaw !== 'exited') errors.push(`status must be active or exited, not "${statusRaw}".`)
@@ -419,6 +440,7 @@ export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportP
       status: current.status,
       confirmation_date: current.confirmation_date,
       conversion_date: current.conversion_date,
+      is_alumni: yesNo(current.is_alumni),
       manager_email: current.manager_id ? existingById.get(current.manager_id)?.email?.toLowerCase() ?? null : null,
     }
     const after: Record<string, string | null | undefined> = {
@@ -430,6 +452,7 @@ export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportP
       status: r.write.status,
       confirmation_date: r.write.confirmation_date,
       conversion_date: r.write.conversion_date,
+      is_alumni: r.write.is_alumni === undefined ? undefined : yesNo(r.write.is_alumni),
       manager_email: r.managerEmail ?? undefined,
     }
     for (const [field, to] of Object.entries(after)) {
