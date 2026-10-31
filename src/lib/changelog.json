@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.05.01",
+    "date": "2026-10-31",
+    "title": "Deploy script, the two things the guide missed, and key handling",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "A script deploys the vault functions correctly. The three that core calls had to skip Supabase's login check, and the setup guide left that out. The guide now says how the vault's keys are kept from developers."
+      }
+    ]
+  },
+  {
     "version": "2.05.00",
     "date": "2026-10-31",
     "title": "A state on every location, for professional tax",
