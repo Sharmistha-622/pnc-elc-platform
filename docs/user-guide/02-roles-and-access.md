@@ -1,5 +1,10 @@
 # 2. Roles and access
 
+> **In this chapter.** The twelve roles, what each can see and change, which
+> screens each one gets, and who can hand out roles. The guiding idea: **you
+> see what your job needs and nothing more.** That's why two people on the same
+> team may see different sidebars. It isn't a bug.
+
 Everything you can see and do on the platform comes from your **role**. Each
 person has exactly one. This chapter explains the roles in plain words. The
 official version is [`docs/rbac.md`](../rbac.md).
@@ -106,3 +111,31 @@ A person's role follows their status automatically:
 
 If someone also holds a team role (e.g. an employee who is also PnC Admin),
 the team role wins.
+
+## Why access works this way
+
+- **Least access by default.** When roles were introduced, everyone moved to
+  the *lower* of two possible roles (e.g. the old "PnC" became PnC Ops, not
+  PnC Admin), and admins then promoted the few who needed more. If you
+  lost access you used to have, this is why. Ask your team's admin.
+- **Teams staff themselves.** PnC Admin staffs PnC; Fin Admin staffs Finance.
+  Neither can grant the other's roles, so no one team can quietly widen its
+  own sight of the other's data.
+- **The platform team builds the system but can't see sensitive data.**
+  Platform Admin manages settings and templates but sees no salary, bank, ID
+  or feedback data, and can't grant itself more.
+- **Viewing as another role only narrows.** An admin checking what PnC Ops
+  sees never gains anything by doing so.
+
+## Worked example: a new PnC Ops joins
+
+1. They sign in for the first time and land as **Employee**: Dashboard, My
+   Profile, My Forms only.
+2. A PnC Admin opens **Users & Roles**, finds them, clicks **⋮ › Edit
+   Allocations**, sets **PnC Ops** and team **PnC**, writes *"Joined PnC
+   operations"* as the reason, and saves.
+3. On their next page load they see **People** (Onboarding, Employees,
+   Confirmations, Reviews, Offboarding). They still don't see Letters,
+   Reports or salary figures, because PnC Ops has no salary access.
+4. They don't need a vault invitation: PnC Ops works only with data that
+   hasn't been sealed yet.

@@ -1,5 +1,10 @@
 # 4. My Workspace
 
+> **In this chapter.** The screens every staff member has: the Dashboard,
+> your profile, your forms, your reviews, and (if people report to you) your
+> team. If you only ever use the platform to take part in reviews, this is the
+> only chapter you need after *Getting started*.
+
 These screens are about **you**. Every staff member has them.
 
 ## Dashboard (`/`)
@@ -128,3 +133,35 @@ Appears once at least one person reports to you.
 > The *Confirmations* and *New Confirmation* buttons on this page only work
 > for roles that can open Confirmations. If they send you back to the
 > Dashboard, work from **My Reviews** instead.
+
+## Worked example: Asha's confirmation, from her side
+
+*Asha is a fictional employee, used for illustration.*
+
+1. Seven days before her probation ends, Asha gets an email: *"Your
+   confirmation review is due — self-reflection and peer nominations."*
+2. She opens **My Reviews**, clicks the review, and adds five colleagues she
+   has worked closely with. She can't pick her manager, because the manager
+   gives a separate review. She clicks **Save nominations**.
+3. She clicks **Fill in my self-reflection**, answers over two sittings using
+   **Save draft**, then **Submits**. Her nominations lock and her five peers
+   are emailed.
+4. Over the next week her review page shows peers moving from *Waiting* to
+   *Submitted*. She can see **who** has answered, never **what** they wrote.
+5. A calendar invite arrives for a 30-minute meeting with her manager and PnC.
+   The time clashes with a class, so she opens the review and uses
+   **Reschedule and re-send invite**.
+6. After the meeting the review shows *With PnC*, then *Completed*. PnC
+   contacts her with the outcome. Her **My Profile** then shows *Confirmed
+   (date)*.
+
+## Good practice
+
+- **Fill in forms before the due date.** Reminders go out every 24 hours,
+  and after two reminders PnC is told.
+- **Choose peers who actually saw your work**: four to five, from different
+  teams if you can.
+- **Write peer feedback you'd stand behind.** It's anonymous to the employee
+  but not to the system.
+- **Managers:** submit your manager review early. The meeting can't be
+  booked until it's in.

@@ -1,5 +1,9 @@
 # 9. Reports and audit trail
 
+> **In this chapter.** The organisation-wide numbers on the Reports page,
+> what each CSV export contains, and where to look when you need to know *who
+> did what, and when*.
+
 ## Reports (`/reports`)
 
 **Who:** Super Admin, PnC Admin, Fin Admin, Exec View.
@@ -43,3 +47,20 @@ The same history also appears at the bottom of each **employee profile**.
 | Role changes | Users & Roles → ⋮ → **View Audit Trail** | Who changed whose role or team, and why. |
 | Emails | Email Center › **Delivery Monitor & Outbox** | Every email, with its status (*Delivered, In Queue, Failed, Bounced*). |
 | Candidate activity | Candidate review page › **Audit & Visits** | Everything the candidate and PnC did, and every portal visit. |
+
+## Which report answers which question
+
+| Question | Where |
+|---|---|
+| How many people work here, by team and type? | Reports › **Headcount & Demographics** |
+| Who joined or left this month? | Dashboard tiles (Finance, Exec View) |
+| How many people are mid-onboarding? | Reports › **Onboarding Pipeline** |
+| How are probation confirmations going? | Reports › **Confirmations & Probation**, and People › **Reviews** |
+| Who falls in the July vs December appraisal cycle? | Reports › **Appraisals & Cohorts**, or People › **Appraisals** |
+| Did our emails go out? | Reports › **Email Delivery**, or Email Center › **Delivery Monitor** |
+| Who changed this person's record, and when? | **Audit Trail**, or the bottom of their profile |
+| Who changed this setting? | Settings › **Audit Log** |
+| Who gave this person their role? | Users & Roles → ⋮ › **View Audit Trail** |
+
+**Handling exports:** CSV files leave the platform's protection. Keep them in
+restricted folders, and delete local copies when you're done.

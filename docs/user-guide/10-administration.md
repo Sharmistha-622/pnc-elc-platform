@@ -1,5 +1,11 @@
 # 10. Administration
 
+> **In this chapter.** The screens that run the platform itself: user
+> accounts and roles, settings, the Email Center, master data (departments,
+> locations, employment types), the bulk employee import, and the Form Builder.
+> Most people never need these. PnC Admin uses *Users & Roles* and the
+> import. The Platform team owns the rest.
+
 **Sidebar:** Administration › Users & Roles · Settings · Email Center · Data
 Management · Form Builder · Audit Trail.
 
@@ -164,3 +170,17 @@ In the builder:
    and how many days until it expires. It appears in that person's **My
    Forms** (no email is sent for this yet). Submitted answers are listed
    below.
+
+## Good practice for administrators
+
+- **Always write a reason** when changing a role. It's what the audit trail
+  shows later.
+- **Remove access the day it's no longer needed.** When someone moves teams,
+  change their role straight away.
+- **Change settings between cycles, not during one.** Review timings apply to
+  reviews already running.
+- **Run an import on a small test file first** (two or three rows). There's no
+  undo.
+- **Archive, don't delete.** Departments, locations, employment types and
+  forms can be archived and restored. History that points at them stays
+  intact.

@@ -1,5 +1,10 @@
 # 13. Known limitations
 
+> **In this chapter.** An honest list of what isn't finished, or behaves
+> differently from what the screen suggests. Each item says what to do instead.
+> This list will shrink with each release. Check the **Changelog** (`/changelog`)
+> for what has changed since this guide was written.
+
 What isn't finished yet, or behaves differently from what the screen
 suggests, as of version 2.04.00. **Read this before relying on a screen for
 real work.** Items are grouped by area.
@@ -109,3 +114,13 @@ real work.** Items are grouped by area.
 - Bank details aren't captured as data, only as an uploaded proof document.
 - CTCs and letters are still held on the platform, behind role rules, until
   the vault work is done.
+
+## Reporting a new problem
+
+When something doesn't work as this guide describes, send the Platform team:
+
+1. **What you were trying to do**, and the page address.
+2. **What you expected**, and **what happened** (with the exact message).
+3. **Your role** (shown in the header), and whether you were in *Role View
+   Mode*.
+4. A screenshot **with any salary, bank, ID or feedback data covered**.

@@ -1,5 +1,10 @@
 # 12. Data privacy and the vault
 
+> **In this chapter.** Why the platform has two data stores, what goes in the
+> locked one (the *vault*), how data moves into it ("sealing"), how much of
+> that is built today, and what each of us is responsible for. Read this
+> chapter if you handle salary, bank details, ID documents or review feedback.
+
 ## Two stores
 
 The platform keeps data in two separate places:
@@ -60,3 +65,13 @@ review, **without a vault login**.
   reasons, comments) or into import files.
 - **Peer feedback is anonymous** to the employee. Never pass on who said
   what.
+
+## Worked example: what happens to a PAN card
+
+1. The candidate uploads a PAN card scan in their portal. It's stored on the
+   platform, visible to PnC.
+2. PnC Ops opens it, types the PAN number and clicks **Verify and secure**.
+3. The scan and full number move into the vault. The platform now shows only
+   *"Secured in vault"* and the last four characters, e.g. `••••••234F`.
+4. From then on, only vault users (Super Admin, PnC Admin, Fin Admin, Fin Ops)
+   can read the full number, and **each read is logged**.

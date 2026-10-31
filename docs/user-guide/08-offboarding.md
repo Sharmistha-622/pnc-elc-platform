@@ -1,5 +1,12 @@
 # 8. Offboarding and exits
 
+> **In this chapter.** What happens from the moment someone resigns to the day
+> their exit is closed: reviewing the resignation, the retention window, the
+> exit checklist, asset return, the four-department No Dues sign-off, the
+> full-and-final settlement, and closing the case.
+>
+> **Main users:** PnC (whole process) and Fin Admin (Finance No Dues and F&F).
+
 **For:** Super Admin, PnC Admin, PnC Ops, Fin Admin.
 **Sidebar:** People › **Offboarding** (`/offboarding`).
 
@@ -115,3 +122,34 @@ returned before closure*, *allow immediate relieving / notice waiver*.
 > [Known limitations › Offboarding](13-known-limitations.md#offboarding).**
 > Parts of it can show sample cases, and the asset, attendance and leave
 > panels use placeholder data.
+
+## Worked example: a resignation with a 30-day notice
+
+1. **Day 0.** An employee emails their resignation. PnC Ops clicks
+   **Initiate Resignation**, chooses **Ingest Email**, pastes the email,
+   fills in the dates (notice 30 days) and **Submits for Review**.
+2. **Days 0–2.** PnC talks to the manager and records both reviews. Both
+   click **Accept Resignation**, and an offboarding case is created
+   automatically.
+3. **Notice period.** PnC works the **Exit Checklist**: knowledge handover,
+   manager acceptance, IT asset inspection. IT records the laptop as
+   *Returned & Inspected*, then *Cleared*.
+4. **Week before the LWD.** Each of the four departments clears its **No
+   Dues**. Finance holds theirs at *Blocked / Exception* for an open
+   advance, then clears it once it's recovered.
+5. **After the LWD.** Fin Admin opens **F&F Settlement**, records payable
+   days, leave encashment and deductions, and moves the status through to
+   *Processed & Paid* with the UTR.
+6. **Closure.** PnC generates the No Dues Certificate and the Relieving &
+   Experience Certificate, then clicks **Confirm & Execute Final Exit
+   Closure**. The employee moves to *Exited* and gets the relieving letter
+   by email.
+
+## Good practice
+
+- **Record the resignation the day it arrives**, so every date (notice, LWD,
+  F&F target) is computed from the right starting point.
+- **Use *Adjust Last Working Day*** for any change, with a reason. Don't
+  close and reopen a case.
+- **Write a reason whenever you block a clearance.** The next person needs
+  to know what's outstanding.

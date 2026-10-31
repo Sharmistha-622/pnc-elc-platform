@@ -1,5 +1,8 @@
 # 14. Glossary and FAQ
 
+> **In this chapter.** Short definitions of the terms used in this guide and on
+> the platform, then answers to the questions new users ask most.
+
 ## Glossary
 
 | Term | Meaning |

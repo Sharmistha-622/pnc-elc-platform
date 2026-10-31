@@ -1,5 +1,10 @@
 # 11. Finance guide
 
+> **In this chapter.** Everything the Finance team needs in one place: your
+> two roles, the screens you can open, your three regular tasks (joiners and
+> leavers, exits and F&F, staffing your team), and a plain-language summary of
+> the payroll design, which is **planned but not yet built**.
+
 **For:** Fin Admin, Fin Ops.
 
 This chapter covers what the Finance team can do on the platform **today**,
@@ -151,3 +156,22 @@ final **approver** is also hasn't been decided yet.
 
 The full design is in [`docs/payroll/`](../payroll/README.md), with a
 glossary.
+
+## Month-end checklist for Finance (today)
+
+1. **Dashboard:** note *Joined this month* and *Leaving this month*.
+2. **Reports › Headcount › Export CSV.** Reconcile with the payroll sheet:
+   new joiners added, leavers removed, type changes (e.g. intern → FTE).
+3. **Employees › Exited:** confirm exit dates for anyone leaving this month.
+4. **Offboarding › F&F Pending:** clear Finance No Dues and update each
+   settlement.
+5. **Users & Roles:** check that only current Finance staff hold Finance roles.
+
+## How Finance can help payroll arrive sooner
+
+- Provide the **inputs still owed** (F-01 to F-10), especially PT rules for
+  Chhattisgarh and Bihar, PF opt-out records, and the bank and ECR file
+  formats.
+- Name the **approver** for the sign-off chain.
+- Plan for **two months of shadow runs**: the sheet and the platform run side
+  by side until they match.

@@ -1,5 +1,10 @@
 # 1. Getting started
 
+> **In this chapter.** How to sign in, how the screen is laid out, what each
+> sidebar group is for, and what happens when you open a page your role
+> doesn't cover. Read it once before your first login. It takes five minutes,
+> and it explains most of the "why can't I see…?" questions people ask.
+
 ## Signing in
 
 1. Open the platform and click **Sign in with Google**.
@@ -102,3 +107,25 @@ to switch back.
 | Reviews dashboard (PnC) | `/reviews` |
 | Offboarding | `/offboarding` |
 | Reports | `/reports` |
+
+## Your first login: a checklist
+
+1. Sign in with your **@navgurukul.org** Google account.
+2. Look at the sidebar. Does it match what your job needs? Compare it with the
+   table in [Roles and access](02-roles-and-access.md#which-screens-each-role-gets).
+   If something is missing, ask your team's admin. Don't share another
+   person's login.
+3. Open **My Profile**. Check your joining date, team and reporting manager.
+   Tell PnC if anything is wrong. Reviews are sent to the manager on record,
+   so a wrong manager means your review goes to the wrong person.
+4. Open **My Forms**. Anything waiting? Forms have due dates, and reminders
+   follow.
+5. Bookmark the Dashboard. It's the quickest way to see what's waiting on you.
+
+## Good practice
+
+- **Sign out on shared computers** (*Your name ▾ › Log out*).
+- **Don't screenshot or forward** pages that show salary, bank, ID or
+  feedback data.
+- If a page looks wrong or empty, **refresh first**. Then check
+  [Known limitations](13-known-limitations.md) before reporting it.

@@ -7,6 +7,9 @@ leadership, managers and employees.
 Read this before you start using the site. You don't need any technical
 knowledge for it.
 
+**Printable copy:** [ELC-Platform-User-Guide.pdf](ELC-Platform-User-Guide.pdf) has
+the whole guide in one file to share or print.
+
 > **Scope.** This guide describes the platform as built at version **2.04.00**
 > (October 2026). Where a screen is still unfinished, or shows sample data,
 > the guide says so. [Known limitations](13-known-limitations.md) collects

@@ -1,5 +1,14 @@
 # 3. Where to go to do what
 
+> **In this chapter.** A lookup table. Find what you're trying to do, follow
+> the path in the *Go to* column, and check the *Who* column. If your role isn't
+> listed, the action belongs to someone else. The last column tells you who to
+> ask.
+>
+> Paths are written as **Sidebar group › Item** then *button or tab*. For
+> example, **People › Offboarding** → *Manage Case* means: open *Offboarding*
+> under *People* in the sidebar, then click *Manage Case*.
+
 Find what you want to do, then go to the place listed. The **Who** column
 lists the roles that can do it.
 
@@ -81,3 +90,13 @@ lists the roles that can do it.
 | Check whether emails were sent or failed | **Administration › Email Center** → *Delivery Monitor & Outbox* | Platform Admin |
 | Edit the self-reflection, peer or manager review questions | **Administration › Form Builder** | Platform Admin |
 | Add a department, location or employment type | **Administration › Data Management** | Platform Admin, PnC Admin |
+
+## Still can't find it?
+
+- Check the **sidebar**. If the item isn't there, your role doesn't include it.
+- Check the **Dashboard** tiles. Most tiles open the exact screen where that
+  work happens.
+- Check [Known limitations](13-known-limitations.md). Some actions aren't
+  built yet and are done outside the platform for now.
+- Ask the right person (see the table at the end of the
+  [FAQ](14-glossary-and-faq.md)).

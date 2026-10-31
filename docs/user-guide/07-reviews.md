@@ -1,5 +1,15 @@
 # 7. Confirmations, appraisals and reviews
 
+> **In this chapter.** How confirmations (end of probation) and appraisals
+> (twice-yearly performance reviews) run: what is automatic, what each person
+> does, what PnC watches on the Reviews dashboard, and which settings change the
+> timings.
+>
+> **The short version:** the platform opens the review, collects a
+> self-reflection, peer feedback and a manager review, books a meeting, and
+> asks the manager for a decision, which PnC then accepts or sends back. People
+> only have to do their own part when asked.
+
 **For:** PnC, managers, leadership, and every employee being reviewed.
 
 Two kinds of review run through the same process:
@@ -211,3 +221,33 @@ The written feedback is meant to move ("seal") into the **vault** within 30
 days of the review closing. After that only a record of who responded and
 the decision stays on the platform. See
 [Data privacy and the vault](12-privacy-and-vault.md).
+
+## Worked example: one appraisal cycle, from PnC's side
+
+1. **14 days before the cycle month**, the morning job opens a review for
+   everyone in the cohort. The **Reviews** dashboard fills up, all at
+   *Self-review*.
+2. **First week.** PnC watches *Self-reflections in*. Three people show
+   under *Due, not started* with *No manager on record*. PnC fixes their
+   managers with an import and clicks **Start now** on each.
+3. **Second week.** *Not responding* shows 6. PnC opens each review, checks
+   who is stuck, and either reminds them or **withdraws** a peer who is on
+   leave and **adds** another.
+4. **As each review reaches *Ready for meeting***, a meeting is booked. PnC
+   checks the slots, because calendars aren't read yet.
+5. **After the meetings**, managers record decisions and the reviews show
+   *Decision with PnC*. PnC Admin reads each note and clicks **Accept and
+   close**, or sends one back asking for more detail.
+6. **Leadership** follows the cycle from the same dashboard and the
+   **Reports** page.
+
+## Good practice
+
+- **Check the dashboard daily during a cycle.** *Not responding* and *Due,
+  not started* are the two numbers that need action.
+- **Use *Run automation now*** after fixing data (e.g. adding managers), so
+  you don't have to wait for the next morning.
+- **Don't edit a live form mid-cycle.** In Form Builder, publish a new version
+  between cycles. Forms already answered keep their version.
+- **Tell the employee the outcome promptly.** The platform deliberately
+  doesn't show it to them.

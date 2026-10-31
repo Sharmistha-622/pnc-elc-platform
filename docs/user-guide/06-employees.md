@@ -1,5 +1,11 @@
 # 6. Employee directory and profiles
 
+> **In this chapter.** The employee directory: how to find people, what each
+> role sees on a profile, where documents live, and how team, manager and
+> status changes reach a record. The directory is the platform's single record
+> of who works here. Payroll, reviews and reports all read from it, so
+> keeping it accurate matters.
+
 **For:** Super Admin, PnC Admin, PnC Ops, Fin Admin, Fin Ops, Exec View.
 **Sidebar:** People › **Employees** (`/employees`).
 
@@ -54,3 +60,20 @@ See [Onboarding › Employee documents](05-onboarding-and-letters.md#employee-do
   decision (see [Reviews](07-reviews.md)).
 - **Exited:** set automatically when an offboarding case is closed (see
   [Offboarding](08-offboarding.md)).
+
+## Keeping the directory accurate
+
+The directory feeds everything else:
+
+| If this is wrong… | …this goes wrong |
+|---|---|
+| Reporting manager | Reviews go to the wrong person, or **never open** (no manager = no review) |
+| Joining or conversion date | Confirmation and appraisal reviews open at the wrong time |
+| Employee type | The wrong probation length, letter template and salary split |
+| Team | Reports and the team filters are off |
+| Email | The person sees *"Employee Record Not Linked"* and can't use My Forms or My Reviews |
+
+**Good practice for PnC:** after each batch of joiners, use the **Reviews**
+dashboard's *Due, not started* card to spot anyone with *No manager on
+record*, and fix them with a small import file (just `email` and
+`manager_email`).

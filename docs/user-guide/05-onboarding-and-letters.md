@@ -1,5 +1,13 @@
 # 5. Onboarding and letters
 
+> **In this chapter.** The full path from "we want to hire this person" to
+> "they have an official NavGurukul account": creating the candidate, what the
+> candidate does in their portal, how PnC verifies and approves, what happens
+> after joining, and how letter templates and signatories work.
+>
+> **Main users:** PnC Admin (offers, letters) and PnC Ops (the day-to-day
+> pipeline). Fin Admin can read everything here but can't act.
+
 **For:** PnC Admin, PnC Ops (and Fin Admin, read-only).
 **Sidebar:** People › **Onboarding** (Overview · Candidates · New Joiners) and
 People › **Letters** (Issued Letters · Templates · Signatories).
@@ -291,3 +299,47 @@ The compliance file for an existing employee (PnC Admin, PnC Ops).
 - **Upload Employee Document**: choose the category (this decides the Google
   Drive folder: *Team Member* or *Verification Docs*), attach a PDF/JPG/PNG
   (max 10 MB) and click **Upload Document**.
+
+## Worked example: hiring a new programme associate
+
+*All names are fictional.*
+
+1. **Day 0, PnC Admin.** **Candidates › Create Candidate.** Fills in Ravi
+   Kumar, his personal email, *Programme Associate*, FTE, joining on the 1st,
+   annual CTC, *3 Months (Standard)* probation. Picks the FTE offer template,
+   clicks **Use Template**, checks the preview, leaves *Send Portal Invitation*
+   on, and clicks **Save & Create Candidate**.
+   → Ravi appears as *Invitation Sent*, with the annexure and three letters
+   generated.
+2. **Days 1–5, Ravi** (portal link): fills in his details, uploads Aadhaar,
+   PAN, degree certificate, photo, address proof, resume and a cancelled
+   cheque, reads the five policies, signs the offer and appointment letters,
+   and clicks **Submit Onboarding to P&C**.
+   → *Submitted*; **Pending P&C Review** goes up by one.
+3. **Day 6, PnC Ops.** Opens **Review → Verification**. Opens and verifies
+   each document, typing the PAN number (only the last four characters stay
+   on the platform). The address proof is blurry, so they **Reject** it with
+   *"Please upload a clearer copy, all four corners visible"*, and **message
+   Ravi themselves**, because no email goes out on a rejection.
+4. **Day 7, Ravi** re-uploads. **PnC Ops** verifies it.
+5. **Day 7, PnC Ops.** **Approve Dossier**, then **Create Official
+   Account → Confirm & Provision Account**.
+   → Ravi gets an official email and employee code, appears in **Employees**,
+   and his 30/60-day check-ins are booked.
+6. **Day 7, by hand.** IT creates the Google Workspace account and sends the
+   login details. The Apps Script sends the Day-1 email.
+7. **Day 1 onwards, PnC.** **New Joiners**: tick the orientation checklist,
+   mark POSH done, record the 30- and 60-day check-ins.
+
+## Good practice
+
+- **Verify documents within a few days of submission.** Until verified, the
+  scans sit outside the vault (see [Data privacy](12-privacy-and-vault.md)).
+- **Always write a clear rejection reason.** The candidate sees exactly what
+  you type.
+- **Check the letter preview before saving the candidate.** Letters are
+  generated straight away, and a signed letter is never regenerated.
+- **Keep templates per employee type** (FTE, intern, consultant…) so the
+  right wording is picked automatically.
+- **Look at *In Progress* candidates weekly.** Correction requests from the
+  portal don't reach PnC by email.
