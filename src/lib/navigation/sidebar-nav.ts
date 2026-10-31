@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 
 import { canAccessRoute, type UserRole } from "@/lib/role-constants";
+import { isBreakGlassRoute } from "@/lib/rbac/breakGlass";
 
 /**
  * How a path decides whether an item is the current one.
@@ -238,10 +239,19 @@ export function isItemOnPath(pathname: string, item: NavItem): boolean {
  */
 export function visibleSections(
   role: UserRole | null | undefined,
-  options: { hasReports?: boolean } = {}
+  options: {
+    hasReports?: boolean
+    /**
+     * The caller holds break-glass access (src/lib/rbac/breakGlass.ts): the
+     * users screen stays listed whatever role they hold, the same exception
+     * middleware makes for that route.
+     */
+    breakGlass?: boolean
+  } = {}
 ): NavSection[] {
   const shows = (url: string) =>
-    canAccessRoute(role, url) && !(url === "/my-team" && options.hasReports === false);
+    (options.breakGlass === true && isBreakGlassRoute(url)) ||
+    (canAccessRoute(role, url) && !(url === "/my-team" && options.hasReports === false));
 
   return NAV_SECTIONS.map((section) => ({
     ...section,

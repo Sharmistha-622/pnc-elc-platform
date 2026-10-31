@@ -42,18 +42,21 @@ function render(section: NavSection, pathname: string): RenderedItem[] {
 export function AppSidebar({
   userRole,
   hasReports,
+  breakGlass,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   userRole?: UserRole | null
   /** False hides My Team. Undefined leaves it to the role. */
   hasReports?: boolean
+  /** Keeps Users & Roles listed for a break-glass account. */
+  breakGlass?: boolean
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
   const pathname = usePathname()
 
   const sections = React.useMemo(
-    () => visibleSections(userRole, { hasReports }),
-    [userRole, hasReports]
+    () => visibleSections(userRole, { hasReports, breakGlass }),
+    [userRole, hasReports, breakGlass]
   )
 
   // One parent open across the whole sidebar, not one per section.
