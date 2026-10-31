@@ -39,7 +39,7 @@ describe('server actions', () => {
   // A 'use server' file exports functions the browser can call directly, with
   // any arguments, whatever page imported them. The first lines of each must
   // decide whether this caller may proceed.
-  const GUARD = /\b(guard|guardResource|requireFeature|platformConfigRefusal|canEditPlatformConfig|profileAccess|isNominatedPeer)\(/
+  const GUARD = /\b(guard|guardResource|requireFeature|platformConfigRefusal|canEditPlatformConfig|profileAccess|isNominatedPeer|breakGlassCaller)\(/
 
   // Reviewed exceptions: protected some other way, said how.
   const EXEMPT: Record<string, string> = {

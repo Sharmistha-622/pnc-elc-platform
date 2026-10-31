@@ -122,7 +122,9 @@ pending submission without ever being able to read it.
   Super Admin and the two portal roles (Manager and Employee included, which
   nobody else may set by hand). They can never grant Super Admin or change
   anything about a Super Admin. Every such change is marked `break_glass` in
-  the audit trail. A Super Admin turns it off under Settings → Super Admin; it
+  the audit trail. They can also switch their own role from the header
+  ("Switch my role"), which is the same real, audited change, not a preview.
+  A Super Admin turns it off under Settings → Super Admin; it
   is on by default. It is an exception by account, not by role, so it does not
   appear in the matrix above.
 

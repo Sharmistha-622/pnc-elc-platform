@@ -30,7 +30,8 @@ export interface UpdateAllocationsInput {
   targetEmail: string
   targetName?: string
   newRole: UserRole
-  newTeam: string
+  /** Omit to keep the department the target has now. */
+  newTeam?: string
   /** Ignored: the target's current role is looked up from `targetUserId`. */
   currentRole?: UserRole | null
   /** Ignored: the target's current team is looked up from `targetUserId`. */
@@ -174,7 +175,7 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   const isImmutable = IMMUTABLE_SUPER_ADMIN_EMAILS.includes(cleanTargetEmail)
 
   const normalizedCurrentTeam = target.team
-  const normalizedNewTeam = newTeam || 'None'
+  const normalizedNewTeam = newTeam === undefined ? normalizedCurrentTeam : newTeam || 'None'
   const normalizedCurrentRole = target.role
 
   const roleChanged = normalizedCurrentRole !== newRole

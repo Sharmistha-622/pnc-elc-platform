@@ -273,6 +273,16 @@ describe('updateUserAllocations, break-glass', () => {
     expect(state.updatedAuth).toEqual([])
   })
 
+  it('keeps the department when none is given (the header switch)', async () => {
+    breakGlassAs('employee')
+    state.users[bg].user_metadata.team = 'Engineering'
+    const res = await updateUserAllocations({ targetUserId: bg, targetEmail: '', newRole: 'pnc_ops' })
+    expect(res.success).toBe(true)
+    expect(state.audit[0].changed_data.changes).toEqual([
+      { field: 'role', label: 'System Role', from: 'employee', to: 'pnc_ops' },
+    ])
+  })
+
   it('leaves an ordinary change unmarked', async () => {
     as(ids.root, 'super_admin')
     expect((await move(ids.emp, 'pnc_ops', 'None')).success).toBe(true)

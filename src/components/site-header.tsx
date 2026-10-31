@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
 import { DevRoleToggle } from "@/components/dev-role-toggle"
+import { BreakGlassRoleSwitch } from "@/components/break-glass-role-switch"
 import { HeaderUserMenu } from "@/components/header-user-menu"
 
 export function SiteHeader({
@@ -60,6 +61,7 @@ export function SiteHeader({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto flex items-center gap-2">
+          <BreakGlassRoleSwitch />
           <DevRoleToggle userRole={userRole} />
           <ModeToggle />
           <HeaderUserMenu />

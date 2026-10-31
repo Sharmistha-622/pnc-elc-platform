@@ -136,7 +136,10 @@ original role to be able to write.
   `canBreakGlassChange` when the ordinary rules refuse them. Never Super Admin,
   in either direction. Its switch lives in `break_glass_settings`, a table
   closed to sessions, and only `guard(['super_admin'])` writes it. It does not
-  reach `setUserRole`, `createUserWithRole` or any other screen.
+  reach `setUserRole`, `createUserWithRole` or any other screen. The header's
+  "Switch my role" (`switchOwnRole`) is the same path aimed at the caller's own
+  account: a real role change, not emulation, so the "emulation only narrows"
+  rule is untouched.
 
 ## Enforcement boundary
 
