@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.07.00",
+    "date": "2026-10-31",
+    "title": "Submit-bank and approve-bank, with the rules in the database",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Bank details go into the vault as a request and take effect only when a different person (Super Admin or Fin Admin) approves them. An account already used by someone else is refused, and every decision is audited."
+      }
+    ]
+  },
+  {
     "version": "2.06.00",
     "date": "2026-10-31",
     "title": "Break-glass role and department access for two named accounts",
