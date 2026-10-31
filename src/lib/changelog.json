@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.06.00",
+    "date": "2026-10-31",
+    "title": "Break-glass role and department access for two named accounts",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Two named accounts have break-glass access to change any role (except Super Admin) or department from Users & Roles, and to switch their own role from the header. A Super Admin can turn this off under Settings → Super Admin."
+      }
+    ]
+  },
+  {
     "version": "2.05.01",
     "date": "2026-10-31",
     "title": "Deploy script, the two things the guide missed, and key handling",
