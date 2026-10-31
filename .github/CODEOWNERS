@@ -11,6 +11,7 @@
 # The database: schema, policies, and the vault.
 /supabase/                         @Nitinsudarshan
 /scripts/rls-probe.sh              @Nitinsudarshan
+/scripts/vault-*.sh               @Nitinsudarshan
 
 # Who a request is, and what their role reaches.
 /src/middleware.ts                 @Nitinsudarshan
@@ -36,3 +37,12 @@
 /REVIEW.md                         @Nitinsudarshan
 /eslint.config.mjs                 @Nitinsudarshan
 /.github/                          @Nitinsudarshan
+
+# What runs in production, and with what. A dependency or a build setting can
+# read every setting the app holds, the vault's submission secret included.
+/package.json                      @Nitinsudarshan
+/package-lock.json                 @Nitinsudarshan
+/next.config.ts                    @Nitinsudarshan
+/vercel.json                       @Nitinsudarshan
+/src/lib/email/                    @Nitinsudarshan
+/src/lib/integrations/             @Nitinsudarshan

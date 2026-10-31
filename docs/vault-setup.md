@@ -25,15 +25,13 @@ Create **two**:
 | Vault dev | `elc-vault-dev` | dummy data only; where anything is tried first |
 
 Choose **`ap-south-1` (Mumbai)** for both. Payroll and HR data must stay in
-India-hosted storage. Core is currently in Singapore and is planned to move to
-Mumbai before real data is loaded (`docs/payroll/decisions.md`, D-01), so do
-not match core's current region. Set a strong database password and put it in
-your password manager, not in a file.
-Choose **`ap-south-1` (Mumbai)** for both. Payroll needs India-hosted storage,
-and the vault is where payroll data lives. Core is currently in Singapore and is
-planned to move to Mumbai; do not match the vault to core's current region.
-Set a strong database password and put it in your password manager, not in a
-file.
+India-hosted storage (`docs/payroll/decisions.md`, D-01); core is in Mumbai
+too. Set a strong database password and put it in your password manager, not
+in a file.
+
+**Organization:** create both vault projects in a **separate Supabase
+organization** from core's. Members of core's organization — the platform
+team — then cannot see the vault projects at all, let alone their keys.
 
 **Members:** add nobody yet. The platform team is never added to either. The
 only other member will be the break-glass owner in step 5.
@@ -91,26 +89,52 @@ function, and the access log can be bypassed.
 
 ## 3. Deploy the functions
 
+On your own machine, signed in to the Supabase CLI (`npx supabase login`),
+dev vault first:
+
 ```bash
-for fn in read-salary read-feedback submit-documents seal-document seal-feedback; do
-  supabase functions deploy "$fn" --project-ref <ref>
-done
+scripts/vault-deploy.sh <dev-vault-ref> --dry-run   # prints what it will do
+scripts/vault-deploy.sh <dev-vault-ref>
+scripts/vault-deploy.sh <production-vault-ref>
 ```
+
+The script deploys the five functions, generates `CORE_SUBMISSION_SECRET` and
+stores it in the vault's function secrets (printing it once, for your password
+manager), then checks that each function refuses what it must. Two things it
+handles that a plain `supabase functions deploy` from the repo root does not:
+
+- **Layout.** The functions live in `supabase/vault/functions`; the CLI
+  deploys from `<workdir>/supabase/functions`. The script stages a copy laid
+  out that way.
+- **`--no-verify-jwt` on the three functions core calls**
+  (`submit-documents`, `seal-document`, `seal-feedback`). Core proves itself
+  with the `x-core-signature` header, not a vault login, and Supabase's
+  gateway would reject those calls before the function's own check ran.
+  `read-salary` and `read-feedback` keep the gateway check: only a signed-in
+  vault user reaches them.
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into the function
 runtime by Supabase. You do not set them, and they do not leave that runtime.
 
-One secret you do set, for the submission path:
+Revoke your CLI access token (Account → Access Tokens) when you are done.
 
-```bash
-# A long random value. Core holds the same one.
-openssl rand -hex 32
-supabase secrets set CORE_SUBMISSION_SECRET=<that value> --project-ref <ref>
-```
+### Connecting core — later, and deliberately
 
-Core needs `VAULT_URL` and `CORE_SUBMISSION_SECRET` in Vercel. **Core never
-gets the vault service-role key** — it can only call these functions, which is
-why they are narrow.
+Core needs `VAULT_URL` (`https://<production-vault-ref>.supabase.co`) and the
+same `CORE_SUBMISSION_SECRET` in Vercel. **Core never gets the vault
+service-role key** — it can only call these functions, which is why they are
+narrow.
+
+Hold this step until the vault can show what core hands it. From the moment
+both are set, every ID document PnC verifies moves into the vault and is
+deleted from core (`src/lib/vault/seal-service.ts`); with no vault users
+invited and no screen that reads documents from the vault, PnC would lose
+sight of them. When you do set them:
+
+- **Production only.** Never Preview or Development: developers' preview
+  deployments and `vercel env pull` must not reach the vault.
+- **Sensitive.** Vercel then never shows the value again, to anyone.
+- Redeploy production.
 
 ## 4. Turn sign-ups off, then invite
 
@@ -190,6 +214,38 @@ select * from access_log order by at desc limit 1;   -- must show that read
 ```
 
 The second check is the one that matters most: it is the whole of principle 3.
+
+## Keeping the keys from developers
+
+Developers can see core's settings; they must never be able to see, or use,
+the vault's.
+
+| Secret | Lives in | Who can read it |
+|---|---|---|
+| Vault service-role key | Supabase only; injected into the vault functions | Nobody copies it: not Vercel, not the repo, not a file |
+| Vault database password | Your password manager | You |
+| `CORE_SUBMISSION_SECRET` | The vault's function secrets, and Vercel Production (Sensitive) | Nobody, once saved |
+| Supabase CLI access token | Your machine, for the deploy | Revoked afterwards |
+
+What keeps it that way:
+
+1. **A separate Supabase organization** for the vault (step 1), with you and
+   the break-glass owner as its only members.
+2. **Vercel roles.** Developers hold the Developer role, which cannot change
+   Production settings; Sensitive values cannot be read back by anyone.
+3. **Production only** for the vault settings (step 3), so nothing a
+   developer can deploy or pull holds them.
+4. **Reviewed code only reaches production.** Code running in production can
+   read its own settings, so whoever can ship unreviewed code to production
+   could print the secret. Protect `main` in GitHub: require a pull request
+   with an approving review, require review from Code Owners
+   (`.github/CODEOWNERS`), and deploy production only from `main`.
+5. **Detection.** The vault's `access_log` records every read; keep GitHub
+   secret scanning on.
+6. **If a secret leaks:** set a new `CORE_SUBMISSION_SECRET` with
+   `scripts/vault-deploy.sh` (it asks), put the same value in Vercel, and
+   redeploy. A leak of core's keys does not reach the vault: core holds no
+   key that can read it.
 
 ## What exists so far, and what does not
 
