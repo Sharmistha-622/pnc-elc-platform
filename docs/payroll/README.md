@@ -91,14 +91,15 @@ These exist today and have to be closed before, or as part of, Phase 0.
    basic, HRA, allowances, PF and gratuity in core. It is frozen until the
    vault exists, then moved into vault `compensation` and its amount columns
    dropped (decision D-02).
-2. **No state on locations.** `ng_locations` has a free-text `address` but no
-   `state`. PT and minimum wage need one. Remote staff (about 56% of sample
-   rows) need a per-person work state, because their location is "Remote".
-3. **No location or department link on `employees`.**
-   `src/lib/rbac/updateUserAllocations.ts` writes `employees.department_id`,
-   but no migration creates that column.
-4. **No employee code, PAN, UAN** on the person. Code goes in core;
-   PAN and UAN go in the vault.
+2. **~~No state on locations.~~** Closed by `202610291200_location_states.sql`:
+   `ng_locations.state_code` and an `indian_states` master, backfilled from the
+   address. Still open: remote staff (about 56% of sample rows) need a
+   per-person work state on their engagement, because their location is
+   "Remote".
+3. **No location link on `employees`.** (The `department_id` half is closed:
+   since #58, `updateUserAllocations.ts` writes only `team` and `team_id`.)
+4. **No PAN or UAN** on the person; they go in the vault. (The employee code
+   is in core since #59: `employees.employee_code`.)
 5. **No engagement history.** A conversion overwrites `employee_type`; payroll
    needs the old and new engagement side by side in the conversion month.
 6. **`ftc` means "Full-Time Consultant"** in ELC screens, and "Fixed-term" to
@@ -110,13 +111,12 @@ These exist today and have to be closed before, or as part of, Phase 0.
    are not built.
 9. **No maker ≠ checker check anywhere.** `approveConfirmation.ts` lets anyone
    who can reach it approve, including the person who created the record.
-10. **`ng_locations` and `ng_campuses` RLS policies are `to public` with
-    insert / update / delete `using (true)`.** Once a payroll-critical field
-    (state) lives there, anonymous writes have to be closed.
-11. **The vault has no tables yet.** The vault project now exists in
-    `ap-south-1` (Mumbai), but none of its tables have been created. Core is
-    still in Singapore and has to move to Mumbai before real data is loaded
-    (decision D-01).
+10. **~~`ng_locations` and `ng_campuses` RLS policies are `to public`.~~**
+    Closed by `202610241000_lockdown_rls.sql`: staff read, and only Super
+    Admin, PnC Admin and Platform Admin write.
+11. **~~The vault has no tables yet.~~** Closed: vault migrations 0001–0004
+    are applied to both vault projects in `ap-south-1` (Mumbai), and core has
+    moved to a new Mumbai project (decision D-01).
 
 ## What lives where
 

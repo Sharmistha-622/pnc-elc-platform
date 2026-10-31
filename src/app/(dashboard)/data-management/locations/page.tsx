@@ -63,10 +63,12 @@ import {
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { Location, LocationType, LocationStatus } from '@/lib/locations/types';
+import { Location, LocationType, LocationStatus, IndianState } from '@/lib/locations/types';
+import { stateFromAddress, stateLabel } from '@/lib/locations/states';
 
 export default function LocationsManagementPage() {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [states, setStates] = useState<IndianState[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | LocationType>('all');
@@ -82,6 +84,9 @@ export default function LocationsManagementPage() {
   const [newLocType, setNewLocType] = useState<LocationType>('Campus');
   const [newLocAddress, setNewLocAddress] = useState('');
   const [newLocStatus, setNewLocStatus] = useState<LocationStatus>('active');
+  // The state follows the address until someone picks one by hand.
+  const [newLocState, setNewLocState] = useState('');
+  const [newLocStateTouched, setNewLocStateTouched] = useState(false);
 
   // Edit Type Dialog
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -91,16 +96,21 @@ export default function LocationsManagementPage() {
   // Address Dialog (Add / Edit Address)
   const [isAddressOpen, setIsAddressOpen] = useState(false);
   const [addressInput, setAddressInput] = useState('');
+  const [stateInput, setStateInput] = useState('');
+  const [stateTouched, setStateTouched] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
   const fetchLocations = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/locations?includeClosed=true');
+      const res = await fetch('/api/locations?includeClosed=true&include=states');
       const json = await res.json();
       if (json.success && json.data) {
         setLocations(json.data);
+        if (json.states) setStates(json.states);
+      } else {
+        toast.error(json.error || 'Failed to load locations');
       }
     } catch (err) {
       toast.error('Failed to load locations');
@@ -113,12 +123,15 @@ export default function LocationsManagementPage() {
     fetchLocations();
   }, []);
 
+  const missingState = locations.filter((l) => l.status === 'active' && !l.state_code).length;
+
   // Filtered locations
   const filteredLocations = useMemo(() => {
     return locations.filter((loc) => {
       const matchesSearch =
         loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (loc.address && loc.address.toLowerCase().includes(searchQuery.toLowerCase()));
+        (loc.address && loc.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        stateLabel(loc.state_code, states).toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
 
       if (typeFilter !== 'all' && loc.type.toLowerCase() !== typeFilter.toLowerCase()) {
@@ -129,7 +142,7 @@ export default function LocationsManagementPage() {
       if (statusFilter === 'closed') return loc.status === 'closed';
       return true;
     });
-  }, [locations, searchQuery, typeFilter, statusFilter]);
+  }, [locations, states, searchQuery, typeFilter, statusFilter]);
 
   // Paginated list
   const paginatedLocations = useMemo(() => {
@@ -158,7 +171,8 @@ export default function LocationsManagementPage() {
         body: JSON.stringify({
           name: newLocName.trim(),
           type: newLocType,
-          address: newLocAddress.trim() || undefined,
+          address: newLocAddress.trim() || null,
+          state_code: newLocState || null,
           status: newLocStatus,
         }),
       });
@@ -169,6 +183,8 @@ export default function LocationsManagementPage() {
         setNewLocName('');
         setNewLocType('Campus');
         setNewLocAddress('');
+        setNewLocState('');
+        setNewLocStateTouched(false);
         setNewLocStatus('active');
         fetchLocations();
       } else {
@@ -223,14 +239,16 @@ export default function LocationsManagementPage() {
         body: JSON.stringify({
           id: selectedLoc.id,
           address: addressInput.trim() || null,
+          state_code: stateInput || null,
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(`Address updated for "${selectedLoc.name}"`);
+        toast.success(`Address and state saved for "${selectedLoc.name}"`);
         setIsAddressOpen(false);
         setSelectedLoc(null);
         setAddressInput('');
+        setStateInput('');
         fetchLocations();
       } else {
         toast.error(json.error || 'Failed to update address');
@@ -268,6 +286,29 @@ export default function LocationsManagementPage() {
       toast.error('Error modifying location status');
     }
   };
+
+  const renderStatePicker = (id: string, value: string, onPick: (code: string) => void, suggested: boolean) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-semibold">
+        State <span className="text-muted-foreground font-normal">(decides professional tax for people here)</span>
+      </Label>
+      <Select value={value} onValueChange={onPick}>
+        <SelectTrigger id={id} className="rounded-lg text-sm bg-card">
+          <SelectValue placeholder="Pick a state" />
+        </SelectTrigger>
+        <SelectContent className="rounded-lg text-sm max-h-72">
+          {states.map((st) => (
+            <SelectItem key={st.code} value={st.code} className="rounded-lg">
+              {st.name} ({st.code}){st.kind === 'union_territory' ? ' · UT' : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {suggested && value && (
+        <p className="text-[11px] text-muted-foreground">Taken from the address. Change it if that&apos;s wrong.</p>
+      )}
+    </div>
+  );
 
   const renderTypeBadge = (type: LocationType) => {
     switch (type) {
@@ -388,9 +429,21 @@ export default function LocationsManagementPage() {
                         placeholder="Full street address, PIN code, and state..."
                         className="rounded-lg text-sm min-h-[70px]"
                         value={newLocAddress}
-                        onChange={(e) => setNewLocAddress(e.target.value)}
+                        onChange={(e) => {
+                          setNewLocAddress(e.target.value);
+                          if (!newLocStateTouched) setNewLocState(stateFromAddress(e.target.value, states) ?? '');
+                        }}
                       />
                     </div>
+                    {renderStatePicker(
+                      'locState',
+                      newLocState,
+                      (code) => {
+                        setNewLocState(code);
+                        setNewLocStateTouched(true);
+                      },
+                      !newLocStateTouched
+                    )}
                   </div>
                   <DialogFooter className="gap-2 sm:gap-0">
                     <Button
@@ -487,6 +540,12 @@ export default function LocationsManagementPage() {
         </div>
       </div>
 
+      {missingState > 0 && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+          {missingState} active location{missingState === 1 ? ' has' : 's have'} no state yet. Payroll can&apos;t work out professional tax for people there until one is set: use <strong>Edit address and state</strong> on the row.
+        </div>
+      )}
+
       {/* Search and Action Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-card/60 backdrop-blur-md p-2.5 rounded-lg border border-border shadow-xs">
         <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -494,7 +553,7 @@ export default function LocationsManagementPage() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by name or address..."
+              placeholder="Search by name, address or state..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -547,6 +606,7 @@ export default function LocationsManagementPage() {
           <TableHeader className="bg-muted/40">
             <TableRow>
               <TableHead className="py-2.5 px-3 text-xs font-semibold">Location Name</TableHead>
+              <TableHead className="w-[200px] py-2.5 px-3 text-xs font-semibold">State</TableHead>
               <TableHead className="w-[180px] py-2.5 px-3 text-xs font-semibold">Type</TableHead>
               <TableHead className="w-[140px] py-2.5 px-3 text-xs font-semibold">Status</TableHead>
               <TableHead className="w-[70px] py-2.5 px-3 text-xs font-semibold text-right">Actions</TableHead>
@@ -555,13 +615,13 @@ export default function LocationsManagementPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground py-4">
+                <TableCell colSpan={5} className="h-24 text-center text-xs text-muted-foreground py-4">
                   Loading locations...
                 </TableCell>
               </TableRow>
             ) : paginatedLocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground py-4">
+                <TableCell colSpan={5} className="h-24 text-center text-xs text-muted-foreground py-4">
                   No locations found matching your search.
                 </TableCell>
               </TableRow>
@@ -579,6 +639,17 @@ export default function LocationsManagementPage() {
                         </Avatar>
                         <span className="font-semibold text-foreground text-xs">{loc.name}</span>
                       </div>
+                    </TableCell>
+
+                    {/* State */}
+                    <TableCell className="py-2 px-3 text-xs">
+                      {loc.state_code ? (
+                        <span className="text-foreground">{stateLabel(loc.state_code, states)}</span>
+                      ) : (
+                        <Badge variant="secondary" className="rounded-md text-[10px] py-0 px-2 bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                          State needed
+                        </Badge>
+                      )}
                     </TableCell>
 
                     {/* Type */}
@@ -614,11 +685,13 @@ export default function LocationsManagementPage() {
                             onClick={() => {
                               setSelectedLoc(loc);
                               setAddressInput(loc.address || '');
+                              setStateInput(loc.state_code || stateFromAddress(loc.address, states) || '');
+                              setStateTouched(Boolean(loc.state_code));
                               setIsAddressOpen(true);
                             }}
                           >
                             <MapPinPlus className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-                            {loc.address ? 'Edit Address' : 'Add Address'}
+                            {loc.address || loc.state_code ? 'Edit address and state' : 'Add address and state'}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="rounded-lg gap-2 cursor-pointer"
@@ -728,10 +801,10 @@ export default function LocationsManagementPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-base font-bold">
                 <MapPinPlus className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
-                {selectedLoc?.address ? 'Edit Location Address' : 'Add Location Address'}
+                Address and state
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Maintain physical street address and postal details for <strong>{selectedLoc?.name}</strong>. Stored in database for official documents.
+                For <strong>{selectedLoc?.name}</strong>. The address goes on offer letters; the state decides professional tax for everyone here.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-2">
@@ -743,12 +816,21 @@ export default function LocationsManagementPage() {
                 placeholder="e.g. NavGurukul Residential Campus, Electronic City Phase 1, Bangalore, Karnataka 560100"
                 className="rounded-lg text-sm min-h-[90px]"
                 value={addressInput}
-                onChange={(e) => setAddressInput(e.target.value)}
+                onChange={(e) => {
+                  setAddressInput(e.target.value);
+                  if (!stateTouched) setStateInput(stateFromAddress(e.target.value, states) ?? '');
+                }}
                 autoFocus
               />
-              <p className="text-[11px] text-muted-foreground">
-                This address is securely persisted in <code>ng_locations</code> for offer letters and courier dispatches.
-              </p>
+              {renderStatePicker(
+                'locStateInput',
+                stateInput,
+                (code) => {
+                  setStateInput(code);
+                  setStateTouched(true);
+                },
+                !stateTouched
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
@@ -761,7 +843,7 @@ export default function LocationsManagementPage() {
                 Cancel
               </Button>
               <Button type="submit" className="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white" disabled={submitting}>
-                {submitting ? 'Saving Address...' : 'Save Address'}
+                {submitting ? 'Saving...' : 'Save'}
               </Button>
             </DialogFooter>
           </form>

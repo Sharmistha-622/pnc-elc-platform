@@ -52,7 +52,7 @@ Still to be populated (owed by Finance):
 
 ### 1.3 PT state applicability
 
-The PT state for a person is the `state` of their `ng_locations` row, or their
+The PT state for a person is the `state_code` of their `ng_locations` row, or their
 engagement's `work_state_code` when the location is Remote (D-25). The NG rule
 is evaluated per state per month on employee headcount. Employee headcount by
 state in the Sep-26 sample:
