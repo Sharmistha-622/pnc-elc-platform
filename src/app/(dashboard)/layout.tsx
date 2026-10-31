@@ -12,6 +12,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
 import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
 import { getHasReports } from "@/lib/employees/hasReports"
+import { breakGlassCaller } from "@/lib/rbac/breakGlassAccess"
 
 export default async function DashboardLayout({
     children,
@@ -83,6 +84,9 @@ export default async function DashboardLayout({
     const effectiveRole: UserRole = role || DEFAULT_ROLE
     // Whether My Team leads anywhere. Shared with the dashboard page.
     const hasReports = await getHasReports()
+    // Users & Roles stays in the sidebar for a break-glass account while the
+    // Super Admin switch is on. Reads the switch only for those accounts.
+    const breakGlass = (await breakGlassCaller()) !== null
 
     const userData: User = {
         id: authUser.id,
@@ -102,7 +106,7 @@ export default async function DashboardLayout({
                         <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
                             <SiteHeader userRole={effectiveRole} />
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
-                                <AppSidebar userRole={effectiveRole} hasReports={hasReports} />
+                                <AppSidebar userRole={effectiveRole} hasReports={hasReports} breakGlass={breakGlass} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
                                     {children}
                                 </SidebarInset>

@@ -100,6 +100,15 @@ describe('visibleSections', () => {
     expect(visibleSections(null)).toEqual([])
   })
 
+  it('keeps Users & Roles, and only that, for a break-glass account', () => {
+    const urls = (sections: ReturnType<typeof visibleSections>) =>
+      sections.flatMap((s) => s.items.flatMap((i) => [i.url, ...(i.items ?? []).map((c) => c.url)]))
+    const plain = urls(visibleSections('employee'))
+    const withBreakGlass = urls(visibleSections('employee', { breakGlass: true }))
+    expect(plain).not.toContain('/manage/users')
+    expect(withBreakGlass.filter((u) => !plain.includes(u))).toEqual(['/manage/users'])
+  })
+
   it('drops a section whose every item is out of reach', () => {
     // Platform Admin touches no employee data, so the lifecycle group should
     // not render as a heading above nothing.
