@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
-import { guard } from '@/lib/rbac/guard'
-import { ApproveButton } from './ApproveButton'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
 
@@ -26,9 +24,6 @@ export default async function CompiledReportPage({
   if (cycle) redirect(`/reviews/${cycle.id}`)
 
   const report = await getCompiledFeedback(id)
-  // Only those who can make the final call see the button that makes it;
-  // `approveConfirmation` refuses everyone else regardless.
-  const canApprove = (await guard(['super_admin', 'pnc_admin'])).ok
 
   if (!report) {
     return (
@@ -151,11 +146,6 @@ export default async function CompiledReportPage({
         </div>
       </div>
 
-      {canApprove && (
-        <div className="pt-1">
-          <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
-        </div>
-      )}
     </div>
   )
 }
