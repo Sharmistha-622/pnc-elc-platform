@@ -1,5 +1,7 @@
 'use server'
 
+import { guard } from '@/lib/rbac/guard'
+
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -124,6 +126,9 @@ export async function saveSubmission(formData: FormData): Promise<void> {
  * instead of redirecting, so the page does not reload while someone is typing.
  */
 export async function autoSaveDraft(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  // Signed-in users only; saveSubmission then checks the form is assigned to them.
+  const allowed = await guard('self')
+  if (!allowed.ok) return { ok: false, error: allowed.error }
   formData.set('intent', 'draft')
   try {
     await saveSubmission(formData)
