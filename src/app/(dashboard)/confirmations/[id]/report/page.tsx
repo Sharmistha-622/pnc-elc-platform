@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
+import { passes } from '@/lib/rbac/guard'
+import { cycleHref } from '@/lib/reviews/links'
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
+import { ApproveButton } from './ApproveButton'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
 
@@ -12,18 +16,22 @@ export default async function CompiledReportPage({
   const { id } = await params
 
   // A confirmation run as a review cycle keeps its answers in the cycle's
-  // forms, not in peer_feedback, so this page would show nothing. Send the
-  // reader to the review instead; it applies the same access rules.
+  // forms, not in peer_feedback, so this page would show nothing; send the
+  // reader to the cycle (`cycleHref`: the dashboard for the review roles, My
+  // Reviews for a line manager). The cycle is read with the session client,
+  // so RLS decides whether there is one to send them to.
   const supabase = await createServerSupabaseClient()
-  const { data: cycle } = await supabase
-    .from('review_cycles')
-    .select('id')
-    .eq('confirmation_id', id)
-    .limit(1)
-    .maybeSingle()
-  if (cycle) redirect(`/reviews/${cycle.id}`)
+  const [resolved, { data: cycle }] = await Promise.all([
+    getCurrentUserRole(),
+    supabase.from('review_cycles').select('id').eq('confirmation_id', id).limit(1).maybeSingle(),
+  ])
+  if (cycle) redirect(cycleHref(resolved, cycle.id))
 
+  // A confirmation from before review cycles is still approved here. Only
+  // those who make the final call see the button; `approveConfirmation`
+  // refuses everyone else regardless.
   const report = await getCompiledFeedback(id)
+  const canApprove = passes(resolved, ['super_admin', 'pnc_admin'])
 
   if (!report) {
     return (
@@ -146,6 +154,11 @@ export default async function CompiledReportPage({
         </div>
       </div>
 
+      {canApprove && (
+        <div className="pt-1">
+          <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
+        </div>
+      )}
     </div>
   )
 }

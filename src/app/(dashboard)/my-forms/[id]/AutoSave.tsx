@@ -1,84 +1,115 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { useFormStatus } from 'react-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { autoSaveDraft } from '@/lib/forms/respondentActions'
 
-const SAVE_DELAY_MS = 2000
+const SAVE_DELAY_MS = 1500
+
+/** Fired on window after a background save succeeds, so stale notices can hide. */
+export const AUTOSAVED_EVENT = 'my-forms:autosaved'
 
 type Status = 'idle' | 'saving' | 'saved' | 'error'
 
 // Saves the form as a draft a moment after the respondent stops typing,
-// replacing the manual "Save draft" button.
+// replacing the manual "Save draft" button. One save runs at a time; edits made
+// during it are saved right after. Pressing Submit cancels any pending save
+// (the submission carries the same answers), and leaving the page flushes one.
 export function AutoSave() {
   const marker = useRef<HTMLSpanElement>(null)
-  const { pending } = useFormStatus()
-  const submitting = useRef(false)
+  const saveNow = useRef<() => void>(() => {})
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    submitting.current = pending
-  }, [pending])
 
   useEffect(() => {
     const form = marker.current?.closest('form')
     if (!form) return
 
     let timer: ReturnType<typeof setTimeout> | undefined
+    let dirty = false
     let inFlight = false
-    let queued = false
+    let submitted = false
+    let alive = true
 
     const save = async () => {
-      if (submitting.current) return
-      if (inFlight) {
-        queued = true
-        return
-      }
+      clearTimeout(timer)
+      timer = undefined
+      if (submitted || !dirty) return
+      if (inFlight) return // the running save re-checks `dirty` when it ends
       inFlight = true
-      setStatus('saving')
+      dirty = false
+      if (alive) setStatus('saving')
       try {
-        const data = new FormData(form)
-        const res = await autoSaveDraft(data)
+        const res = await autoSaveDraft(new FormData(form))
+        if (!alive) return
         if (res.ok) {
           setStatus('saved')
           setError(null)
+          window.dispatchEvent(new Event(AUTOSAVED_EVENT))
         } else {
           setStatus('error')
           setError(res.error ?? 'Could not save your answers')
         }
       } catch {
-        setStatus('error')
-        setError('Could not save your answers')
+        dirty = true // keep the edits pending so a retry sends them
+        if (alive) {
+          setStatus('error')
+          setError('Could not reach the server')
+        }
       } finally {
         inFlight = false
       }
-      if (queued) {
-        queued = false
-        void save()
-      }
+      if (dirty && !submitted) void save()
+    }
+
+    saveNow.current = () => {
+      dirty = true
+      void save()
     }
 
     const onEdit = () => {
+      dirty = true
       clearTimeout(timer)
       timer = setTimeout(() => void save(), SAVE_DELAY_MS)
+    }
+    const onSubmit = () => {
+      submitted = true
+      clearTimeout(timer)
+    }
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void save()
     }
 
     form.addEventListener('input', onEdit)
     form.addEventListener('change', onEdit)
+    form.addEventListener('submit', onSubmit)
+    document.addEventListener('visibilitychange', onHide)
     return () => {
-      clearTimeout(timer)
+      // Navigating away inside the app unmounts this; send what is pending.
+      // The request outlives the component.
+      alive = false
+      void save()
       form.removeEventListener('input', onEdit)
       form.removeEventListener('change', onEdit)
+      form.removeEventListener('submit', onSubmit)
+      document.removeEventListener('visibilitychange', onHide)
     }
   }, [])
+
+  const retry = useCallback(() => saveNow.current(), [])
 
   return (
     <span ref={marker} className="text-xs text-gray-500" aria-live="polite">
       {status === 'idle' && 'Your answers are saved automatically as you type.'}
       {status === 'saving' && 'Saving…'}
       {status === 'saved' && 'All changes saved.'}
-      {status === 'error' && `Not saved: ${error}`}
+      {status === 'error' && (
+        <>
+          <span className="text-red-700 dark:text-red-300">Not saved: {error}</span>{' '}
+          <button type="button" onClick={retry} className="underline">
+            Try again
+          </button>
+        </>
+      )}
     </span>
   )
 }
