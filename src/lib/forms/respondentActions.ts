@@ -117,3 +117,27 @@ export async function saveSubmission(formData: FormData): Promise<void> {
   revalidatePath(path)
   redirect(`${path}?saved=1`)
 }
+
+/**
+ * Saves a draft in the background, for auto-save. Runs the same draft path as
+ * the form's own save (same ownership and status checks), but returns a result
+ * instead of redirecting, so the page does not reload while someone is typing.
+ */
+export async function autoSaveDraft(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  formData.set('intent', 'draft')
+  try {
+    await saveSubmission(formData)
+    return { ok: true }
+  } catch (err) {
+    // saveSubmission always ends in a redirect: `?saved=1` on success,
+    // otherwise back to the form or the list with a message.
+    const digest = (err as { digest?: unknown } | null)?.digest
+    if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) {
+      const target = digest.split(';')[2] ?? ''
+      if (target.includes('saved=1')) return { ok: true }
+      const match = target.match(/[?&](?:error|message)=([^&]*)/)
+      return { ok: false, error: match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : 'Could not save your answers' }
+    }
+    return { ok: false, error: 'Could not save your answers' }
+  }
+}

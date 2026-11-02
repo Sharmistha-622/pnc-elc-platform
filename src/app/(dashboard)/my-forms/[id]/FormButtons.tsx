@@ -2,24 +2,14 @@
 
 import { useFormStatus } from 'react-dom'
 
-// Disables both buttons while the form is being saved or submitted, so a
-// slow response cannot be clicked twice and send duplicate submissions.
+// Answers are saved automatically (see AutoSave), so the only button is Submit.
+// It is disabled while the form is being sent, so a slow response cannot be
+// clicked twice and send duplicate submissions.
 export function FormButtons() {
-  const { pending, data } = useFormStatus()
-  const intent = pending ? String(data?.get('intent') ?? '') : ''
+  const { pending } = useFormStatus()
 
   return (
     <div className="flex gap-3">
-      <button
-        type="submit"
-        name="intent"
-        value="draft"
-        disabled={pending}
-        aria-disabled={pending}
-        className="border px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {intent === 'draft' ? 'Saving…' : 'Save draft'}
-      </button>
       <button
         type="submit"
         name="intent"
@@ -28,7 +18,7 @@ export function FormButtons() {
         aria-disabled={pending}
         className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {intent === 'submit' ? 'Submitting…' : 'Submit'}
+        {pending ? 'Submitting…' : 'Submit'}
       </button>
     </div>
   )
