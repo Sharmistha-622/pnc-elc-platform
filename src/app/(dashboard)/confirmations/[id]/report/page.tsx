@@ -1,10 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
-import { passes } from '@/lib/rbac/guard'
 import { cycleHref } from '@/lib/reviews/links'
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
-import { ApproveButton } from './ApproveButton'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
 
@@ -27,11 +25,9 @@ export default async function CompiledReportPage({
   ])
   if (cycle) redirect(cycleHref(resolved, cycle.id))
 
-  // A confirmation from before review cycles is still approved here. Only
-  // those who make the final call see the button; `approveConfirmation`
-  // refuses everyone else regardless.
+  // Confirmations are accepted on the review page (the manager records the
+  // decision, PnC Admin closes it), so this report is read-only.
   const report = await getCompiledFeedback(id)
-  const canApprove = passes(resolved, ['super_admin', 'pnc_admin'])
 
   if (!report) {
     return (
@@ -153,12 +149,6 @@ export default async function CompiledReportPage({
           )}
         </div>
       </div>
-
-      {canApprove && (
-        <div className="pt-1">
-          <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
-        </div>
-      )}
     </div>
   )
 }
