@@ -27,6 +27,16 @@ export default [
     },
   },
   {
+    // Node scripts run by hand with `node`, outside the app. They are
+    // CommonJS on purpose: some load tools installed globally (Playwright for
+    // scripts/user-guide-pdf/render.js), which only require() finds through
+    // NODE_PATH; an ES import would not. Every other rule still applies.
+    files: ["scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     ignores: [
       ".next/**",
       "node_modules/**",
