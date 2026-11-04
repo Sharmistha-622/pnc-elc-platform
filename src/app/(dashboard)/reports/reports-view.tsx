@@ -194,6 +194,7 @@ export function ReportsView({ data }: ReportsViewProps) {
   // -------------------------------------------------------------------------
   const [headcountSearch, setHeadcountSearch] = useState('')
   const [headcountTypeFilter, setHeadcountTypeFilter] = useState<string>('all')
+  const [headcountBackgroundFilter, setHeadcountBackgroundFilter] = useState<string>('all')
   const [headcountPage, setHeadcountPage] = useState(1)
   const [headcountPageSize, setHeadcountPageSize] = useState(10)
 
@@ -205,12 +206,15 @@ export function ReportsView({ data }: ReportsViewProps) {
         e.team_name.toLowerCase().includes(headcountSearch.toLowerCase()) ||
         e.location_name.toLowerCase().includes(headcountSearch.toLowerCase())
       if (!matchesSearch) return false
+      if (headcountBackgroundFilter !== 'all' && e.background !== headcountBackgroundFilter) {
+        return false
+      }
       if (headcountTypeFilter !== 'all' && e.employee_type !== headcountTypeFilter) {
         return false
       }
       return true
     })
-  }, [data.headcount.employees, headcountSearch, headcountTypeFilter])
+  }, [data.headcount.employees, headcountSearch, headcountTypeFilter, headcountBackgroundFilter])
 
   const paginatedHeadcount = useMemo(() => {
     const start = (headcountPage - 1) * headcountPageSize
@@ -277,11 +281,11 @@ export function ReportsView({ data }: ReportsViewProps) {
           .join('\n')
     } else if (activeTab === 'headcount') {
       csvContent =
-        'Name,Email,Role,Engagement Type,Team,Location,Joining Date\n' +
+        'Name,Email,Role,Engagement Type,Background,Team,Location,Joining Date\n' +
         data.headcount.employees
           .map(
             (e) =>
-              `"${e.name}","${e.email}","${e.designation || ''}","${e.employee_type}","${e.team_name}","${
+              `"${e.name}","${e.email}","${e.designation || ''}","${e.employee_type}","${e.background}","${e.team_name}","${
                 e.location_name
               }","${e.joining_date || ''}"`
           )
@@ -1138,7 +1142,7 @@ export function ReportsView({ data }: ReportsViewProps) {
           </div>
 
           {/* Breakdown Distribution Panels */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* Engagement Type Breakdown */}
             <Card className="rounded-lg border border-border/80 bg-card p-4 space-y-3 shadow-xs">
               <div className="flex items-center justify-between pb-2 border-b border-border/60">
@@ -1166,6 +1170,45 @@ export function ReportsView({ data }: ReportsViewProps) {
                   )
                 })}
               </div>
+            </Card>
+
+            {/* Alumni or external */}
+            <Card className="rounded-lg border border-border/80 bg-card p-4 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                <span className="text-xs font-bold text-foreground">NavGurukul Alumni vs External</span>
+                <span className="text-[11px] font-mono text-muted-foreground">Share of Headcount</span>
+              </div>
+              <div className="space-y-2.5">
+                {(Object.entries(data.headcount.byBackground) as [string, number][])
+                  .filter(([background, count]) => background !== 'Not recorded' || count > 0)
+                  .map(([background, count]) => {
+                    const share = data.headcount.total > 0 ? Math.round((count / data.headcount.total) * 100) : 0
+                    return (
+                      <div key={background} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-foreground">{background}</span>
+                          <span className="font-mono text-muted-foreground">
+                            {count} ({share}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`${
+                              background === 'Not recorded' ? 'bg-muted-foreground/40' : 'bg-indigo-600 dark:bg-indigo-500'
+                            } h-full rounded-full transition-all duration-500`}
+                            style={{ width: `${share}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+              {data.headcount.byBackground['Not recorded'] > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Not recorded: people added before alumni status was required. Fill it in from Data Management → Import with an{' '}
+                  <span className="font-mono">email,is_alumni</span> file.
+                </p>
+              )}
             </Card>
 
             {/* Team Distribution */}
@@ -1204,6 +1247,23 @@ export function ReportsView({ data }: ReportsViewProps) {
 
             <div className="flex items-center gap-2">
               <Select
+                value={headcountBackgroundFilter}
+                onValueChange={(val: string) => {
+                  setHeadcountBackgroundFilter(val)
+                  setHeadcountPage(1)
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs rounded-lg w-[160px]" aria-label="Filter by alumni or external">
+                  <SelectValue placeholder="Alumni & External" />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg">
+                  <SelectItem value="all" className="text-xs rounded-lg">Alumni &amp; External</SelectItem>
+                  <SelectItem value="Alumni" className="text-xs rounded-lg">Alumni</SelectItem>
+                  <SelectItem value="External" className="text-xs rounded-lg">External</SelectItem>
+                  <SelectItem value="Not recorded" className="text-xs rounded-lg">Not recorded</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
                 value={headcountTypeFilter}
                 onValueChange={(val: any) => {
                   setHeadcountTypeFilter(val)
@@ -1234,6 +1294,7 @@ export function ReportsView({ data }: ReportsViewProps) {
                     <th className="px-4 py-3">Employee Name</th>
                     <th className="px-4 py-3">Team &amp; Designation</th>
                     <th className="px-4 py-3">Engagement Model</th>
+                    <th className="px-4 py-3">Background</th>
                     <th className="px-4 py-3">Campus Location</th>
                     <th className="px-4 py-3">Joining Date</th>
                     <th className="px-4 py-3 text-right">Roster Profile</th>
@@ -1242,7 +1303,7 @@ export function ReportsView({ data }: ReportsViewProps) {
                 <tbody className="divide-y divide-border/60">
                   {paginatedHeadcount.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-xs">
                         No employees matching filter criteria.
                       </td>
                     </tr>
@@ -1261,6 +1322,7 @@ export function ReportsView({ data }: ReportsViewProps) {
                             {emp.employee_type}
                           </Badge>
                         </td>
+                        <td className="px-4 py-3 text-muted-foreground">{emp.background}</td>
                         <td className="px-4 py-3 text-muted-foreground">{emp.location_name}</td>
                         <td className="px-4 py-3 text-muted-foreground font-mono">
                           {emp.joining_date ? new Date(emp.joining_date).toLocaleDateString() : '—'}
