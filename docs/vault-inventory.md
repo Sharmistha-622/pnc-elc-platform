@@ -130,12 +130,14 @@ Review these four lists quarterly, alongside `vault_roles`.
 
 1. **Create the vault in `ap-south-1`**, plus `elc-vault-dev` for synthetic
    data ([`vault-setup.md`](./vault-setup.md) §1).
-2. **Apply `0001`, `0002` and `0003`** in order. `0003` closes the function
-   grants: without it the vault's anon key could read a full Aadhaar number
-   through `read_identity_number`, and could write fake rows into the access
-   log. Run both checks in §2.
-3. **Deploy the built functions**: `read-salary`, `read-feedback`,
-   `submit-documents`, `seal-document`, `seal-feedback`.
+2. **Apply every vault migration** in order (`0001` to `0006`). `0003` closes
+   the function grants: without it the vault's anon key could read a full
+   Aadhaar number through `read_identity_number`, and could write fake rows
+   into the access log. `0006` extends that to every function added since,
+   and to new ones. Run both checks in §2.
+3. **Deploy the built functions** with `scripts/vault-deploy.sh`:
+   `read-salary`, `read-feedback`, `submit-documents`, `seal-document`,
+   `seal-feedback`, `submit-bank`, `approve-bank`.
 4. **Build what the inventory marks Not built**, in this order. Each depends on
    the one before.
    1. `sync-person`: the one-way copy of name, team and manager into `people`.

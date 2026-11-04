@@ -38,6 +38,21 @@ insert into pg_temp.failures
    where n.nspname = 'public' and r.rolname in ('anon', 'authenticated')
      and has_function_privilege(r.oid, p.oid, 'execute');
 
+-- 3b. A function created after the migrations starts closed. Postgres grants
+-- EXECUTE on every new function to PUBLIC unless a GLOBAL default withdraws
+-- it; a per-schema default cannot (0006_function_defaults.sql). Created and dropped here, as the
+-- role that applied the migrations.
+create function public.probe_new_function() returns int language sql as 'select 1';
+insert into pg_temp.failures
+  select 'new function starts closed', 'probe_new_function → ' || r.rolname
+    from pg_roles r
+   where r.rolname in ('anon', 'authenticated')
+     and has_function_privilege(r.oid, 'public.probe_new_function()'::regprocedure, 'execute');
+insert into pg_temp.failures
+  select 'new function starts closed', 'probe_new_function not callable by service_role'
+   where not has_function_privilege('service_role', 'public.probe_new_function()'::regprocedure, 'execute');
+drop function public.probe_new_function();
+
 -- 4. Every policy is for service_role alone.
 insert into pg_temp.failures
   select 'service role only', tablename || '.' || policyname || ' ' || roles::text

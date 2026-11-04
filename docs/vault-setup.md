@@ -39,7 +39,7 @@ only other member will be the break-glass owner in step 5.
 ## 2. Apply the schema
 
 From this repository, on your machine, with each project's connection string
-(Project Settings → Database). Apply every file, in order (0001 to 0005 so far):
+(Project Settings → Database). Apply every file, in order (0001 to 0006 so far):
 
 ```bash
 # dev first, always
@@ -61,6 +61,10 @@ letters, the payroll audit trail). It is safe to apply before payroll is
 built: the tables stay empty, and service-role only, until it is.
 `scripts/vault-probe.sh` builds a scratch vault from every file and checks
 the walls; CI runs it on every change.
+
+`0006` applies `0003`'s rule to every function added since, and makes it
+the default for new ones. Apply it with the rest, then run the function
+check below.
 
 `0003` is not optional. Without it, every function in the vault is callable by
 anyone holding the vault's anon key, and three of them run with the owner's
