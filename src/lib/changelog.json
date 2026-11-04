@@ -1,5 +1,25 @@
 [
   {
+    "version": "2.09.00",
+    "date": "2026-11-04",
+    "title": "Record whether each employee is a NavGurukul alumnus (mandatory)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Every employee now records whether they are a NavGurukul alumnus or an external hire. The field is required for new employees, can be filled in for existing ones by import, and is shown in the headcount report."
+      },
+      {
+        "category": "Improvements",
+        "description": "The employee import preview flags anything missing: columns the file lacks, and people left without an employee ID, team or alumni status."
+      },
+      {
+        "category": "Improvements",
+        "description": "The new-candidate form asks \"NavGurukul Alumni\" as a required Yes/No with nothing pre-selected, instead of a switch that defaulted to No."
+      }
+    ]
+  },
+  {
     "version": "2.08.00",
     "date": "2026-10-31",
     "title": "Keep Users & Roles in the sidebar for break-glass accounts",
