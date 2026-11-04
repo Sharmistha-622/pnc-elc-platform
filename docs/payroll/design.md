@@ -435,7 +435,7 @@ Built on the roles in `src/lib/rbac/roles.ts`. Changes needed:
 | PnC Admin | Approves split-variation edits; enters and edits CTC; P&C path | — |
 | PnC Ops | P&C path: events, attendance sign-off, data verification; CTC write-only | New write-only salary path |
 | Approver | Final step(s) of the configurable chain | New role or qualifier (O-02) |
-| Exec View, heads of department, others | Totals views, only where Super Admin has switched them on. A head of department sees their own department only; line managers see none (O-03) | New toggle (D-23) |
+| Exec View, heads of department, others | Totals views, only where Super Admin has switched them on. A head of department sees their own department only, and none for a department under 3 people; line managers see none (O-03) | New toggle (D-23) |
 | Employee | Own payslips, structure, Form 16, raise a query | Via the letter route |
 | Platform Admin / Ops | Masters and rate tables are config; **no amounts, no vault** | — |
 
