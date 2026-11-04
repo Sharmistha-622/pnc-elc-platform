@@ -132,10 +132,14 @@ between reminders cannot go below 24 hours.
 - **Email** goes through the Gmail account in `GOOGLE_*`. Without those
   variables nothing is delivered, and each attempt is logged as failed in the
   Email Center.
-- **Free/busy** for the meeting comes from the calendar integration, which is
-  still a mock: it assumes a daily stand-up. The invitation itself is a real
-  calendar invitation. Until real free/busy is connected, check the booked slot,
-  or switch automatic booking off and book by hand.
+- **Free/busy** for the meeting is read from the manager's Google Calendar,
+  through the same `GOOGLE_*` account that sends email. That account's refresh
+  token needs a calendar scope (`calendar.freebusy` or `calendar.readonly`) as
+  well as `gmail.send`, and the manager's free/busy must be visible to it. If
+  the lookup fails, booking falls back to the old mock, which assumes a daily
+  stand-up, and the only sign is `[calendar] Real free/busy lookup failed` in
+  the server logs. Check the booked slot until you have seen a real lookup
+  work. The invitation itself is a real calendar invitation either way.
 - **The daily job runs once a day.** An automatic reminder is therefore sent
   at the first run at least 24 hours after the previous one, not to the minute.
   Running it hourly needs a Vercel plan that allows hourly cron jobs; the job is
