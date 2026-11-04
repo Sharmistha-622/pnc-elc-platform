@@ -109,8 +109,9 @@ These exist today and have to be closed before, or as part of, Phase 0.
 8. **No xlsx library**, no Slack adapter (the bot token exists), and the vault
    functions `submit-bank`, `approve-bank`, `sync-person` and `payroll-export`
    are not built.
-9. **No maker ≠ checker check anywhere.** `approveConfirmation.ts` lets anyone
-   who can reach it approve, including the person who created the record.
+9. **No maker ≠ checker check anywhere.** The example here was
+   `approveConfirmation.ts`, since removed (confirmations are now closed on
+   the review cycle); nothing else checks it either.
 10. **~~`ng_locations` and `ng_campuses` RLS policies are `to public`.~~**
     Closed by `202610241000_lockdown_rls.sql`: staff read, and only Super
     Admin, PnC Admin and Platform Admin write.

@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
+import { cycleHref } from '@/lib/reviews/links'
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
@@ -12,17 +14,19 @@ export default async function CompiledReportPage({
   const { id } = await params
 
   // A confirmation run as a review cycle keeps its answers in the cycle's
-  // forms, not in peer_feedback, so this page would show nothing. Send the
-  // reader to the review instead; it applies the same access rules.
+  // forms, not in peer_feedback, so this page would show nothing; send the
+  // reader to the cycle (`cycleHref`: the dashboard for the review roles, My
+  // Reviews for a line manager). The cycle is read with the session client,
+  // so RLS decides whether there is one to send them to.
   const supabase = await createServerSupabaseClient()
-  const { data: cycle } = await supabase
-    .from('review_cycles')
-    .select('id')
-    .eq('confirmation_id', id)
-    .limit(1)
-    .maybeSingle()
-  if (cycle) redirect(`/reviews/${cycle.id}`)
+  const [resolved, { data: cycle }] = await Promise.all([
+    getCurrentUserRole(),
+    supabase.from('review_cycles').select('id').eq('confirmation_id', id).limit(1).maybeSingle(),
+  ])
+  if (cycle) redirect(cycleHref(resolved, cycle.id))
 
+  // Confirmations are accepted on the review page (the manager records the
+  // decision, PnC Admin closes it), so this report is read-only.
   const report = await getCompiledFeedback(id)
 
   if (!report) {
@@ -145,7 +149,6 @@ export default async function CompiledReportPage({
           )}
         </div>
       </div>
-
     </div>
   )
 }

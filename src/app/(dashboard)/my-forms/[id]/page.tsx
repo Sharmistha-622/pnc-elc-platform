@@ -5,6 +5,7 @@ import { saveSubmission } from '@/lib/forms/respondentActions'
 import { visibleSectionIds } from '@/lib/forms/branching'
 import { FormButtons } from './FormButtons'
 import { AutoSave } from './AutoSave'
+import { FormNotice } from './FormNotice'
 import { BranchingForm } from './BranchingForm'
 import { asArray, asObject, asString, formatAnswer } from '@/lib/forms/answers'
 
@@ -161,14 +162,14 @@ export default async function FillFormPage({
       </div>
 
       {error && (
-        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <FormNotice className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error.slice(0, 300)}
-        </div>
+        </FormNotice>
       )}
       {saved === '1' && (
-        <div className="rounded border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800">
+        <FormNotice className="rounded border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800">
           Draft saved. You can come back and finish it later.
-        </div>
+        </FormNotice>
       )}
       {justSubmitted === '1' && (
         <div className="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800">
