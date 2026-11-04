@@ -28,6 +28,16 @@ includes developers. In practice:
 - No real personal data in the repo. It is public.
 - A new sensitive field goes in the vault (`docs/vault-inventory.md`).
 
+## Issues, and what may be said in public
+
+- Every confirmed problem becomes an issue as it is found, and every to-do
+  someone asks for becomes one assigned to them: `rules/issues.md`.
+- Issues, commits, branch names, pull requests, code comments and docs are all
+  public. A serious security problem (S1, S2) goes to the private tracker
+  `Nitinsudarshan/pnc-elc-security` and is described in public only after it
+  is fixed in production: `rules/disclosure.md`. Run its §6 checklist before
+  every public post, commit and push.
+
 ## Checks
 
 ```bash

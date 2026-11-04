@@ -1,0 +1,7 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A security problem
+    url: https://github.com/Sharmistha-622/pnc-elc-platform/blob/main/rules/disclosure.md
+    about: >-
+      This repository is public. If someone could read or change data they
+      should not, do not file it here. Tell the owner, who tracks it privately.

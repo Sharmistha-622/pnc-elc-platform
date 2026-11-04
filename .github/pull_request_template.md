@@ -1,6 +1,15 @@
 ## What this changes
 
-<!-- A sentence or two. What was wrong, or what is new. -->
+<!--
+A sentence or two. What was wrong, or what is new.
+
+Link the issue it fixes with "Fixes #123", so GitHub closes it on merge.
+Never reference an issue in the private security tracker here.
+
+This description, the title, the branch name and every commit are public.
+For a security fix, say what changed, never what was possible before it,
+and nothing about which environment is still unfixed (rules/disclosure.md).
+-->
 
 ## Changelog
 
@@ -43,3 +52,5 @@ Required. Reviewed against REVIEW.md. "None" is a fine answer when it is true.
 - [ ] Any migration re-runs cleanly on an already-migrated database
 - [ ] If `supabase/` changed: `scripts/rls-probe.sh` passes
 - [ ] No real personal data, secrets or production identifiers anywhere in the diff
+- [ ] Title, description, branch name and commits pass the `rules/disclosure.md` §6 checklist
+- [ ] Migrations or vault functions already applied before merge: labelled `already-applied`

@@ -1,0 +1,40 @@
+name: Owner actions
+
+# When a pull request that changes core migrations, vault migrations or vault
+# Edge Functions merges, files an `owner-action` issue for the owner: what to
+# apply, on which projects, in what order. See rules/issues.md.
+#
+# It never touches a database. CI holds no database credentials, the vault's
+# least of all, so it cannot tell when the owner has applied something: the
+# owner ticks the boxes and closes the issue.
+#
+# A pull request labelled `already-applied` files nothing. Every S1/S2
+# security fix is applied before it merges (rules/disclosure.md §4), and an
+# open public "apply this" issue would say production is still exposed.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  file:
+    name: File owner actions
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      # main, as merged: reviewed code only, never the pull request's head.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/owner-actions.mjs`)
+            await run({ github, context, core })
