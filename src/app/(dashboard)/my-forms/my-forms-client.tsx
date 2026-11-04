@@ -265,15 +265,16 @@ export function MyFormsClient({
                     </TableCell>
                     <TableCell className="py-3 px-3 text-right">
                       {item.canOpen ? (
-                        <Link href={`/my-forms/${item.requestId}`}>
-                          <Button
-                            size="sm"
-                            className={`h-7 px-3 text-xs rounded-lg font-semibold gap-1.5 shadow-xs ${
-                              item.status === 'Submitted'
-                                ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                            }`}
-                          >
+                        <Button
+                          asChild
+                          size="sm"
+                          className={`h-7 px-3 text-xs rounded-lg font-semibold gap-1.5 shadow-xs ${
+                            item.status === 'Submitted'
+                              ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          }`}
+                        >
+                          <Link href={`/my-forms/${item.requestId}`}>
                             <span>
                               {item.status === 'Submitted'
                                 ? 'View'
@@ -282,8 +283,8 @@ export function MyFormsClient({
                                 : 'Open'}
                             </span>
                             <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">Unavailable</span>
                       )}

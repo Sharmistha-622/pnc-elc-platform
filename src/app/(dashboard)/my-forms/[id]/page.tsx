@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { getFormFill } from '@/lib/forms/getFormFill'
 import { saveSubmission } from '@/lib/forms/respondentActions'
 import { visibleSectionIds } from '@/lib/forms/branching'
+import { FormButtons } from './FormButtons'
+import { AutoSave } from './AutoSave'
 import { BranchingForm } from './BranchingForm'
 import { asArray, asObject, asString, formatAnswer } from '@/lib/forms/answers'
 
@@ -241,14 +243,8 @@ export default async function FillFormPage({
           ))}
 
           <p className="text-xs text-gray-500">Fields marked * are required when you submit.</p>
-          <div className="flex gap-3">
-            <button type="submit" name="intent" value="draft" className="border px-4 py-2 rounded text-sm">
-              Save draft
-            </button>
-            <button type="submit" name="intent" value="submit" className="bg-black text-white px-4 py-2 rounded text-sm">
-              Submit
-            </button>
-          </div>
+          <AutoSave />
+          <FormButtons />
         </BranchingForm>
       )}
     </div>
