@@ -1,6 +1,6 @@
+import { redirect } from 'next/navigation'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCompiledFeedback } from '@/lib/confirmations/getCompiledFeedback'
-import { guard } from '@/lib/rbac/guard'
-import { ApproveButton } from './ApproveButton'
 import { PageBanner } from '@/components/shared/page-banner'
 import { FileText, AlertTriangle, Users, CheckCircle2, Clock } from 'lucide-react'
 
@@ -10,10 +10,20 @@ export default async function CompiledReportPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+
+  // A confirmation run as a review cycle keeps its answers in the cycle's
+  // forms, not in peer_feedback, so this page would show nothing. Send the
+  // reader to the review instead; it applies the same access rules.
+  const supabase = await createServerSupabaseClient()
+  const { data: cycle } = await supabase
+    .from('review_cycles')
+    .select('id')
+    .eq('confirmation_id', id)
+    .limit(1)
+    .maybeSingle()
+  if (cycle) redirect(`/reviews/${cycle.id}`)
+
   const report = await getCompiledFeedback(id)
-  // Only those who can make the final call see the button that makes it;
-  // `approveConfirmation` refuses everyone else regardless.
-  const canApprove = (await guard(['super_admin', 'pnc_admin'])).ok
 
   if (!report) {
     return (
@@ -136,11 +146,6 @@ export default async function CompiledReportPage({
         </div>
       </div>
 
-      {canApprove && (
-        <div className="pt-1">
-          <ApproveButton confirmationId={report.confirmationId} employeeId={report.employeeId} />
-        </div>
-      )}
     </div>
   )
 }
