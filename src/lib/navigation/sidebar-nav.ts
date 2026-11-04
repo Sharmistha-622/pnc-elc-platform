@@ -32,7 +32,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   TrendingUp,
-  User,
   UserMinus,
   UserPlus,
   Users,
@@ -113,7 +112,6 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "workspace",
     label: "My Workspace",
     items: [
-      { title: "My Profile", url: "/profile", icon: User },
       { title: "My Forms", url: "/my-forms", icon: Inbox },
       { title: "My Reviews", url: "/my-reviews", icon: ClipboardCheck },
       // Hidden by `visibleSections` for anyone with no direct reports, however
