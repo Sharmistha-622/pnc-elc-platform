@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.09.01",
+    "date": "2026-11-04",
+    "title": "Disable Submit while sending, auto-save answers, one-click View",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "The Submit button can no longer be clicked twice while a form is being sent."
+      },
+      {
+        "category": "Fixes",
+        "description": "The View / Open / Continue button in My Forms opens the form on the first click."
+      },
+      {
+        "category": "Improvements",
+        "description": "Form answers are saved automatically as you type, replacing the Save draft button."
+      },
+      {
+        "category": "Improvements",
+        "description": "Opening a form shows a loading state straight away."
+      }
+    ]
+  },
+  {
     "version": "2.09.00",
     "date": "2026-11-04",
     "title": "Record whether each employee is a NavGurukul alumnus (mandatory)",
