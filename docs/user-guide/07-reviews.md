@@ -207,8 +207,10 @@ date.
   No with a reschedule date. Only the reporting manager or PnC can save it.
 - **Report** (*Compiled Feedback*): who was nominated and who responded,
   anonymous written feedback, and a **Red Flag** banner if the response rate
-  is low or a flagged keyword appears. PnC Admin can **Approve & Complete
-  Confirmation**, which sets the confirmation date.
+  is low or a flagged keyword appears. The report is read-only. A
+  confirmation run as a review cycle opens that cycle instead, and is closed
+  there: the manager records the decision and PnC Admin accepts it, which
+  sets the confirmation date (step 9 above).
 
 The decision options differ from the new flow (Yes / No-reschedule here;
 Confirm / Extend / Do not confirm there). Prefer the new flow.
