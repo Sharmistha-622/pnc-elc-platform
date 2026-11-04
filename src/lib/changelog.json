@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.09.05",
+    "date": "2026-11-04",
+    "title": "Every function service-role only, including new ones",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Tighter permissions on vault functions, including any added later."
+      }
+    ]
+  },
+  {
     "version": "2.09.04",
     "date": "2026-11-04",
     "title": "Follow-ups from reviewing #69 and #70",
