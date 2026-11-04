@@ -253,18 +253,6 @@ export function ConfirmationsTable({ initialConfirmations }: ConfirmationsTableP
           </Select>
         </div>
 
-        {/* New Confirmation Action */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/confirmations/new">
-            <Button
-              size="sm"
-              className="h-8 rounded-lg text-xs gap-1.5 font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
-            >
-              <PlusCircle className="h-3.5 w-3.5" />
-              New Confirmation
-            </Button>
-          </Link>
-        </div>
       </div>
 
       {/* Confirmations Table */}
