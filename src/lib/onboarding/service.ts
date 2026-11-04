@@ -914,8 +914,8 @@ export async function verifyOrRejectDocument(
  *
  * Their uploaded documents are deliberately NOT purged here. Nothing will ever
  * seal them — there is no verification coming — so they show up in
- * `exposed_records` as orphaned, and a person decides what happens to them.
- * See open decision #6.
+ * `exposed_records` as orphaned until the scheduled purge deletes them after
+ * the hold period set in Settings (decision #6 in docs/rbac.md).
  */
 export async function withdrawJoiner(
   id: string,

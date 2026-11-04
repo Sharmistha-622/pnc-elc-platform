@@ -64,7 +64,7 @@ it; **Not built** means neither exists yet.
 | Data | Lives in core while | Seals into | Trigger | Core keeps | Status |
 |---|---|---|---|---|---|
 | ID document scans (Aadhaar, PAN card, passport, address proof, education, relieving letters) | awaiting verification, in the `candidate-documents` bucket + `onboarding_documents` | `identity_documents` + `identity-documents` bucket | PnC Ops verifies it | status, verifier, date, `vault_document_id`, `document_number_last4` | **Built** (`seal-document`, `src/lib/vault/seal-service.ts`). Budget: 14 days |
-| Full ID number, typed at verification | never stored in core; passes through | `identity_documents.document_number` | the same verification | last four characters | **Built**. Read only via `read_identity_number` (logs; refuses Exec View) |
+| Full ID number, typed at verification | never stored in core; passes through | `identity_documents.document_number` | the same verification | last four characters | **Built**. Read only via `read_identity_number` (logs; refuses Exec View). Decided: a full number is shown only on an approved, logged request (`rbac.md` #9) |
 | Peer feedback text | the confirmation cycle is open, in `peer_feedback.feedback_text` | `feedback` | the cycle closes | who was asked, whether they responded | **Built** (`seal-feedback`). Budget: 30 days |
 | Confirmation and appraisal **form answers** | the cycle is open, in `form_answers.value` | `feedback` (kind `appraisal`) | the cycle closes | submission status | **Not built.** Same mechanism as peer feedback; add a `SealableKind` |
 | Review-cycle **decision note** (the manager's reasoning) and PnC's note | the review cycle is open, in `review_decisions.note` and `pnc_note` | `feedback` | the cycle closes | the decision itself, who decided, when | **Not built.** Readable in core by Super Admin, PnC Admin, Exec View and the manager only (`202610261000_review_cycles.sql`) |
@@ -79,7 +79,7 @@ it failed, and nobody is waiting on it any more.
 |---|---|---|
 | Name, team, email, joining and exit dates, employee type, manager | General data; the app runs on it | Every staff role (RLS `is_staff()`) |
 | Statuses and outcomes: confirmation decision yes or no, appraisal status, offboarding stage | Outcomes, not reasons | The roles in `FEATURE_ACCESS` |
-| Contact and personal details: phone, address, emergency contact, date of birth, blood group | Needed daily, low harm compared with the list above. **Open decision P1 below.** | The person; Super Admin, PnC Admin, PnC Ops (RLS) |
+| Contact and personal details: phone, address, emergency contact, date of birth, blood group | Needed daily, low harm compared with the list above. Decided: stays in core (P1 below). | The person; Super Admin, PnC Admin, PnC Ops (RLS) |
 | Masked residue: last four characters of a document number, `vault_document_id`, seal state | Lets people identify a record without holding it | As the parent record |
 | Configuration: templates, rules, cycles, document types | Not about a person | Staff read; config editors write |
 
@@ -121,7 +121,7 @@ is actually true:
 |---|---|---|
 | Member of the **production core** Supabase project | core, including every staged and not-yet-migrated item above | Super Admin only. Developers work in a separate dev project seeded with synthetic data (`supabase/seed/` uses `example.com`) |
 | Member of the **vault** project | the vault | Super Admin, and the sealed break-glass owner ([`vault-setup.md`](./vault-setup.md) §5). Never the platform team |
-| Anyone who can read the **Vercel environment variables** | core, through `SUPABASE_SERVICE_ROLE_KEY` | Super Admin. Production env vars should be visible to no developer |
+| Anyone who can read the **Vercel environment variables** | core, through `SUPABASE_SERVICE_ROLE_KEY` | Super Admin and the repository admin, for now (payroll O-04). Mark every secret Sensitive, so even they cannot read it back |
 | Anyone who can **deploy to production** | core, through code that runs with the service-role key | Merge to `main` requires review by a code owner (`.github/CODEOWNERS`) |
 
 Review these four lists quarterly, alongside `vault_roles`.
@@ -141,7 +141,8 @@ Review these four lists quarterly, alongside `vault_roles`.
 4. **Build what the inventory marks Not built**, in this order. Each depends on
    the one before.
    1. `sync-person`: the one-way copy of name, team and manager into `people`.
-      It is blocked on open decision #3 (whether a candidate is a Supabase user).
+      No longer blocked: decision #3 settled that a candidate is not a
+      Supabase user, so it copies from core's record.
    2. `read-identity-number`: an Edge Function around the SQL function, so the
       app has a logged path to it.
    3. ~~`submit-bank` and `approve-bank`~~ (built). Next: point the candidate
@@ -154,14 +155,14 @@ Review these four lists quarterly, alongside `vault_roles`.
    (decision D-01, [`payroll/README.md`](./payroll/README.md)).
 7. **Payroll**, which builds on all of the above (see the payroll design).
 
-## Open decisions
+## Decisions
 
-The vault-related decisions recorded in [`rbac.md`](./rbac.md) still stand:
-#3 candidate access, #6 withdrawn joiners' documents, and #9 who may read a
-full document number. This document adds three:
+The vault-related decisions in [`rbac.md`](./rbac.md) (#3 candidate access,
+#6 withdrawn joiners' documents, #9 full document numbers) were settled on
+2026-11-04. This document's own three were settled the same day:
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
-| P1 | Do contact details (phone, address, emergency contact, date of birth) belong in the vault? | Keep them in core behind RLS (the person themselves, plus identity-edit roles). They are needed daily and low-harm next to the list above. ID and address-proof **numbers** go to the vault |
-| P2 | Where do rendered letters live? | In the vault, delivered through the `letter` route. Core keeps type, status and signature date. This needs a vault letter store, which does not exist yet |
-| P3 | Should confirmation and appraisal form answers seal like peer feedback? | Yes, same trigger (the cycle closes) and the same 30-day budget |
+| P1 | Do contact details (phone, address, emergency contact, date of birth) belong in the vault? | **No.** They stay in core behind RLS (the person themselves, plus identity-edit roles). They are needed daily and low-harm next to the list above. ID and address-proof **numbers** go to the vault |
+| P2 | Where do rendered letters live? | **In the vault**, delivered through the `letter` route. Core keeps type, status and signature date. This needs a vault letter store, which does not exist yet |
+| P3 | Should confirmation and appraisal form answers seal like peer feedback? | **Yes**, same trigger (the cycle closes) and the same 30-day budget |
