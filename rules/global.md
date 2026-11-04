@@ -34,13 +34,15 @@ to the task at hand.
 | `rbac-settings.md` | RBAC system architecture and feature registration |
 | `greetings.md` | Dashboard greeting banner spec (not yet implemented) |
 | `version-and-changelog.md` | Automatic versioning and changelog maintenance requirement |
+| `disclosure.md` | What may be written in public (issues, commits, pull requests, comments, docs), and what to do when too much was |
+| `issues.md` | Every problem found becomes an issue: where, how, who owns it, how it closes |
 
 ## Precedence
 
 If two rules conflict, resolve in this order (most specific wins):
 
 1. A rule scoped to the exact file/folder being edited (via `globs:` in frontmatter)
-2. `security.md`, `data-access.md`, `data-import.md` (safety/correctness > style)
+2. `security.md`, `disclosure.md`, `data-access.md`, `data-import.md` (safety/correctness > style)
 3. `server-client-boundary.md`, `api-conventions.md` (architecture correctness)
 4. `code-standards.md` / `component-architecture.md` / `project-structure.md`
 5. `forms-and-validation.md` / `testing.md` / `performance.md`
@@ -54,3 +56,7 @@ If a conflict can't be resolved this way, stop and ask rather than guessing.
 These rules apply to all code generated or edited under `src/`, plus the SQL in
 `supabase/migrations/`. They do not apply to one-off maintenance scripts at the
 repo root unless explicitly asked.
+
+`disclosure.md` and `issues.md` are the exception: they apply to everything
+written anywhere in or about this repository — issues, comments, commits,
+branch names, pull requests, docs and scripts included.
