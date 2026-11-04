@@ -150,7 +150,8 @@ Review these four lists quarterly, alongside `vault_roles`.
    5. Sealing for form answers.
 5. **Migrate core** following the table above: one resource at a time, with the
    core copy dropped in the same change.
-6. **Move core to `ap-south-1`.**
+6. ~~**Move core to `ap-south-1`.**~~ Done: core is on a Mumbai project
+   (decision D-01, [`payroll/README.md`](./payroll/README.md)).
 7. **Payroll**, which builds on all of the above (see the payroll design).
 
 ## Open decisions
