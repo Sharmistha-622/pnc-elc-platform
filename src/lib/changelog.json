@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.09.02",
+    "date": "2026-11-04",
+    "title": "Open the review cycle instead of an empty compiled report",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "A confirmation run as a review cycle now opens its review page, instead of an empty compiled feedback report."
+      },
+      {
+        "category": "Improvements",
+        "description": "Removed the old \"Approve & Complete Confirmation\" button; confirmations are accepted by PnC Admin on the review page."
+      }
+    ]
+  },
+  {
     "version": "2.09.01",
     "date": "2026-11-04",
     "title": "Disable Submit while sending, auto-save answers, one-click View",
