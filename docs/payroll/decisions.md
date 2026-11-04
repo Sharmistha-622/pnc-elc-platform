@@ -62,7 +62,7 @@ inputs still owed.
 | D-20 | Later or out of scope | Consultant invoices (OTP e-accept, RM approval) come later. Reimbursements are out of scope; the reimbursement dashboard's API can be read later for extra data points if needed. | Nitin |
 | D-21 | Allocation | A person can be 100% on one project and donor, split across projects for one donor, or split across several projects and donors. | Nitin |
 | D-22 | Employee self-view | Monthly payslips, current salary structure, Form 16, and raising a payroll query. | Nitin |
-| D-23 | Totals views are toggled per role | Org-wide totals (cost, headcount by project or donor) are shown to roles the Super Admin switches on — candidates are Exec View, PnC Admin, managers (own team total), Finance. No individual amounts in any totals view. | Nitin |
+| D-23 | Totals views are toggled per role | Org-wide totals (cost, headcount by project or donor) are shown to roles the Super Admin switches on — candidates are Exec View, PnC Admin, heads of department (their own department's total; never line managers, O-03), Finance. No individual amounts in any totals view. | Nitin |
 | D-24 | Notifications | Email, a payroll Slack channel, and an in-app task list. | Nitin |
 | D-25 | PT state comes from the core location table | `ng_locations.state_code`, referencing the `indian_states` master (ISO 3166-2:IN codes); remote staff carry a work state on their engagement. | Pranjali |
 
@@ -96,8 +96,8 @@ calculator; detail and worked examples in [`pnc-rules.md`](./pnc-rules.md).
 |---|---|---|---|---|
 | O-01 | `ftc` label | Rename ELC's `ftc` to "Fixed-term employee" and add `consultant_ft`; or keep `ftc` = Full-Time Consultant and add `fixed_term`. Existing rows need mapping either way. | Nitin + P&C | Open |
 | O-02 | Sign-off chain | Which roles, in which order, for regular, FnF and adjustment runs. Is there a CEO step in the system? `exec_view` is view-only, so an approver needs a `ceo` role or an `approve_payroll` qualifier. | Nitin + Finance | Open |
-| O-03 | Totals through core | Totals contain amounts. Serving them to managers (who have no vault login) means core proxies a vault aggregate. Acceptable, given no individual figures? | Nitin | Open |
-| O-04 | Vault secrets in Vercel | `CORE_SUBMISSION_SECRET` marked Sensitive; production env editable by owners only. Confirm who those owners are. | Nitin | Open |
+| O-03 | Totals through core | Totals contain amounts. Serving them to managers (who have no vault login) means core proxies a vault aggregate. Acceptable, given no individual figures? | Nitin | **Decided 2026-11-04:** yes, but to the head of department only (`departments.head_of_department_id`), for their own department. Never to line managers. Whether to hide the total for very small departments is still to decide |
+| O-04 | Vault secrets in Vercel | `CORE_SUBMISSION_SECRET` marked Sensitive; production env editable by owners only. Confirm who those owners are. | Nitin | **Decided 2026-11-04:** Nitin and Sharmistha, for now |
 | O-05 | Sheets export and residency | Google Sheets export puts amounts in Google Drive. Allowed, or CSV / XLSX download only? | Finance | Open |
 | O-06 | xlsx library | Needed for imports and exports. Choice deferred to the slice that needs it. | Tech | Open |
 | O-07 | TDS declarations in Phase 1 | The scope document puts the declaration portal out of Phase 1; D-19 puts it in. Confirm. | Finance | Open |

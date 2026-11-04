@@ -158,22 +158,22 @@ Admin.
 |---|---|---|---|
 | 1 | Who verifies ID documents | **PnC Ops**, in core. The document is uploaded to core, verified there, and sealed into the vault on approval, leaving a completion marker and a masked number behind. PnC Ops therefore needs no vault login. | 2026-10-16 |
 | 2 | Where written feedback lives | **Core while the cycle is open, the vault once it closes.** Same mechanism as #1. `logged_function` is a real vault read, but only after sealing. | 2026-10-16 |
+| 3 | Candidate access | **A link emailed each time.** A candidate holds no account and is not a Supabase user: every visit to the offer page or the portal starts from a fresh link sent to their email. `sync-person` copies them into the vault from core's record, not from an account. | 2026-11-04 |
+| 6 | Withdrawn joiners' documents | **Deleted after a hold period: 90 days after withdrawal, for now.** PnC can change the period in Settings. `purgeWithdrawnDocuments` runs on a schedule, using that setting. | 2026-11-04 |
+| 9 | Full document numbers | **Aadhaar is collected. Everyone sees the last four digits only, the rest masked (`XXXX XXXX 1234`).** Seeing the full number is a request: a notice tells the requester the request is logged under the DPDP Act, they give a reason, and it goes to PnC Admin and Fin Admin to approve. Approving or refusing needs a reason too. Every request, approval and refusal is logged: who asked, who decided, and why. Until that is built, the full number is readable only through `read_identity_number` (Super Admin, PnC Admin, Fin Admin, Fin Ops; Exec View refused). | 2026-11-04 |
 
-Both were answered the same way, and became one mechanism — see
+#1 and #2 were answered the same way, and became one mechanism — see
 `src/lib/vault/sealing.ts`.
 
 ### Still open
 
 Carried from the source document, plus one found while encoding it. None of
-these blocks the role model; the remaining ones block parts of the vault build.
+these blocks the role model or the vault build.
 
 | # | Question | Why it matters |
 |---|---|---|
-| 3 | **Candidate access** — magic link, or a full account for the offer page and portal. | decides whether `candidate` is a Supabase user at all |
 | 4 | **Signing** — e-sign or upload, for the offer, agreement and Form 11. | |
 | 5 | **Account creation** — whether ELC creates Workspace and Slack accounts or only records who did. | |
-| 6 | **Withdrawn joiners** — keep or delete their uploaded documents, and for how long. The mechanism is built (`purgeWithdrawnDocuments`) but never runs on its own; their documents show in `exposed_records` with `orphaned = true`, meaning no trigger will ever seal them. | withdrawing is a workflow step; deleting someone's identity documents is a decision, so they are separate actions |
-| 9 | **Who may read a full document number**, and whether capturing Aadhaar at all is wanted. Built as: last four in core for everyone who needs to identify it, full number in the vault behind `read_identity_number`, readable by Super Admin, PnC Admin, Fin Admin and Fin Ops. Exec View is refused. | an Aadhaar number is a key, not a label; UIDAI guidance expects masked display and restricts storage, so this is worth confirming with whoever owns compliance |
 | 7 | **Per-type rules** — document checklist, PF/EPF applicability and confirmation offset per employee type. | |
 | 8 | **Group count.** The summary says six groups; the matrix lists seven (Owner, PnC, Finance, Leadership, Platform, Line, Lifecycle). The code encodes seven. | cosmetic, but the two should agree |
 

@@ -191,8 +191,8 @@ update break_glass_log
 
 Review that table when you are back.
 
-**Still open:** who holds the sealed credentials, and who may authorise opening
-them. Decide this before you create the account, not after.
+**Decided (2026-11-04):** a senior person outside the tech team holds the sealed
+credentials. Opening them needs the approval of the Super Admin or the CEO.
 
 ## 6. Check it works
 
@@ -277,13 +277,12 @@ Built and tested:
   `submit-bank` needs the person in `people` first, so end to end it waits on
   `sync-person`.
 
-Not built, and deliberately so — each is blocked on a decision in
-[`rbac.md`](./rbac.md):
+Not built yet:
 
-| Needed | Blocked on |
+| Needed | Status |
 |---|---|
-| `payroll-export` | needs the Super Admin alert channel decided |
-| `sync-person` (core → vault, one way) | #3 — whether a candidate is a Supabase user at all |
+| `payroll-export` | Blocked: needs the Super Admin alert channel decided |
+| `sync-person` (core → vault, one way) | Unblocked: `rbac.md` #3 settled that a candidate is not a Supabase user, so it copies from core's record |
 
 ## Sealing, and the window it leaves open
 
