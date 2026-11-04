@@ -7,14 +7,11 @@ import { getHasReports } from "@/lib/employees/hasReports";
 import { TONES } from "@/lib/ui/tone";
 import { AtAGlance } from "./_components/dashboard/at-a-glance";
 import { WaitingOnYou } from "./_components/dashboard/waiting-on-you";
+import { RoleDashboardView } from "./_components/dashboard/role-dashboard-view";
 
 /**
- * The home screen, composed per role by `src/lib/dashboard/widgets.ts`.
- *
- * It replaced a grid of eight shortcut cards that every role was shown, most
- * of which led somewhere the role was then refused. The sidebar is the way
- * around the app; this page is what is waiting on you, and the few numbers
- * your job turns on.
+ * The home screen, customized per role.
+ * Shows role-appropriate people data and activities without crossing over to world data.
  */
 export default async function DashboardPage({
   searchParams,
@@ -39,6 +36,7 @@ export default async function DashboardPage({
           <p className="-mt-2 text-sm text-muted-foreground">{data.focus}</p>
           <WaitingOnYou groups={data.tasks} />
           <AtAGlance stats={data.stats} />
+          {role && <RoleDashboardView role={role} data={data.roleCustomData} />}
         </>
       )}
     </div>
