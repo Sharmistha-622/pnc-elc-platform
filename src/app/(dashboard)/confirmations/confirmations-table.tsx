@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/employees/tenure";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -321,8 +322,8 @@ export function ConfirmationsTable({ initialConfirmations }: ConfirmationsTableP
                   </TableCell>
 
                   {/* Initiated Date */}
-                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground">
-                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
+                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground" suppressHydrationWarning>
+                    {c.createdAt ? formatDate(c.createdAt) : "—"}
                   </TableCell>
 
                   {/* Actions */}

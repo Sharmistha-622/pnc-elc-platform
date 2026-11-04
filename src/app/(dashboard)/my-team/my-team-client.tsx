@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import type { EmployeeProfileData } from '@/lib/profile/profileActions'
+import { formatDate } from '@/lib/employees/tenure'
 
 interface MyTeamClientProps {
   currentManagerName: string
@@ -260,8 +261,8 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
                     {rep.team || 'None'}
                   </TableCell>
 
-                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground font-mono">
-                    {rep.joiningDate ? new Date(rep.joiningDate).toLocaleDateString() : '—'}
+                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground font-mono" suppressHydrationWarning>
+                    {rep.joiningDate ? formatDate(rep.joiningDate) : '—'}
                   </TableCell>
 
                   <TableCell className="py-2.5 px-3">

@@ -12,6 +12,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { formatDate } from '@/lib/employees/tenure'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -261,7 +262,7 @@ export function MyFormsClient({
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 px-3 text-xs text-muted-foreground">
-                      {item.assignedAt ? new Date(item.assignedAt).toLocaleDateString() : '—'}
+                      {item.assignedAt ? formatDate(item.assignedAt) : '—'}
                     </TableCell>
                     <TableCell className="py-3 px-3 text-right">
                       {item.canOpen ? (

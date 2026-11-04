@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateReportingManager, type EmployeeProfileData } from '@/lib/profile/profileActions'
+import { formatDate } from '@/lib/employees/tenure'
 import { toast } from 'sonner'
 import { useUserContext } from '@/contexts/user-context'
 import { accessFor } from '@/lib/rbac/roles'
@@ -184,7 +185,7 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
               Joining Date
             </span>
             <div className="font-semibold text-foreground">
-              {profile.joiningDate ? new Date(profile.joiningDate).toLocaleDateString() : '—'}
+              {profile.joiningDate ? formatDate(profile.joiningDate) : '—'}
             </div>
           </div>
 
@@ -194,7 +195,7 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
             </span>
             <div className="font-semibold text-foreground">
               {profile.confirmationDate
-                ? `Confirmed (${new Date(profile.confirmationDate).toLocaleDateString()})`
+                ? `Confirmed (${formatDate(profile.confirmationDate)})`
                 : 'In Probation'}
             </div>
           </div>
