@@ -32,6 +32,21 @@ found it, before that pull request merges. Say so in its body instead.
 assigned to them in both trackers, then file anything new that came up while
 answering, assigned to them.
 
+## Seeing everything in one place
+
+Each issue lives in one tracker only, never both, and the public repository
+never holds a placeholder for a private issue (`disclosure.md` §2). To see
+both at once, use a view only you can see: GitHub's issues dashboard
+(github.com/issues), with this search saved as a view.
+
+```
+is:issue is:open assignee:@me repo:Sharmistha-622/pnc-elc-platform repo:Nitinsudarshan/pnc-elc-security
+```
+
+It shows the security repository's issues only to people who can open that
+repository. A private GitHub Project board holding issues from both works
+the same way, if columns are wanted; it must stay private.
+
 ## Where
 
 Decide the tier first (`disclosure.md` §1).

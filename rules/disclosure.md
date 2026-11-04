@@ -35,9 +35,9 @@ the higher one.
 an S1 fix is S1: while it is open, it says production is still exposed.
 
 **The private tracker** is `Nitinsudarshan/pnc-elc-security`, a private
-repository. Its issues may carry full detail. Saying that something is
-"tracked privately" is fine; linking to or numbering a private issue in public
-text is not.
+repository. Its issues may carry full detail. Saying in general that security
+problems are tracked privately is fine; pointing at any one of them in public
+is not: no link, no number, no placeholder (§2).
 
 ## 2. Writing in public
 
@@ -63,6 +63,14 @@ text is not.
   records. Test data uses `example.com` and invented people.
 - **Production logs or error output**: they carry emails, ids and tokens.
 - **Links to private-tracker issues**, or their numbers.
+- **Placeholders for S1 or S2 problems**: no public issue, project card or
+  note that stands in for one, however empty ("Security item, tracked
+  privately", a bare link, an issue to close once the private one is fixed).
+  While it is open, it says production is exposed; next to the pull requests
+  landing at the same time, it says where; and together they show how many
+  serious problems are open and for how long. To see both trackers in one
+  place, use the private view in `issues.md` ("Seeing everything in one
+  place").
 
 ### Examples (invented)
 
@@ -93,8 +101,9 @@ Not only issues. For an S1 or S2 problem, until it is fixed in production:
 | Vercel and other bot comments | Preview links are posted publicly on every pull request, so previews must never use production keys or data |
 
 Once a problem is fixed in **every** environment, the full story may be
-written up, as `docs/security-review-2026-10.md` was. Nothing in such a
-write-up may still be open.
+written up, as `docs/security-review-2026-10.md` was, or recorded as a public
+issue filed already closed, in neutral words, linking the fix. Nothing in
+such a record may still be open.
 
 ## 4. Fix first, describe later (S1 and S2)
 
@@ -147,7 +156,8 @@ Speed beats tidiness. In this order:
 - [ ] No secrets, private identifiers, personal data, production logs or
       screenshots.
 - [ ] Nothing says which environment is still unfixed.
-- [ ] No link to a private issue.
+- [ ] No link to a private issue, no private issue number, and no public
+      placeholder standing in for one.
 
 **Claude** runs this checklist before every public issue, comment, commit,
 push and pull request. If a request would break this rule — "file this in the
