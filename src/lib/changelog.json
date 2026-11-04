@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.09.04",
+    "date": "2026-11-04",
+    "title": "Follow-ups from reviewing #69 and #70",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Line managers who open a confirmation's report now land on the review in My Reviews, not on the dashboard."
+      },
+      {
+        "category": "Fixes",
+        "description": "Form auto-save no longer fails when two saves start at the same moment, no longer reloads the page after each save, and offers \"Try again\" when a save fails."
+      },
+      {
+        "category": "Fixes",
+        "description": "An old error notice on a form now clears after the next successful auto-save."
+      },
+      {
+        "category": "Security",
+        "description": "Removed the unused server action that approved a confirmation from the old compiled report."
+      }
+    ]
+  },
+  {
     "version": "2.09.03",
     "date": "2026-11-04",
     "title": "Claude/elc site documentation ykm3ro",
