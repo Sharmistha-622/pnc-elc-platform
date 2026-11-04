@@ -1246,7 +1246,7 @@ export async function getAllOffboardingCases(): Promise<OffboardingCase[]> {
 
     clearTimeout(timeout);
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       return data.map((row: any) => ({
         ...row,
         employee_name: row.employees?.name || row.employee_name,
@@ -2742,7 +2742,7 @@ export async function getAllResignationRequests(): Promise<ResignationRequest[]>
 
     clearTimeout(timeout);
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       return data.map((row: any) => ({
         ...row,
         employee_name: row.employees?.name || row.employee_name,
