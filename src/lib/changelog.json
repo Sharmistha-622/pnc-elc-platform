@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.09.03",
+    "date": "2026-11-04",
+    "title": "Claude/elc site documentation ykm3ro",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Claude/elc site documentation ykm3ro"
+      }
+    ]
+  },
+  {
     "version": "2.09.02",
     "date": "2026-11-04",
     "title": "Open the review cycle instead of an empty compiled report",
