@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle, ArrowRight, CheckCircle2, ClipboardCheck, Inbox, MessageSquare } from "lucide-react";
+import { AlertCircle, ArrowRight, ClipboardCheck, Inbox, MessageSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,30 +22,21 @@ const ICONS: Record<TaskWidgetId, LucideIcon> = {
 export function WaitingOnYou({ groups }: { groups: TaskGroup[] }) {
   const pending = groups.filter((g) => g.items.length > 0 || !g.loaded);
 
+  if (pending.length === 0) {
+    return null;
+  }
+
   return (
     <section aria-labelledby="waiting-heading" className="space-y-3">
       <h2 id="waiting-heading" className="text-base font-semibold tracking-tight text-foreground">
         Waiting on you
       </h2>
 
-      {pending.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className={`flex size-8 items-center justify-center rounded-lg ${TONES.success.chip}`}>
-              <CheckCircle2 className="size-4" aria-hidden="true" />
-            </span>
-            <p className="text-sm text-muted-foreground">
-              You&apos;re all caught up — nothing is waiting on you.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {pending.map((group) => (
-            <TaskPanel key={group.id} group={group} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {pending.map((group) => (
+          <TaskPanel key={group.id} group={group} />
+        ))}
+      </div>
     </section>
   );
 }
