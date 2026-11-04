@@ -27,16 +27,16 @@ done
 psql_ -d "${DB}" <<'SQL'
 -- The cast. M manages R. P1–P5 are R's colleagues. A1 joined long enough ago
 -- to be in an appraisal batch. Everyone is made up.
-insert into public.employees (id, name, email, employee_type, joining_date, status, manager_id) values
-  ('10000000-0000-0000-0000-00000000000a', 'Meera Manager', 'meera@navgurukul.org', 'fte', '2024-01-01', 'active', null),
-  ('10000000-0000-0000-0000-00000000000b', 'Ravi Report',   'ravi@navgurukul.org',  'fte', '2026-07-20', 'active', '10000000-0000-0000-0000-00000000000a'),
-  ('10000000-0000-0000-0000-0000000000c1', 'Pia Peer',      'pia@navgurukul.org',   'fte', '2025-01-01', 'active', null),
-  ('10000000-0000-0000-0000-0000000000c2', 'Paul Peer',     'paul@navgurukul.org',  'fte', '2025-01-01', 'active', null),
-  ('10000000-0000-0000-0000-0000000000c3', 'Priya Peer',    'priya@navgurukul.org', 'fte', '2025-01-01', 'active', null),
-  ('10000000-0000-0000-0000-0000000000c4', 'Pranav Peer',   'pranav@navgurukul.org','fte', '2025-01-01', 'active', null),
-  ('10000000-0000-0000-0000-0000000000c5', 'Pooja Peer',    'pooja@navgurukul.org', 'fte', '2025-01-01', 'active', null),
-  ('10000000-0000-0000-0000-0000000000d1', 'Anil Appraisee','anil@navgurukul.org',  'fte', '2025-04-01', 'active', '10000000-0000-0000-0000-00000000000a'),
-  ('10000000-0000-0000-0000-0000000000e1', 'Old Record',    'old@navgurukul.org',   'fte', '2019-01-01', 'active', '10000000-0000-0000-0000-00000000000a');
+insert into public.employees (id, name, email, employee_type, joining_date, status, manager_id, is_alumni) values
+  ('10000000-0000-0000-0000-00000000000a', 'Meera Manager', 'meera@navgurukul.org', 'fte', '2024-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-00000000000b', 'Ravi Report',   'ravi@navgurukul.org',  'fte', '2026-07-20', 'active', '10000000-0000-0000-0000-00000000000a', false),
+  ('10000000-0000-0000-0000-0000000000c1', 'Pia Peer',      'pia@navgurukul.org',   'fte', '2025-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-0000000000c2', 'Paul Peer',     'paul@navgurukul.org',  'fte', '2025-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-0000000000c3', 'Priya Peer',    'priya@navgurukul.org', 'fte', '2025-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-0000000000c4', 'Pranav Peer',   'pranav@navgurukul.org','fte', '2025-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-0000000000c5', 'Pooja Peer',    'pooja@navgurukul.org', 'fte', '2025-01-01', 'active', null, false),
+  ('10000000-0000-0000-0000-0000000000d1', 'Anil Appraisee','anil@navgurukul.org',  'fte', '2025-04-01', 'active', '10000000-0000-0000-0000-00000000000a', false),
+  ('10000000-0000-0000-0000-0000000000e1', 'Old Record',    'old@navgurukul.org',   'fte', '2019-01-01', 'active', '10000000-0000-0000-0000-00000000000a', false);
 
 -- Their accounts. PnC Admin and PnC Ops have no employee record.
 insert into auth.users (id, email, raw_app_meta_data) values

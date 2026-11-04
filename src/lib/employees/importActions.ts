@@ -26,7 +26,7 @@ async function loadDirectory(db: SupabaseClient): Promise<ExistingEmployee[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db
       .from('employees')
-      .select('id, email, employee_code, name, employee_type, joining_date, manager_id, team, status, confirmation_date, conversion_date')
+      .select('id, email, employee_code, name, employee_type, joining_date, manager_id, team, status, confirmation_date, conversion_date, is_alumni')
       .order('id')
       .range(from, from + PAGE - 1)
     if (error) throw new Error(`Could not read the directory: ${error.message}`)
@@ -144,6 +144,7 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
           team_id: teamIdFor(r.write.team),
           confirmation_date: r.write.confirmation_date ?? null,
           conversion_date: r.write.conversion_date ?? null,
+          is_alumni: r.write.is_alumni,
         }))
       )
       .select('id, email')

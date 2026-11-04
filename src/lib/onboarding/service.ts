@@ -315,6 +315,9 @@ export async function createOnboardingRecord(
    */
   customLetters?: Partial<Record<GeneratedDocumentType, string>>
 ): Promise<FullOnboardingData> {
+  if (typeof payload.is_alumni !== 'boolean') {
+    throw new Error('Say whether the candidate is a NavGurukul alumnus (yes or no).');
+  }
   const db = onboardingDb();
   const token = generateInvitationToken(payload.candidate_name);
 
@@ -339,7 +342,7 @@ export async function createOnboardingRecord(
       ctc: payload.ctc ?? null,
       ctc_amount: payload.ctc_amount ?? null,
       ctc_frequency: payload.ctc_frequency ?? null,
-      is_alumni: payload.is_alumni ?? false,
+      is_alumni: payload.is_alumni,
       role_responsibilities: payload.role_responsibilities ?? null,
       status: 'draft',
       progress_percentage: 0,
@@ -1172,6 +1175,10 @@ async function linkEmployeeRecord(
     team_id: record.team_id ?? null,
     manager_id: record.manager_id ?? null,
     status: 'active',
+    // Mandatory on every employee (the database refuses a new one without it).
+    // Yes when either PnC (on the record) or the candidate (in their personal
+    // details) said so, exactly as the onboarding review screen shows it.
+    is_alumni: Boolean(data.personalDetails?.is_alumni || record.is_alumni),
   };
 
   let employeeId = (existing as { id: string } | null)?.id ?? null;

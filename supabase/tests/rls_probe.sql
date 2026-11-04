@@ -17,10 +17,10 @@ set client_min_messages = warning;
 -- The cast
 -------------------------------------------------------------------------
 -- M manages R. X is R's peer reviewer. Everyone else is a role holder.
-insert into public.employees (id, name, email, employee_type, joining_date, status, manager_id) values
-  ('00000000-0000-0000-0000-00000000000a', 'M Manager', 'm@navgurukul.org', 'fte', '2025-01-01', 'active', null),
-  ('00000000-0000-0000-0000-00000000000b', 'R Report',  'r@navgurukul.org', 'fte', '2026-06-01', 'active', '00000000-0000-0000-0000-00000000000a'),
-  ('00000000-0000-0000-0000-00000000000c', 'X Peer',    'x@navgurukul.org', 'fte', '2025-01-01', 'active', null);
+insert into public.employees (id, name, email, employee_type, joining_date, status, manager_id, is_alumni) values
+  ('00000000-0000-0000-0000-00000000000a', 'M Manager', 'm@navgurukul.org', 'fte', '2025-01-01', 'active', null, false),
+  ('00000000-0000-0000-0000-00000000000b', 'R Report',  'r@navgurukul.org', 'fte', '2026-06-01', 'active', '00000000-0000-0000-0000-00000000000a', true),
+  ('00000000-0000-0000-0000-00000000000c', 'X Peer',    'x@navgurukul.org', 'fte', '2025-01-01', 'active', null, false);
 
 insert into public.employee_profiles (employee_id, contact_number, id_proof_number)
   values ('00000000-0000-0000-0000-00000000000b', '+91 90000 00000', 'ID-NUMBER-R');

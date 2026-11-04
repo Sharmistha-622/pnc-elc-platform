@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { DocumentLetterhead } from '@/components/shared/document-letterhead';
@@ -104,7 +105,9 @@ export default function CreateCandidateOnboardingPage() {
     notice_period: '1 Month',
     ctc_amount: 60000,
     ctc_frequency: 'monthly' as CtcFrequency,
-    is_alumni: false,
+    // No default: PnC must answer it for every candidate (it becomes the
+    // employee's mandatory alumni status), so a blank cannot pass as "No".
+    is_alumni: null as boolean | null,
     role_responsibilities:
       'Lead key engineering deliverables, mentor student cohorts, collaborate with cross-functional campus teams, and actively support student technical learning.',
     send_invite_immediately: true,
@@ -229,6 +232,8 @@ export default function CreateCandidateOnboardingPage() {
     toast.success(`Loaded "${template.name}" with candidate details mapped`);
   };
 
+  const [alumniMissing, setAlumniMissing] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -248,6 +253,12 @@ export default function CreateCandidateOnboardingPage() {
       // The salary split and the employee record are both resolved from this,
       // so creating without it would silently produce an FTE annexure.
       toast.error('Select an employment type');
+      return;
+    }
+    if (formData.is_alumni === null) {
+      setAlumniMissing(true);
+      toast.error('Say whether the candidate is a NavGurukul alumnus');
+      document.getElementById('is-alumni-yes')?.focus();
       return;
     }
 
@@ -373,17 +384,45 @@ export default function CreateCandidateOnboardingPage() {
               />
             </div>
 
-            <div className="sm:col-span-2 flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+            <div
+              className={`sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 bg-muted/30 ${
+                alumniMissing ? 'border-destructive' : ''
+              }`}
+            >
               <div className="space-y-0.5">
-                <Label className="text-xs font-semibold">NavGurukul Alumni</Label>
-                <p className="text-[11px] text-muted-foreground">
+                <Label id="is-alumni-label" className="text-xs font-semibold">
+                  NavGurukul Alumni <span className="text-destructive">*</span>
+                </Label>
+                <p id="is-alumni-help" className="text-[11px] text-muted-foreground">
                   Is this candidate a graduate/alumni of a NavGurukul residential school program?
                 </p>
+                {alumniMissing && (
+                  <p role="alert" className="text-[11px] text-destructive">
+                    Choose Yes or No.
+                  </p>
+                )}
               </div>
-              <Switch
-                checked={formData.is_alumni}
-                onCheckedChange={(checked) => handleChange('is_alumni', checked)}
-              />
+              <RadioGroup
+                aria-labelledby="is-alumni-label"
+                aria-describedby="is-alumni-help"
+                aria-required="true"
+                aria-invalid={alumniMissing || undefined}
+                className="flex gap-4"
+                value={formData.is_alumni === null ? '' : formData.is_alumni ? 'yes' : 'no'}
+                onValueChange={(v) => {
+                  handleChange('is_alumni', v === 'yes');
+                  setAlumniMissing(false);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="is-alumni-yes" value="yes" aria-invalid={alumniMissing || undefined} />
+                  <Label htmlFor="is-alumni-yes" className="text-xs font-medium">Yes</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="is-alumni-no" value="no" aria-invalid={alumniMissing || undefined} />
+                  <Label htmlFor="is-alumni-no" className="text-xs font-medium">No</Label>
+                </div>
+              </RadioGroup>
             </div>
           </CardContent>
         </Card>
