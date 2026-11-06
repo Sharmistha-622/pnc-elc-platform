@@ -32,22 +32,26 @@ function StatTile({ stat }: { stat: StatResult }) {
   return (
     <Link
       href={stat.href}
-      className="group flex flex-col gap-1 rounded-lg border bg-card p-4 shadow-xs transition-colors hover:border-foreground/20 hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="group flex flex-col justify-between gap-2 rounded-xl border border-border/70 bg-card p-4 shadow-2xs transition-all hover:border-indigo-300 dark:hover:border-indigo-800 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-      <span className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
-        {stat.label}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors truncate">
+          {stat.label}
+        </span>
         <ArrowUpRight
-          className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+          className="size-3.5 shrink-0 text-muted-foreground opacity-40 transition-all group-hover:opacity-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
           aria-hidden="true"
         />
-      </span>
-      <span
-        className="text-2xl font-semibold tabular-nums tracking-tight text-foreground"
-        title={unavailable ? "Couldn't load this number" : undefined}
-      >
-        {unavailable ? "—" : formatter.format(stat.value!)}
-      </span>
-      <span className="text-xs text-muted-foreground">{stat.hint}</span>
+      </div>
+      <div className="space-y-0.5">
+        <span
+          className="text-2xl font-bold tabular-nums tracking-tight text-foreground block"
+          title={unavailable ? "Couldn't load this number" : undefined}
+        >
+          {unavailable ? "—" : formatter.format(stat.value!)}
+        </span>
+        <span className="text-[11px] text-muted-foreground block truncate">{stat.hint}</span>
+      </div>
     </Link>
   );
 }
