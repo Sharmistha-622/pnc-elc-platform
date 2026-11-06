@@ -10,6 +10,7 @@ export type Employee = {
   exit_date?: string | null
   confirmation_date: string | null
   status: string
+  is_alumni?: boolean | null
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -24,8 +25,10 @@ export async function getEmployees(): Promise<Employee[]> {
       email,
       joining_date,
       exit_date,
+      is_alumni,
       confirmation_date,
       status,
+
       employee_types ( name ),
       teams ( name )
     `)
@@ -44,6 +47,7 @@ export async function getEmployees(): Promise<Employee[]> {
         joining_date,
         confirmation_date,
         status,
+
         employee_types ( name ),
         teams ( name )
       `)
@@ -68,5 +72,6 @@ export async function getEmployees(): Promise<Employee[]> {
     exit_date: row.exit_date || null,
     confirmation_date: row.confirmation_date,
     status: row.status || 'active',
+    is_alumni: row.is_alumni ?? null,
   }))
 }
