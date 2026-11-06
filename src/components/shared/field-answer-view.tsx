@@ -23,7 +23,7 @@ interface FieldAnswerViewProps {
   employeeNames?: Map<string, string>
 }
 
-function getRatingMetadata(score: number) {
+export function getRatingMetadata(score: number) {
   if (score >= 5) {
     return {
       label: 'Outstanding',
@@ -70,6 +70,176 @@ function getRatingMetadata(score: number) {
 }
 
 /**
+ * Beautifully renders a rating grid with summary bar and individual criterion bar charts.
+ */
+export function RatingGridVisual({ entries }: { entries: [string, number][] }) {
+  if (entries.length === 0) {
+    return <span className="text-muted-foreground italic text-xs">No ratings provided</span>
+  }
+
+  // Calculate summary stats
+  const totalScore = entries.reduce((sum, [, score]) => sum + (Number(score) || 0), 0)
+  const averageScore = (totalScore / entries.length).toFixed(1)
+  const avgNum = Number(averageScore)
+  const avgMeta = getRatingMetadata(Math.round(avgNum))
+
+  return (
+    <div className="space-y-4 pt-1">
+      {/* Summary Banner for the evaluation */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/60 p-3 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-7 items-center justify-center rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+            <BarChart3 className="size-4" />
+          </span>
+          <div>
+            <span className="text-xs font-semibold text-foreground block">
+              Overall Competency Rating
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Evaluated across {entries.length} criteria on a 1 to 5 scale
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`font-mono text-xs font-bold border px-2.5 py-1 ${avgMeta.tone}`}>
+            Average: {averageScore} / 5
+          </Badge>
+        </div>
+      </div>
+
+      {/* Cards with visual bar graphs for each criterion */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {entries.map(([criterion, score]) => {
+          const num = Number(score) || 0
+          const percentage = Math.min(Math.max((num / 5) * 100, 0), 100)
+          const meta = getRatingMetadata(num)
+
+          return (
+            <div
+              key={criterion}
+              className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-all hover:border-border hover:shadow-xs space-y-2.5"
+            >
+              {/* Criterion Title and Score Badge */}
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-semibold text-xs text-foreground tracking-tight leading-snug">
+                  {criterion}
+                </span>
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border ${meta.tone}`}
+                >
+                  <span>{num} / 5</span>
+                </span>
+              </div>
+
+              {/* Visual Bar Graph with Gradient Fill */}
+              <div className="space-y-1.5">
+                <div className="relative h-2.5 w-full rounded-full bg-muted/80 overflow-hidden shadow-inner">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${meta.barColor}`}
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+
+                {/* 5-Level Scale Pips */}
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5 font-mono">
+                  {[1, 2, 3, 4, 5].map((lvl) => {
+                    const isReached = lvl <= num
+                    return (
+                      <div key={lvl} className="flex flex-col items-center gap-0.5">
+                        <span
+                          className={`size-1.5 rounded-full transition-colors ${
+                            isReached ? meta.dotColor : 'bg-muted-foreground/20'
+                          }`}
+                        />
+                        <span className={isReached ? 'font-bold text-foreground' : 'text-muted-foreground/60'}>
+                          {lvl}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Beautifully renders a single rating score with gradient bar.
+ */
+export function RatingScoreVisual({ num }: { num: number }) {
+  const percentage = Math.min(Math.max((num / 5) * 100, 0), 100)
+  const meta = getRatingMetadata(num)
+
+  return (
+    <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs space-y-3 max-w-md">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-medium">Rating Score</span>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${meta.tone}`}>
+          <Star className="size-3 fill-current" />
+          <span>{num} / 5</span>
+          <span className="font-normal opacity-80">&bull; {meta.label}</span>
+        </span>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="relative h-2.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${meta.barColor}`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+          {[1, 2, 3, 4, 5].map((lvl) => (
+            <span key={lvl} className={lvl <= num ? 'font-bold text-foreground' : 'opacity-60'}>
+              {lvl}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Smart Review Answer View for arbitrary text answers, detecting multiline rating grids
+ * or rating numbers and rendering them as rich bar charts.
+ */
+export function SmartReviewAnswerView({ label, value }: { label?: string; value: string }) {
+  if (!value || value.trim() === '') {
+    return <span className="text-muted-foreground italic text-xs">No response provided</span>
+  }
+
+  const lines = value.split('\n').map((l) => l.trim()).filter(Boolean)
+  const isRatingGrid =
+    lines.length > 0 &&
+    lines.every((line) => /^(.+):\s*([0-5](?:\.\d+)?)\s*\/\s*5$/.test(line))
+
+  if (isRatingGrid) {
+    const entries = lines.map((line) => {
+      const match = line.match(/^(.+):\s*([0-5](?:\.\d+)?)\s*\/\s*5$/)!
+      return [match[1].trim(), Number(match[2])] as [string, number]
+    })
+    return <RatingGridVisual entries={entries} />
+  }
+
+  const singleRatingMatch = value.trim().match(/^([0-5](?:\.\d+)?)\s*\/\s*5$/)
+  if (singleRatingMatch) {
+    return <RatingScoreVisual num={Number(singleRatingMatch[1])} />
+  }
+
+  return (
+    <div className="text-sm font-medium text-foreground whitespace-pre-line leading-relaxed">
+      {value}
+    </div>
+  )
+}
+
+/**
  * Beautifully renders stored form answers.
  * Transforms rating grids and ratings into visually appealing mini bar charts
  * and score meters rather than plain text strings.
@@ -83,148 +253,29 @@ export function FieldAnswerView({ field, value, employeeNames = new Map() }: Fie
     case 'rating_grid': {
       const rated = asObject(value)
       const entries = Object.entries(rated)
-
-      if (entries.length === 0) {
-        return <span className="text-muted-foreground italic text-xs">No ratings provided</span>
-      }
-
-      // Calculate summary stats
-      const totalScore = entries.reduce((sum, [, score]) => sum + (Number(score) || 0), 0)
-      const averageScore = (totalScore / entries.length).toFixed(1)
-      const avgNum = Number(averageScore)
-      const avgMeta = getRatingMetadata(Math.round(avgNum))
-
-      return (
-        <div className="space-y-4 pt-1">
-          {/* Summary Banner for the evaluation */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/60 p-3 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex size-7 items-center justify-center rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-                <BarChart3 className="size-4" />
-              </span>
-              <div>
-                <span className="text-xs font-semibold text-foreground block">
-                  Overall Competency Rating
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Evaluated across {entries.length} criteria on a 1 to 5 scale
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={`font-mono text-xs font-bold border px-2.5 py-1 ${avgMeta.tone}`}>
-                Average: {averageScore} / 5
-              </Badge>
-            </div>
-          </div>
-
-          {/* Cards with small visual bar graphs for each criterion */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {entries.map(([criterion, score]) => {
-              const num = Number(score) || 0
-              const percentage = Math.min(Math.max((num / 5) * 100, 0), 100)
-              const meta = getRatingMetadata(num)
-
-              return (
-                <div
-                  key={criterion}
-                  className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-all hover:border-border hover:shadow-xs space-y-2.5"
-                >
-                  {/* Criterion Title and Score Badge */}
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-semibold text-xs text-foreground tracking-tight leading-snug">
-                      {criterion}
-                    </span>
-                    <span
-                      className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border ${meta.tone}`}
-                    >
-                      <span>{num} / 5</span>
-                    </span>
-                  </div>
-
-                  {/* Visual Bar Graph with Gradient Fill */}
-                  <div className="space-y-1.5">
-                    <div className="relative h-2.5 w-full rounded-full bg-muted/80 overflow-hidden shadow-inner">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${meta.barColor}`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-
-                    {/* 5-Level Scale Pips */}
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5 font-mono">
-                      {[1, 2, 3, 4, 5].map((lvl) => {
-                        const isReached = lvl <= num
-                        return (
-                          <div key={lvl} className="flex flex-col items-center gap-0.5">
-                            <span
-                              className={`size-1.5 rounded-full transition-colors ${
-                                isReached ? meta.dotColor : 'bg-muted-foreground/20'
-                              }`}
-                            />
-                            <span className={isReached ? 'font-bold text-foreground' : 'text-muted-foreground/60'}>
-                              {lvl}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )
+      return <RatingGridVisual entries={entries} />
     }
 
     case 'rating': {
       const num = Number(asString(value)) || 0
-      const percentage = Math.min(Math.max((num / 5) * 100, 0), 100)
-      const meta = getRatingMetadata(num)
-
-      return (
-        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs space-y-3 max-w-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">Rating Score</span>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${meta.tone}`}>
-              <Star className="size-3 fill-current" />
-              <span>{num} / 5</span>
-              <span className="font-normal opacity-80">&bull; {meta.label}</span>
-            </span>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="relative h-2.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r ${meta.barColor}`}
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
-              <span>1 (Lowest)</span>
-              <span>3 (Meets)</span>
-              <span>5 (Highest)</span>
-            </div>
-          </div>
-        </div>
-      )
+      return <RatingScoreVisual num={num} />
     }
 
-    case 'yes_no': {
-      const isYes = String(value).toLowerCase() === 'yes'
+    case 'boolean': {
+      const isTrue = value === true || value === 'true'
       return (
         <div className="pt-0.5">
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold border ${
-              isYes
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
-                : 'bg-muted text-muted-foreground border-border'
+          <Badge
+            variant="outline"
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${
+              isTrue
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
             }`}
           >
-            {isYes ? <CheckCircle2 className="size-3.5 text-emerald-600" /> : <XCircle className="size-3.5 text-rose-500" />}
-            <span>{isYes ? 'Yes' : 'No'}</span>
-          </span>
+            {isTrue ? <CheckCircle2 className="size-3.5" /> : <XCircle className="size-3.5" />}
+            <span>{isTrue ? 'Yes' : 'No'}</span>
+          </Badge>
         </div>
       )
     }
