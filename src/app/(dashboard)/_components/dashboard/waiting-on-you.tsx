@@ -20,7 +20,7 @@ const ICONS: Record<TaskWidgetId, LucideIcon> = {
  * three empty panels each announcing it has nothing to say.
  */
 export function WaitingOnYou({ groups }: { groups: TaskGroup[] }) {
-  const pending = groups.filter((g) => g.items.length > 0 || !g.loaded);
+  const pending = groups.filter((g) => g.items.length > 0);
 
   if (pending.length === 0) {
     return null;

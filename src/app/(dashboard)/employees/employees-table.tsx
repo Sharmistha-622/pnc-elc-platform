@@ -13,6 +13,7 @@ import {
   UserCheck,
   UserX,
   Filter,
+  GraduationCap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
   const [typeFilter, setTypeFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [alumniFilter, setAlumniFilter] = useState<'all' | 'alumni' | 'external'>('all');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -122,9 +124,17 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
         }
       }
 
+      // Alumni background filter
+      if (alumniFilter === 'alumni' && !emp.is_alumni) {
+        return false;
+      }
+      if (alumniFilter === 'external' && emp.is_alumni) {
+        return false;
+      }
+
       return true;
     });
-  }, [currentTabList, search, typeFilter, teamFilter, statusFilter, activeTab]);
+  }, [currentTabList, search, typeFilter, teamFilter, statusFilter, alumniFilter, activeTab]);
 
   // Sort list
   const sorted = useMemo(() => {
@@ -206,13 +216,15 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
     search.trim() !== '' ||
     typeFilter !== 'all' ||
     teamFilter !== 'all' ||
-    statusFilter !== 'all';
+    statusFilter !== 'all' ||
+    alumniFilter !== 'all';
 
   const clearFiltersAndSort = () => {
     setSearch('');
     setTypeFilter('all');
     setTeamFilter('all');
     setStatusFilter('all');
+    setAlumniFilter('all');
     setSortField('name');
     setSortOrder('asc');
     setCurrentPage(1);
@@ -382,6 +394,28 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
               </Select>
             )}
 
+            {/* Filter by Alumni Background */}
+            <Select
+              value={alumniFilter}
+              onValueChange={(val) => {
+                setAlumniFilter(val as 'all' | 'alumni' | 'external');
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[145px]">
+                <div className="flex items-center gap-1.5 truncate">
+                  <GraduationCap className="size-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Alumni:</span>
+                  <SelectValue placeholder="All" />
+                </div>
+              </SelectTrigger>
+              <SelectContent position="popper" className="text-xs">
+                <SelectItem value="all">All Backgrounds</SelectItem>
+                <SelectItem value="alumni">NavGurukul Alumni</SelectItem>
+                <SelectItem value="external">External Hire</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Clear Action */}
             {hasActiveFilters && (
               <Button
@@ -490,9 +524,16 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                                 {emp.name?.charAt(0) || 'U'}
                               </div>
                               <div className="min-w-0">
-                                <span className="block truncate text-foreground text-sm font-semibold">
-                                  {emp.name}
-                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="truncate text-foreground text-sm font-semibold">
+                                    {emp.name}
+                                  </span>
+                                  {emp.is_alumni && (
+                                    <Badge variant="secondary" className="shrink-0 text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60 px-1.5 py-0 h-4">
+                                      Alumni
+                                    </Badge>
+                                  )}
+                                </div>
                                 {emp.email && (
                                   <span className="block truncate text-xs text-muted-foreground font-normal">
                                     {emp.email}
@@ -662,9 +703,16 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                                 {emp.name?.charAt(0) || 'U'}
                               </div>
                               <div className="min-w-0">
-                                <span className="block truncate text-foreground text-sm font-semibold">
-                                  {emp.name}
-                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="truncate text-foreground text-sm font-semibold">
+                                    {emp.name}
+                                  </span>
+                                  {emp.is_alumni && (
+                                    <Badge variant="secondary" className="shrink-0 text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60 px-1.5 py-0 h-4">
+                                      Alumni
+                                    </Badge>
+                                  )}
+                                </div>
                                 {emp.email && (
                                   <span className="block truncate text-xs text-muted-foreground font-normal">
                                     {emp.email}
