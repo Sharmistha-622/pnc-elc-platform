@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { autoSaveDraft } from '@/lib/forms/respondentActions'
+import { Cloud, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
 const SAVE_DELAY_MS = 1500
 
@@ -15,7 +16,7 @@ type Status = 'idle' | 'saving' | 'saved' | 'error'
 // during it are saved right after. Pressing Submit cancels any pending save
 // (the submission carries the same answers), and leaving the page flushes one.
 export function AutoSave() {
-  const marker = useRef<HTMLSpanElement>(null)
+  const marker = useRef<HTMLDivElement>(null)
   const saveNow = useRef<() => void>(() => {})
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -98,18 +99,42 @@ export function AutoSave() {
   const retry = useCallback(() => saveNow.current(), [])
 
   return (
-    <span ref={marker} className="text-xs text-gray-500" aria-live="polite">
-      {status === 'idle' && 'Your answers are saved automatically as you type.'}
-      {status === 'saving' && 'Saving…'}
-      {status === 'saved' && 'All changes saved.'}
+    <div
+      ref={marker}
+      className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/90 backdrop-blur-xs px-3 py-1.5 text-xs text-muted-foreground shadow-2xs"
+      aria-live="polite"
+    >
+      {status === 'idle' && (
+        <>
+          <Cloud className="size-3.5 text-muted-foreground" />
+          <span>Auto-save active</span>
+        </>
+      )}
+      {status === 'saving' && (
+        <>
+          <Loader2 className="size-3.5 animate-spin text-indigo-500" />
+          <span className="text-indigo-600 dark:text-indigo-400 font-medium">Saving draft…</span>
+        </>
+      )}
+      {status === 'saved' && (
+        <>
+          <CheckCircle2 className="size-3.5 text-emerald-500" />
+          <span className="text-emerald-700 dark:text-emerald-400 font-medium">Draft saved</span>
+        </>
+      )}
       {status === 'error' && (
         <>
-          <span className="text-red-700 dark:text-red-300">Not saved: {error}</span>{' '}
-          <button type="button" onClick={retry} className="underline">
-            Try again
+          <AlertCircle className="size-3.5 text-rose-500" />
+          <span className="text-rose-700 dark:text-rose-400 font-medium">Not saved: {error}</span>
+          <button
+            type="button"
+            onClick={retry}
+            className="font-semibold underline hover:text-foreground cursor-pointer ml-1"
+          >
+            Retry
           </button>
         </>
       )}
-    </span>
+    </div>
   )
 }
