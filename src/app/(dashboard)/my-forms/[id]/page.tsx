@@ -22,6 +22,7 @@ import { BranchingForm } from './BranchingForm'
 import { asArray, asObject, asString, formatAnswer } from '@/lib/forms/answers'
 import { formatDate } from '@/lib/employees/tenure'
 import { PageBanner } from '@/components/shared/page-banner'
+import { FieldAnswerView } from '@/components/shared/field-answer-view'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -420,19 +421,23 @@ export default async function FillFormPage({
                   <CardContent className="p-6 space-y-4">
                     {data.fields
                       .filter((f) => f.section_id === section.id)
-                      .map((f) => {
-                        const ans = formatAnswer(f, data.answers.get(f.id), data.employeeNames)
-                        return (
-                          <div key={f.id} className="rounded-lg border border-border/60 bg-muted/15 p-4 space-y-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      .map((f) => (
+                        <div key={f.id} className="rounded-xl border border-border/70 bg-card p-5 space-y-2 shadow-2xs">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
                               {f.label}
                             </span>
-                            <div className="text-sm font-medium text-foreground whitespace-pre-line pt-0.5">
-                              {ans || <span className="text-muted-foreground italic">No answer provided</span>}
-                            </div>
                           </div>
-                        )
-                      })}
+                          {f.help_text && (
+                            <p className="text-xs text-muted-foreground -mt-1">{f.help_text}</p>
+                          )}
+                          <FieldAnswerView
+                            field={f}
+                            value={data.answers.get(f.id)}
+                            employeeNames={data.employeeNames}
+                          />
+                        </div>
+                      ))}
                   </CardContent>
                 </Card>
               ))}

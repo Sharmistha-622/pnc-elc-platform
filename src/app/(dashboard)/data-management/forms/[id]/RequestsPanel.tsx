@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createFormRequest } from '@/lib/forms/requestActions'
 import { formatAnswer } from '@/lib/forms/answers'
+import { FieldAnswerView } from '@/components/shared/field-answer-view'
 import { visibleSectionIds } from '@/lib/forms/branching'
 
 function statusLabel(request: any, submission: any): string {
@@ -169,16 +170,7 @@ export async function RequestsPanel({
                       {submission?.status === 'submitted' ? (
                         <details>
                           <summary className="cursor-pointer text-blue-600">View answers</summary>
-                          <dl className="mt-2 space-y-2">
-                            {submittedFields.map((f) => (
-                              <div key={f.id}>
-                                <dt className="font-medium">{f.label}</dt>
-                                <dd className="whitespace-pre-line text-gray-700">
-                                  {formatAnswer(f, answerByField.get(f.id), employeeNames)}
-                                </dd>
-                              </div>
-                            ))}
-                          </dl>
+                          <div className="mt-3 space-y-3 min-w-[320px] max-w-xl">{submittedFields.map((f) => (<div key={f.id} className="rounded-lg border bg-card p-3 space-y-1"><span className="font-semibold text-xs text-foreground uppercase tracking-wider block">{f.label}</span><FieldAnswerView field={f} value={answerByField.get(f.id)} employeeNames={employeeNames} /></div>))}</div>
                         </details>
                       ) : (
                         <span className="text-gray-400">—</span>
