@@ -6,6 +6,11 @@ import { platformConfigRefusal } from './access'
 import { guard } from '@/lib/rbac/guard'
 import { sendEmail, pingEmailProvider as pingGmail, type EmailPingResult } from '@/lib/email/sendEmail'
 import {
+  getGoogleWorkspaceAccountsInternal,
+  saveGoogleWorkspaceAccountsInternal,
+  maskGoogleAccounts,
+} from '@/lib/email/accounts'
+import {
   type GeneralSetting,
   type ConfirmationRule,
   type AppraisalRule,
@@ -18,6 +23,7 @@ import {
   type EmailTemplate,
   type EmailProviderConfig,
   type EmailProviderType,
+  type GoogleWorkspaceAccount,
   DEFAULT_GENERAL_SETTINGS,
   DEFAULT_CONFIRMATION_RULES,
   DEFAULT_APPRAISAL_RULES,
@@ -293,10 +299,10 @@ export async function getEmailDeliveryLogs(): Promise<EmailDeliveryLog[]> {
  * `sendEmail.ts` is not a server action module, so this file is where the
  * check becomes callable from the browser — and therefore where it is gated.
  */
-export async function pingEmailProvider(): Promise<EmailPingResult> {
+export async function pingEmailProvider(accountId?: string): Promise<EmailPingResult> {
   const allowed = await guard('platformConfig')
   if (!allowed.ok) return { ok: false, status: 'error', message: allowed.error }
-  return pingGmail()
+  return pingGmail(accountId)
 }
 
 
@@ -423,6 +429,9 @@ function withSecretsMasked(config: EmailProviderConfig): EmailProviderConfig {
   for (const field of SECRET_FIELDS) {
     masked[field] = config[field] ? SECRET_MASK : undefined
   }
+  if (config.google_accounts) {
+    masked.google_accounts = maskGoogleAccounts(config.google_accounts)
+  }
   return masked
 }
 
@@ -459,17 +468,24 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
   // Whether a token is configured, never any part of it.
   const refreshTokenPreview = hasRefreshToken ? SECRET_MASK : undefined
 
+  const rawGoogleAccounts = await getGoogleWorkspaceAccountsInternal()
+  const maskedGoogleAccounts = maskGoogleAccounts(rawGoogleAccounts)
+  const activeGoogleAcc = rawGoogleAccounts.find((a) => a.is_active) || rawGoogleAccounts[0]
+
   const liveConfig: EmailProviderConfig = {
     ...DEFAULT_EMAIL_PROVIDER_CONFIG,
     active_provider: 'gmail',
-    from_name: 'NavGurukul People & Culture',
-    from_email: envSender,
-    reply_to_email: envSender,
-    gmail_account: envSender,
-    gmail_client_id: envClientId,
+    from_name: activeGoogleAcc?.name || 'NavGurukul People & Culture',
+    from_email: activeGoogleAcc?.email || envSender,
+    reply_to_email: activeGoogleAcc?.email || envSender,
+    google_accounts: maskedGoogleAccounts,
+    gmail_account: activeGoogleAcc?.email || envSender,
+    gmail_client_id: activeGoogleAcc?.client_id || envClientId,
     gmail_scope: 'https://www.googleapis.com/auth/gmail.send',
     gmail_refresh_token_preview: refreshTokenPreview,
     gmail_auth_status: hasRefreshToken ? 'connected' : 'disconnected',
+    ses_enabled: false,
+    resend_enabled: false,
     smtp_host: 'smtp.gmail.com',
     smtp_port: 587,
     smtp_secure: true,
@@ -496,7 +512,14 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
     if (error || !data) {
       return withSecretsMasked(liveConfig)
     }
-    return withSecretsMasked({ ...liveConfig, ...data })
+    return withSecretsMasked({
+      ...liveConfig,
+      ...data,
+      active_provider: 'gmail',
+      ses_enabled: false,
+      resend_enabled: false,
+      google_accounts: maskedGoogleAccounts,
+    })
   } catch {
     return withSecretsMasked(liveConfig)
   }
@@ -530,6 +553,66 @@ export async function updateEmailProviderConfig(
     return { success: true, data: withSecretsMasked({ ...DEFAULT_EMAIL_PROVIDER_CONFIG, ...changes }) }
   }
 }
+export async function getGoogleWorkspaceAccounts(): Promise<GoogleWorkspaceAccount[]> {
+  const allowed = await guard('platformConfig')
+  if (!allowed.ok) return maskGoogleAccounts([])
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  return maskGoogleAccounts(accounts)
+}
+
+export async function saveGoogleWorkspaceAccounts(
+  accounts: GoogleWorkspaceAccount[],
+  changedBy: string = 'system'
+): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
+  const refused = await platformConfigRefusal()
+  if (refused) return refused
+
+  const res = await saveGoogleWorkspaceAccountsInternal(accounts, changedBy)
+  if (!res.success) {
+    return { success: false, error: res.error }
+  }
+  revalidatePath('/manage/emails')
+  return { success: true, data: maskGoogleAccounts(res.accounts) }
+}
+
+export async function setActiveGoogleAccount(
+  accountId: string,
+  changedBy: string = 'system'
+): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
+  const refused = await platformConfigRefusal()
+  if (refused) return refused
+
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const target = accounts.find((a) => a.id === accountId)
+  if (!target) {
+    return { success: false, error: `Account with ID ${accountId} not found.` }
+  }
+
+  accounts.forEach((a) => {
+    a.is_active = a.id === accountId
+  })
+
+  return saveGoogleWorkspaceAccounts(accounts, changedBy)
+}
+
+export async function reorderGoogleBackups(
+  accountIdsInOrder: string[],
+  changedBy: string = 'system'
+): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
+  const refused = await platformConfigRefusal()
+  if (refused) return refused
+
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  accountIdsInOrder.forEach((id, index) => {
+    const acc = accounts.find((a) => a.id === id)
+    if (acc && !acc.is_active) {
+      acc.backup_priority = index + 1
+    }
+  })
+
+  return saveGoogleWorkspaceAccounts(accounts, changedBy)
+}
+
 
 export async function sendTestEmailVerification(
   recipientEmail: string,
@@ -537,6 +620,13 @@ export async function sendTestEmailVerification(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
+
+  if (provider === 'ses' || provider === 'resend') {
+    return {
+      success: false,
+      error: `${provider.toUpperCase()} is disabled in platform configuration. Live dispatches route through Google Workspace accounts.`,
+    }
+  }
   try {
     const supabase = await createServerSupabaseClient()
     const newLogId = `log-test-${Date.now()}`

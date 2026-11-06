@@ -1,26 +1,24 @@
 // ============================================================================
-// Gmail transport
+// Gmail transport with Multi-Account Failover
 // ----------------------------------------------------------------------------
 // Deliberately NOT a 'use server' module. `sendEmail` takes any recipient, any
 // subject and any HTML, so as a server action it would let any signed-in
 // browser send arbitrary mail from the organisation's Google Workspace account.
 // Only server code imports it — the lifecycle services, which decide who is
 // written to and why, are the actions the browser may call.
+//
+// Supports multiple Google Workspace accounts (e.g. Account A, B, C...) with
+// priority-ordered automatic fallback if the active sender fails.
 // ============================================================================
 
 import { google } from 'googleapis'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-
-const oAuth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET
-)
-
-oAuth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-})
+import {
+  getGoogleWorkspaceAccountsInternal,
+  getOAuth2ClientForAccount,
+} from './accounts'
 
 /**
  * A value safe to place in a mail header.
@@ -43,10 +41,16 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function createEmailBody(to: string, subject: string, htmlBody: string, cc?: string) {
-  const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+function createEmailBody(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  cc?: string,
+  senderEmail?: string
+) {
+  const from = senderEmail || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
   const messageParts = [
-    `From: ${senderEmail}`,
+    `From: ${from}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     'Content-Type: text/html; charset=utf-8',
@@ -81,6 +85,11 @@ function getCategoryFromTemplate(template: string): 'onboarding' | 'confirmation
   return 'system'
 }
 
+/**
+ * Dispatches an email using the active Google Workspace account, with
+ * automatic sequential failover to configured backup accounts (B, C...)
+ * if the primary dispatch fails.
+ */
 export async function sendEmail(
   template: string,
   data: Record<string, string>,
@@ -95,83 +104,104 @@ export async function sendEmail(
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 
+  // Retrieve multi-account configuration
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const activeAccount = accounts.find((a) => a.is_active) || accounts[0]
+  const backupAccounts = accounts
+    .filter((a) => a.id !== activeAccount.id)
+    .sort((a, b) => (a.backup_priority || 0) - (b.backup_priority || 0))
+
+  const attemptChain = [activeAccount, ...backupAccounts]
+  let lastError: string | null = null
+
+  for (let i = 0; i < attemptChain.length; i++) {
+    const acc = attemptChain[i]
+    const isBackup = i > 0
+
+    try {
+      const oAuth2Client = getOAuth2ClientForAccount(acc)
+      const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
+      const raw = createEmailBody(to, subject, htmlBody, cc, acc.email)
+
+      const response = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw },
+      })
+
+      const messageId = response.data.id || 'msg-sent'
+
+      // Automatically record real successful dispatch in database.
+      try {
+        const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
+        await supabase.from('email_delivery_logs').insert({
+          recipient_name: data.recipient_name || to.split('@')[0],
+          recipient_email: to,
+          recipient_role: data.recipient_role || null,
+          category,
+          notification_type: notificationType,
+          subject,
+          body_preview: `${isBackup ? `[Sent via Backup ${acc.name} (${acc.email})] ` : ''}${htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200)}`,
+          status: 'delivered',
+          error_message: null,
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        })
+      } catch (logErr) {
+        console.warn('Could not insert to email_delivery_logs:', logErr)
+      }
+
+      try {
+        revalidatePath('/manage/emails')
+      } catch {}
+
+      return {
+        success: true,
+        messageId,
+        accountUsed: acc.name,
+        senderEmail: acc.email,
+        isBackup,
+      }
+    } catch (error: any) {
+      const errorMsg = error?.message || 'Unknown error'
+      lastError = errorMsg
+      console.warn(`[sendEmail] Attempt via ${acc.name} (${acc.email}) failed: ${errorMsg}`)
+
+      // If there are more backup accounts, failover to the next one!
+      if (i < attemptChain.length - 1) {
+        const nextAcc = attemptChain[i + 1]
+        console.info(
+          `[sendEmail Failover] Failing over to next backup: ${nextAcc.name} (${nextAcc.email})`
+        )
+        continue
+      }
+    }
+  }
+
+  // All accounts failed: record final failure in database
   try {
-    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
-    const raw = createEmailBody(to, subject, htmlBody, cc)
-
-    const response = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw },
+    const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
+    await supabase.from('email_delivery_logs').insert({
+      recipient_name: data.recipient_name || to.split('@')[0],
+      recipient_email: to,
+      recipient_role: data.recipient_role || null,
+      category,
+      notification_type: notificationType,
+      subject,
+      body_preview: htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200),
+      status: 'failed',
+      error_message: `All Google accounts failed. Last error (${attemptChain[attemptChain.length - 1]?.name}): ${lastError}`,
+      sent_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     })
+  } catch {}
 
-    const messageId = response.data.id || 'msg-sent'
+  try {
+    revalidatePath('/manage/emails')
+  } catch {}
 
-    // Automatically record real successful dispatch in database. The id is the
-    // table's own (a uuid default); a made-up text id made every insert fail.
-    try {
-      // Service-role when available: reminders are sent from cron runs, which
-      // have no session, and the database refuses the anonymous role.
-      const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-      await supabase.from('email_delivery_logs').insert({
-        recipient_name: data.recipient_name || to.split('@')[0],
-        recipient_email: to,
-        recipient_role: data.recipient_role || null,
-        category,
-        notification_type: notificationType,
-        subject,
-        body_preview: htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200),
-        status: 'delivered',
-        error_message: null,
-        sent_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-    } catch (logErr) {
-      console.warn('Could not insert to email_delivery_logs:', logErr)
-    }
-
-    try {
-      revalidatePath('/manage/emails')
-    } catch {
-      // ignore
-    }
-
-    return { success: true, messageId }
-  } catch (error: any) {
-    // The message and code only. A Gmail client error carries the request it
-    // failed on — the OAuth bearer token in its headers and the whole message
-    // in its body — and none of that belongs in a log.
-    const errorMsg = error?.message || 'Unknown error'
-    console.error('Error sending email:', errorMsg, error?.code ?? '')
-
-    // Automatically record failure in database
-    try {
-      // Service-role when available: reminders are sent from cron runs, which
-      // have no session, and the database refuses the anonymous role.
-      const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-      await supabase.from('email_delivery_logs').insert({
-        recipient_name: data.recipient_name || to.split('@')[0],
-        recipient_email: to,
-        recipient_role: data.recipient_role || null,
-        category,
-        notification_type: notificationType,
-        subject,
-        body_preview: htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200),
-        status: 'failed',
-        error_message: errorMsg,
-        sent_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-    } catch {
-      // ignore
-    }
-
-    try {
-      revalidatePath('/manage/emails')
-    } catch {
-      // ignore
-    }
-
-    return { success: false, error: errorMsg }
+  return {
+    success: false,
+    error: `All configured Google accounts failed to send. Last error: ${lastError}`,
   }
 }
 
@@ -179,6 +209,7 @@ export async function sendEmail(
  * Sends one meeting invitation to several people: an HTML note plus an
  * iCalendar REQUEST, which Gmail and Outlook render with Yes / No / Maybe and
  * add to the calendar. Each recipient is logged as a delivery, like any mail.
+ * Supports automated failover to backup Google accounts if the primary sender fails.
  */
 export async function sendCalendarInvite(opts: {
   template: string
@@ -190,43 +221,69 @@ export async function sendCalendarInvite(opts: {
   const subject = headerValue(opts.subject)
   const to = opts.to.map((r) => headerValue(r.email)).filter(Boolean)
   if (to.length === 0) return { success: false, error: 'No recipients' }
-  const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
-  const boundary = `elc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-  const message = [
-    `From: ${senderEmail}`,
-    `To: ${to.join(', ')}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    opts.html,
-    `--${boundary}`,
-    'Content-Type: text/calendar; charset=utf-8; method=REQUEST',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    opts.ics,
-    `--${boundary}--`,
-    '',
-  ].join('\r\n')
-  const raw = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-  let result: { success: true; messageId: string } | { success: false; error: string }
-  try {
-    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
-    const response = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
-    result = { success: true, messageId: response.data.id || 'msg-sent' }
-  } catch (error: any) {
-    const errorMsg = error?.message || 'Unknown error'
-    console.error('Error sending calendar invite:', errorMsg, error?.code ?? '')
-    result = { success: false, error: errorMsg }
+  // Retrieve multi-account configuration
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const activeAccount = accounts.find((a) => a.is_active) || accounts[0]
+  const backupAccounts = accounts
+    .filter((a) => a.id !== activeAccount.id)
+    .sort((a, b) => (a.backup_priority || 0) - (b.backup_priority || 0))
+
+  const attemptChain = [activeAccount, ...backupAccounts]
+  let result: { success: true; messageId: string } | { success: false; error: string } = {
+    success: false,
+    error: 'No accounts configured',
   }
 
+  for (let i = 0; i < attemptChain.length; i++) {
+    const acc = attemptChain[i]
+    const senderEmail = acc.email || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+    const boundary = `elc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    const message = [
+      `From: ${senderEmail}`,
+      `To: ${to.join(', ')}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      opts.html,
+      `--${boundary}`,
+      'Content-Type: text/calendar; charset=utf-8; method=REQUEST',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      opts.ics,
+      `--${boundary}--`,
+      '',
+    ].join('\r\n')
+    const raw = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+
+    try {
+      const oAuth2Client = getOAuth2ClientForAccount(acc)
+      const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
+      const response = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+      result = { success: true, messageId: response.data.id || 'msg-sent' }
+      break
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Unknown calendar invite error'
+      result = { success: false, error: errorMsg }
+      console.warn(`[sendCalendarInvite] Attempt via ${acc.name} (${acc.email}) failed: ${errorMsg}`)
+
+      if (i < attemptChain.length - 1) {
+        continue
+      }
+    }
+  }
+
+  const now = new Date().toISOString()
   try {
     const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-    const now = new Date().toISOString()
     await supabase.from('email_delivery_logs').insert(
       opts.to.map((r) => ({
         recipient_name: r.name || r.email.split('@')[0],
@@ -256,25 +313,43 @@ export type EmailPingResult = {
   latencyMs?: number
   email?: string
   senderEmail?: string
+  accountName?: string
 }
 
-export async function pingEmailProvider(): Promise<EmailPingResult> {
-  const clientId = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN
-  const senderEmail = process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+/**
+ * Pings Google Workspace API to verify OAuth credentials.
+ * If accountId is provided, tests that specific account; otherwise tests the active account.
+ */
+export async function pingEmailProvider(accountId?: string): Promise<EmailPingResult> {
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const target = accountId ? accounts.find((a) => a.id === accountId) || accounts[0] : accounts.find((a) => a.is_active) || accounts[0]
+
+  if (!target) {
+    return {
+      ok: false,
+      status: 'not_configured',
+      message: 'No Google Workspace account configured.',
+    }
+  }
+
+  const clientId = target.client_id || process.env.GOOGLE_CLIENT_ID
+  const clientSecret = target.client_secret || process.env.GOOGLE_CLIENT_SECRET
+  const refreshToken = target.refresh_token || process.env.GOOGLE_REFRESH_TOKEN
+  const senderEmail = target.email || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
 
   if (!clientId || !clientSecret || !refreshToken) {
     return {
       ok: false,
       status: 'not_configured',
-      message: 'Google Workspace credentials missing in server environment variables (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN).',
+      message: `${target.name} credentials missing OAuth2 refresh token or client secret.`,
       senderEmail,
+      accountName: target.name,
     }
   }
 
   const start = Date.now()
   try {
+    const oAuth2Client = getOAuth2ClientForAccount(target)
     await oAuth2Client.getAccessToken()
     const latencyMs = Date.now() - start
 
@@ -287,25 +362,26 @@ export async function pingEmailProvider(): Promise<EmailPingResult> {
       }
     } catch {
       // getProfile may require read scope if token is scoped to gmail.send only.
-      // Token acquisition itself proves valid credentials and connectivity.
     }
 
     return {
       ok: true,
       status: 'connected',
-      message: `Google Workspace OAuth2 connected & authenticated successfully (${latencyMs}ms)`,
+      message: `${target.name} (${detectedEmail}) authenticated successfully (${latencyMs}ms)`,
       latencyMs,
       email: detectedEmail,
       senderEmail,
+      accountName: target.name,
     }
   } catch (err: any) {
     const latencyMs = Date.now() - start
     return {
       ok: false,
       status: 'error',
-      message: err?.message || 'Failed to authenticate with Google Workspace API',
+      message: `${target.name} failed: ${err?.message || 'Authentication error'}`,
       latencyMs,
       senderEmail,
+      accountName: target.name,
     }
   }
 }
