@@ -183,3 +183,4 @@ export function maskGoogleAccounts(accounts: GoogleWorkspaceAccount[]): GoogleWo
     refresh_token_preview: acc.refresh_token || acc.refresh_token_preview ? SECRET_MASK : undefined,
   }))
 }
+
