@@ -148,6 +148,23 @@ export type EmailTemplate = {
 
 export type EmailProviderType = 'gmail' | 'ses' | 'resend' | 'smtp'
 
+export type GoogleWorkspaceAccount = {
+  id: string
+  name: string
+  email: string
+  client_id?: string
+  client_secret?: string
+  refresh_token?: string
+  refresh_token_preview?: string
+  is_active: boolean
+  backup_priority: number // 1, 2, 3... failover order when active fails
+  status: 'connected' | 'disconnected' | 'needs_reauth'
+  daily_send_limit: number
+  daily_sent_count: number
+  last_used_at?: string | null
+  error_message?: string | null
+}
+
 export type EmailProviderConfig = {
   id: string
   active_provider: EmailProviderType
@@ -155,21 +172,26 @@ export type EmailProviderConfig = {
   from_email: string
   reply_to_email: string
 
-  // Google Workspace / Gmail
+  // Google Workspace Accounts (Multi-Account & Auto-Failover)
+  google_accounts?: GoogleWorkspaceAccount[]
+
+  // Google Workspace / Gmail legacy single-account compat
   gmail_account: string
   gmail_app_password?: string
   gmail_client_id?: string
   gmail_client_secret?: string
   gmail_auth_status: 'connected' | 'disconnected' | 'needs_reauth'
 
-  // Amazon SES
+  // Amazon SES (Disabled for now)
+  ses_enabled?: boolean
   ses_region: string
   ses_access_key_id?: string
   ses_secret_access_key?: string
   ses_configuration_set?: string
   ses_verification_status: 'verified' | 'pending' | 'failed'
 
-  // Resend
+  // Resend (Disabled for now)
+  resend_enabled?: boolean
   resend_api_key?: string
 
   // Custom SMTP
@@ -1224,12 +1246,31 @@ NavGurukul Foundation for Social Welfare`,
   },
 ]
 
+export const DEFAULT_GOOGLE_ACCOUNTS: GoogleWorkspaceAccount[] = [
+  {
+    id: 'acc-a',
+    name: 'Account A (Primary)',
+    email: 'sharmisthamazumdar24@navgurukul.org',
+    client_id: 'your-google-client-id.apps.googleusercontent.com',
+    client_secret: 'GOCSPX-••••••••••••••••••••••••••••',
+    refresh_token_preview: '1//042-fqCrlAZusCgYIARAAGAQSNwF-••••',
+    is_active: true,
+    backup_priority: 1,
+    status: 'connected',
+    daily_send_limit: 2000,
+    daily_sent_count: 0,
+    last_used_at: null,
+  },
+]
+
 export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   id: 'provider-1',
   active_provider: 'gmail',
   from_name: 'NavGurukul People & Culture',
   from_email: 'sharmisthamazumdar24@navgurukul.org',
   reply_to_email: 'sharmisthamazumdar24@navgurukul.org',
+
+  google_accounts: DEFAULT_GOOGLE_ACCOUNTS,
 
   domain_name: 'navgurukul.org',
   gmail_account: 'sharmisthamazumdar24@navgurukul.org',
@@ -1239,6 +1280,7 @@ export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   gmail_refresh_token_preview: '1//042-fqCrlAZusCgYIARAAGAQSNwF-••••',
   gmail_auth_status: 'connected',
 
+  ses_enabled: false,
   ses_region: 'ap-south-1',
   ses_endpoint: 'email-smtp.ap-south-1.amazonaws.com',
   ses_access_key_id: 'AKIA6GB5ELC7NAV24GUR',
@@ -1246,6 +1288,7 @@ export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   ses_configuration_set: 'pnc-elc-production',
   ses_verification_status: 'verified',
 
+  resend_enabled: false,
   resend_api_key: 're_elc_navgurukul_2026_live',
 
   smtp_host: 'smtp.gmail.com',
@@ -1255,7 +1298,7 @@ export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   smtp_password: '••••••••••••••••',
 
   daily_send_limit: 2000,
-  daily_sent_count: 148,
+  daily_sent_count: 0,
   dkim_verified: true,
   spf_verified: true,
   dmarc_verified: true,

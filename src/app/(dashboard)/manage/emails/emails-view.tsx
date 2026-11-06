@@ -14,6 +14,9 @@ import {
   updateEmailProviderConfig,
   sendTestEmailVerification,
   pingEmailProvider,
+  saveGoogleWorkspaceAccounts,
+  setActiveGoogleAccount,
+  reorderGoogleBackups,
 } from '@/lib/settings/service'
 // Type-only, so nothing from the server module reaches the browser bundle. A
 // 'use server' file may export only async functions, which is why the type
@@ -26,8 +29,10 @@ import {
   type EmailProviderConfig,
   type EmailProviderType,
   type EmailCadenceRule,
+  type GoogleWorkspaceAccount,
   DEFAULT_EMAIL_TEMPLATES,
   DEFAULT_EMAIL_PROVIDER_CONFIG,
+  DEFAULT_GOOGLE_ACCOUNTS,
 } from '@/lib/settings/types'
 
 
@@ -72,6 +77,14 @@ import {
   Loader2,
   CheckCircle2,
   Mail,
+  Plus,
+  Trash2,
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  Workflow,
+  Copy,
+  Layers,
   Search,
   Eye,
   RotateCcw,
@@ -80,7 +93,6 @@ import {
   Radio,
   FileText,
   Edit3,
-  Copy,
   Check,
   Code2,
   Clock,
@@ -153,6 +165,230 @@ export function EmailsView({
     ? `${Math.round(((totalTracked - logsFailedCount) / totalTracked) * 1000) / 10}%`
     : '100%'
 
+
+  // Google Workspace Multi-Account & Failover State
+  const [googleAccounts, setGoogleAccounts] = useState<GoogleWorkspaceAccount[]>(
+    () => (initialProviderConfig?.google_accounts && initialProviderConfig.google_accounts.length > 0)
+      ? initialProviderConfig.google_accounts
+      : DEFAULT_GOOGLE_ACCOUNTS
+  )
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<GoogleWorkspaceAccount | null>(null)
+  const [accountForm, setAccountForm] = useState<{
+    id: string
+    name: string
+    email: string
+    client_id: string
+    client_secret: string
+    refresh_token: string
+    daily_send_limit: number
+  }>({
+    id: '',
+    name: '',
+    email: '',
+    client_id: '',
+    client_secret: '',
+    refresh_token: '',
+    daily_send_limit: 2000,
+  })
+  const [pingingAccId, setPingingAccId] = useState<string | null>(null)
+  const [accountPingResults, setAccountPingResults] = useState<Record<string, EmailPingResult>>({})
+  const [isSavingAccounts, setIsSavingAccounts] = useState(false)
+
+  const activeGoogleAccount = googleAccounts.find((a) => a.is_active) || googleAccounts[0]
+  const backupGoogleAccounts = googleAccounts
+    .filter((a) => !a.is_active)
+    .sort((a, b) => a.backup_priority - b.backup_priority)
+
+  const handleSetActiveAccount = async (accId: string) => {
+    setIsSavingAccounts(true)
+    try {
+      const res = await setActiveGoogleAccount(accId)
+      if (res.success && res.data) {
+        setGoogleAccounts(res.data)
+        const newActive = res.data.find((a) => a.is_active)
+        if (newActive) {
+          setProviderConfig((prev) => ({
+            ...prev,
+            gmail_account: newActive.email,
+            from_email: newActive.email,
+            google_accounts: res.data,
+          }))
+        }
+        toast.success(`Switched primary active sender to ${newActive?.name || 'account'}`)
+      } else {
+        toast.error(res.error || 'Failed to set active account')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error updating active account')
+    } finally {
+      setIsSavingAccounts(false)
+    }
+  }
+
+  const handleMoveBackupPriority = async (accId: string, direction: 'up' | 'down') => {
+    const currentIndex = backupGoogleAccounts.findIndex((a) => a.id === accId)
+    if (currentIndex === -1) return
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= backupGoogleAccounts.length) return
+
+    const newBackups = [...backupGoogleAccounts]
+    const temp = newBackups[currentIndex]
+    newBackups[currentIndex] = newBackups[targetIndex]
+    newBackups[targetIndex] = temp
+
+    const orderedIds = newBackups.map((a) => a.id)
+    setIsSavingAccounts(true)
+    try {
+      const res = await reorderGoogleBackups(orderedIds)
+      if (res.success && res.data) {
+        setGoogleAccounts(res.data)
+        toast.success('Backup failover order updated')
+      } else {
+        toast.error(res.error || 'Failed to update priority order')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error updating backup priority')
+    } finally {
+      setIsSavingAccounts(false)
+    }
+  }
+
+  const handleDeleteAccount = async (accId: string) => {
+    if (googleAccounts.length <= 1) {
+      toast.error('You must keep at least one Google Workspace account configured.')
+      return
+    }
+    const accToDelete = googleAccounts.find((a) => a.id === accId)
+    if (!confirm(`Are you sure you want to remove "${accToDelete?.name || 'this account'}"?`)) {
+      return
+    }
+    const remaining = googleAccounts.filter((a) => a.id !== accId)
+    if (accToDelete?.is_active && remaining.length > 0) {
+      remaining[0].is_active = true
+    }
+    setIsSavingAccounts(true)
+    try {
+      const res = await saveGoogleWorkspaceAccounts(remaining)
+      if (res.success && res.data) {
+        setGoogleAccounts(res.data)
+        toast.success(`${accToDelete?.name || 'Account'} removed successfully`)
+      } else {
+        toast.error(res.error || 'Failed to remove account')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error deleting account')
+    } finally {
+      setIsSavingAccounts(false)
+    }
+  }
+
+  const handleOpenAddAccount = () => {
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+    const existingNames = googleAccounts.map((a) => a.name)
+    const nextLetter = letters.find((l) => !existingNames.some((n) => n.includes(`Account ${l}`))) || `${googleAccounts.length + 1}`
+
+    setEditingAccount(null)
+    setAccountForm({
+      id: `acc-${Date.now()}`,
+      name: `Account ${nextLetter}`,
+      email: '',
+      client_id: '',
+      client_secret: '',
+      refresh_token: '',
+      daily_send_limit: 2000,
+    })
+    setIsAccountModalOpen(true)
+  }
+
+  const handleOpenEditAccount = (acc: GoogleWorkspaceAccount) => {
+    setEditingAccount(acc)
+    setAccountForm({
+      id: acc.id,
+      name: acc.name,
+      email: acc.email,
+      client_id: acc.client_id || '',
+      client_secret: acc.client_secret || '',
+      refresh_token: acc.refresh_token || '',
+      daily_send_limit: acc.daily_send_limit || 2000,
+    })
+    setIsAccountModalOpen(true)
+  }
+
+  const handleSaveAccountModal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!accountForm.email || !accountForm.email.includes('@')) {
+      toast.error('Please enter a valid Google Workspace email address.')
+      return
+    }
+
+    let updatedList: GoogleWorkspaceAccount[] = []
+    if (editingAccount) {
+      updatedList = googleAccounts.map((a) => {
+        if (a.id === editingAccount.id) {
+          return {
+            ...a,
+            name: accountForm.name.trim() || a.name,
+            email: accountForm.email.trim().toLowerCase(),
+            client_id: accountForm.client_id.trim() || undefined,
+            client_secret: accountForm.client_secret.trim() || undefined,
+            refresh_token: accountForm.refresh_token.trim() || undefined,
+            daily_send_limit: Number(accountForm.daily_send_limit) || 2000,
+          }
+        }
+        return a
+      })
+    } else {
+      const highestPriority = backupGoogleAccounts.reduce((max, a) => Math.max(max, a.backup_priority), 0)
+      const newAcc: GoogleWorkspaceAccount = {
+        id: accountForm.id || `acc-${Date.now()}`,
+        name: accountForm.name.trim() || `Account ${googleAccounts.length + 1}`,
+        email: accountForm.email.trim().toLowerCase(),
+        client_id: accountForm.client_id.trim() || undefined,
+        client_secret: accountForm.client_secret.trim() || undefined,
+        refresh_token: accountForm.refresh_token.trim() || undefined,
+        is_active: false,
+        backup_priority: highestPriority + 1,
+        status: accountForm.refresh_token ? 'connected' : 'disconnected',
+        daily_send_limit: Number(accountForm.daily_send_limit) || 2000,
+        daily_sent_count: 0,
+      }
+      updatedList = [...googleAccounts, newAcc]
+    }
+
+    setIsSavingAccounts(true)
+    try {
+      const res = await saveGoogleWorkspaceAccounts(updatedList)
+      if (res.success && res.data) {
+        setGoogleAccounts(res.data)
+        setIsAccountModalOpen(false)
+        toast.success(editingAccount ? 'Google Workspace account updated' : 'New account added to failover backup pool')
+      } else {
+        toast.error(res.error || 'Failed to save Google account')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error saving Google account')
+    } finally {
+      setIsSavingAccounts(false)
+    }
+  }
+
+  const handlePingAccount = async (accId: string) => {
+    setPingingAccId(accId)
+    try {
+      const res = await pingEmailProvider(accId)
+      setAccountPingResults((prev) => ({ ...prev, [accId]: res }))
+      if (res.ok) {
+        toast.success(`${res.message} ${res.latencyMs ? `(${res.latencyMs}ms)` : ''}`)
+      } else {
+        toast.error(res.message)
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Ping failed')
+    } finally {
+      setPingingAccId(null)
+    }
+  }
 
   // Live Google Workspace API Ping state
   const [pingResult, setPingResult] = useState<EmailPingResult | null>(null)
@@ -291,8 +527,12 @@ export function EmailsView({
   const [timeframe, setTimeframe] = useState<
     'today' | 'week' | '15days' | '30days' | 'month' | 'year' | 'custom' | 'lifetime'
   >('week')
-  const [customStartDate, setCustomStartDate] = useState('2026-09-01')
-  const [customEndDate, setCustomEndDate] = useState('2026-09-26')
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 7)
+    return d.toISOString().split('T')[0]
+  })
+  const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [historySearch, setHistorySearch] = useState('')
   const [selectedDayLog, setSelectedDayLog] = useState<{
     dateStr: string
@@ -309,7 +549,7 @@ export function EmailsView({
 
   // Generate date array and day-by-day logs based on timeframe
   const historicalDays = React.useMemo(() => {
-    const refDate = new Date('2026-09-26T12:00:00Z')
+    const refDate = new Date()
     let numDays = 7
     let customEnd: Date | null = null
 
@@ -634,7 +874,7 @@ export function EmailsView({
     if (res.success) {
       setProviderConfig((prev) => ({
         ...prev,
-        daily_sent_count: (prev.daily_sent_count || 148) + 1,
+        daily_sent_count: (prev.daily_sent_count || 0) + 1,
       }))
       toast.success(`Simulated test email sent to ${testSendRecipient}`)
       setTestSendTemplate(null)
@@ -652,7 +892,7 @@ export function EmailsView({
     if (res.success) {
       setProviderConfig((prev) => ({
         ...prev,
-        daily_sent_count: (prev.daily_sent_count || 148) + 1,
+        daily_sent_count: (prev.daily_sent_count || 0) + 1,
       }))
       toast.success(`Verification email dispatched via ${providerConfig.active_provider.toUpperCase()} to ${setupTestEmail}`)
     } else {
@@ -1481,25 +1721,28 @@ export function EmailsView({
                     </div>
                     <div>
                       <span className="text-xs font-bold text-foreground block">Google Workspace</span>
-                      <span className="text-[10px] text-muted-foreground font-medium">OAuth2 REST API</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">Multi-Account Pool</span>
                     </div>
                   </div>
-                  {providerConfig.active_provider === 'gmail' && (
-                    <CheckCircle className="size-4 text-indigo-600 dark:text-indigo-400" />
-                  )}
+                  <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] gap-1 px-1.5 py-0 h-5">
+                    <CheckCircle className="size-3" />
+                    <span>Active Primary</span>
+                  </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Authorized for <span className="font-mono text-foreground font-semibold">sharmisthamazumdar24@navgurukul.org</span> via Googleapis OAuth2.
+                  Primary: <span className="font-mono text-foreground font-semibold">{activeGoogleAccount?.email || providerConfig.gmail_account}</span>
                 </p>
                 <div className="pt-2 border-t border-border/50 space-y-1.5 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground font-medium">Daily Quota:</span>
-                    <span className="font-semibold text-foreground">2,000 / day</span>
+                    <span className="text-muted-foreground font-medium">Failover Chain:</span>
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-400">
+                      {backupGoogleAccounts.length} backup{backupGoogleAccounts.length === 1 ? '' : 's'} configured
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground flex items-center gap-1">
                       <span className="size-1.5 rounded-full bg-indigo-500" />
-                      Used: <strong className="text-foreground">{usedToday.toLocaleString()}</strong>
+                      Daily Sent: <strong className="text-foreground">{usedToday.toLocaleString()}</strong>
                     </span>
                     <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
                       {leftToday.toLocaleString()} left
@@ -1514,14 +1757,10 @@ export function EmailsView({
                 </div>
               </div>
 
-              {/* Amazon SES */}
+              {/* Amazon SES - Disabled */}
               <div
-                onClick={() => setProviderConfig({ ...providerConfig, active_provider: 'ses' })}
-                className={`cursor-pointer p-4 rounded-xl border transition-all space-y-2 relative ${
-                  providerConfig.active_provider === 'ses'
-                    ? 'border-indigo-600 bg-indigo-50/20 dark:bg-indigo-950/30 shadow-xs ring-1 ring-indigo-600'
-                    : 'border-border/80 bg-card hover:border-border hover:bg-muted/20'
-                }`}
+                onClick={() => toast.info('Amazon SES is currently disabled. All outbound emails are routed through Google Workspace accounts with automatic failover.')}
+                className="cursor-not-allowed p-4 rounded-xl border border-border/60 bg-muted/20 opacity-60 transition-all space-y-2 relative select-none"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1533,27 +1772,23 @@ export function EmailsView({
                       <span className="text-[10px] text-muted-foreground font-medium">ap-south-1 (Mumbai)</span>
                     </div>
                   </div>
-                  {providerConfig.active_provider === 'ses' && (
-                    <CheckCircle className="size-4 text-indigo-600 dark:text-indigo-400" />
-                  )}
+                  <Badge variant="outline" className="text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 text-[10px]">
+                    Disabled for now
+                  </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  High-throughput cloud delivery via AWS SES with DKIM verified for <span className="font-mono text-foreground">navgurukul.org</span>.
+                  AWS SES cloud relay. Disabled in favor of multi-account Google Workspace with automatic backup failover.
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[11px]">
-                  <span className="text-muted-foreground">Production Quota:</span>
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">50,000 / day</span>
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="font-semibold text-muted-foreground">Inactive</span>
                 </div>
               </div>
 
-              {/* Resend */}
+              {/* Resend - Disabled */}
               <div
-                onClick={() => setProviderConfig({ ...providerConfig, active_provider: 'resend' })}
-                className={`cursor-pointer p-4 rounded-xl border transition-all space-y-2 relative ${
-                  providerConfig.active_provider === 'resend'
-                    ? 'border-indigo-600 bg-indigo-50/20 dark:bg-indigo-950/30 shadow-xs ring-1 ring-indigo-600'
-                    : 'border-border/80 bg-card hover:border-border hover:bg-muted/20'
-                }`}
+                onClick={() => toast.info('Resend is currently disabled. All outbound emails are routed through Google Workspace accounts with automatic failover.')}
+                className="cursor-not-allowed p-4 rounded-xl border border-border/60 bg-muted/20 opacity-60 transition-all space-y-2 relative select-none"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1565,16 +1800,16 @@ export function EmailsView({
                       <span className="text-[10px] text-muted-foreground font-medium">Cloud Email API</span>
                     </div>
                   </div>
-                  {providerConfig.active_provider === 'resend' && (
-                    <CheckCircle className="size-4 text-indigo-600 dark:text-indigo-400" />
-                  )}
+                  <Badge variant="outline" className="text-muted-foreground bg-muted/40 border-border text-[10px]">
+                    Disabled for now
+                  </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Modern developer API with open/click webhooks and edge delivery for transactional letters.
+                  Cloud email API. Disabled in favor of multi-account Google Workspace with automatic backup failover.
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[11px]">
-                  <span className="text-muted-foreground">Monthly Quota:</span>
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">50,000 / mo</span>
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="font-semibold text-muted-foreground">Inactive</span>
                 </div>
               </div>
 
@@ -1634,97 +1869,359 @@ export function EmailsView({
               </CardHeader>
 
               <CardContent className="p-4 pt-2 space-y-4">
-                {/* Gmail Settings */}
+                {/* Gmail Multi-Account & Failover Settings */}
                 {providerConfig.active_provider === 'gmail' && (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-start justify-between gap-3 text-xs">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
-                          <CheckCircle2 className="size-3.5 text-emerald-700 dark:text-emerald-300" />
-                          <span>Connected to Google Workspace via Environment Credentials</span>
+                  <div className="space-y-4">
+                    {/* Failover Pipeline Visualizer */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-r from-indigo-50/70 via-indigo-50/40 to-muted/30 dark:from-indigo-950/40 dark:via-indigo-950/20 dark:to-muted/10 border border-indigo-200/70 dark:border-indigo-800/60 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Workflow className="size-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <div>
+                            <span className="text-xs font-bold text-foreground">Multi-Account Failover Architecture</span>
+                            <span className="text-[10px] text-muted-foreground block">
+                              Active primary sender with ordered backup failovers on rate-limits, quota exhaustion, or OAuth token refresh errors.
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 leading-relaxed">
-                          The PNC ELC platform is actively authenticating dispatches through Google Cloud Console OAuth 2.0 Client credentials with offline refresh capability.
-                        </p>
+                        <Badge className="w-fit bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] gap-1 px-2 py-0.5">
+                          <CheckCircle className="size-3" />
+                          <span>{googleAccounts.length} Connected Account{googleAccounts.length === 1 ? '' : 's'}</span>
+                        </Badge>
                       </div>
-                      <Badge variant="secondary" className="shrink-0 bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 border-emerald-500/30">
-                        Active &amp; Ready
-                      </Badge>
+
+                      {/* Horizontal Chain Flow */}
+                      <div className="flex items-center gap-2 pt-2 overflow-x-auto pb-1 text-xs">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 font-semibold text-emerald-900 dark:text-emerald-200 shrink-0 shadow-2xs">
+                          <div className="size-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">✓</div>
+                          <span>Primary: {activeGoogleAccount?.name || 'Account A'}</span>
+                          <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300">({activeGoogleAccount?.email})</span>
+                        </div>
+
+                        {backupGoogleAccounts.map((acc, idx) => (
+                          <React.Fragment key={acc.id}>
+                            <div className="flex items-center text-muted-foreground shrink-0 text-[11px] font-medium gap-1">
+                              <span>──►</span>
+                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/80 px-1 py-0.5 rounded bg-muted/60">on fail</span>
+                              <span>──►</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 font-medium text-indigo-950 dark:text-indigo-200 shrink-0 shadow-2xs">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-200/80 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                                Backup #{idx + 1}
+                              </span>
+                              <span>{acc.name}</span>
+                              <span className="text-[10px] font-mono text-muted-foreground">({acc.email})</span>
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">Authorized Sender Email</Label>
-                        <Input
-                          value={providerConfig.gmail_account}
-                          onChange={(e) => setProviderConfig({ ...providerConfig, gmail_account: e.target.value })}
-                          className="text-xs h-8.5 font-mono"
-                          placeholder="sharmisthamazumdar24@navgurukul.org"
-                        />
-                        <span className="text-[10px] text-muted-foreground">Configured in GOOGLE_SENDER_EMAIL</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">OAuth 2.0 Client ID</Label>
-                        <Input
-                          value={providerConfig.gmail_client_id || 'your-google-client-id.apps.googleusercontent.com'}
-                          onChange={(e) => setProviderConfig({ ...providerConfig, gmail_client_id: e.target.value })}
-                          className="text-xs h-8.5 font-mono truncate"
-                          placeholder="your-client-id.apps.googleusercontent.com"
-                        />
-                        <span className="text-[10px] text-muted-foreground">Synced from GOOGLE_CLIENT_ID</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">OAuth 2.0 Client Secret</Label>
-                        <Input
-                          type="password"
-                          readOnly
-                          value="GOCSPX-••••••••••••••••••••••••••••"
-                          className="text-xs h-8.5 font-mono bg-muted/30"
-                        />
-                        <span className="text-[10px] text-muted-foreground">Stored securely in environment</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">Refresh Token Status</Label>
-                        <Input
-                          readOnly
-                          value="1//042-fqCrlAZusCgYIARAAGAQSNwF-•••• (Valid)"
-                          className="text-xs h-8.5 font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-500/30"
-                        />
-                        <span className="text-[10px] text-muted-foreground">Offline token configured with auto-refresh</span>
-                      </div>
-                      <div className="sm:col-span-2 space-y-1">
-                        <Label className="text-xs font-semibold">Google API Authorized Scope</Label>
-                        <Input
-                          readOnly
-                          value="https://www.googleapis.com/auth/gmail.send"
-                          className="text-xs h-8.5 font-mono bg-muted/30 text-muted-foreground"
-                        />
-                      </div>
-                      <div className="sm:col-span-2 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/30 border border-border/60">
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                            <Signal className="size-3.5 text-indigo-600 dark:text-indigo-400" />
-                            <span>Live OAuth2 Connection Status</span>
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {pingResult
-                              ? `${pingResult.message} ${pingResult.latencyMs ? `(${pingResult.latencyMs}ms latency)` : ''}`
-                              : 'Click Ping to verify server-to-Google OAuth2 token exchange and network latency.'}
+                    {/* Google Accounts List & Management */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-bold text-foreground">Google Workspace Sender Accounts</h4>
+                          <p className="text-[10px] text-muted-foreground">
+                            Configure accounts (Account A, Account B, Account C...), assign the primary active sender, and sequence backup priority.
                           </p>
                         </div>
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          disabled={isPinging}
-                          onClick={handlePingProvider}
-                          className="h-8 text-xs font-semibold gap-1.5 shrink-0"
+                          onClick={handleOpenAddAccount}
+                          className="h-7 text-xs font-semibold gap-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-2xs"
                         >
-                          <RefreshCw className={`size-3 text-indigo-600 dark:text-indigo-400 ${isPinging ? 'animate-spin' : ''}`} />
-                          <span>{isPinging ? 'Pinging Google...' : 'Ping Google API Now'}</span>
+                          <Plus className="size-3.5" />
+                          <span>Add Google Account</span>
                         </Button>
                       </div>
+
+                      <div className="space-y-2">
+                        {googleAccounts.map((acc) => {
+                          const isAccActive = acc.is_active
+                          const ping = accountPingResults[acc.id]
+                          const isPingLoading = pingingAccId === acc.id
+
+                          // Extract letter tag (e.g. A from Account A)
+                          const letterMatch = acc.name.match(/Account\s+([A-Z0-9]+)/i)
+                          const letter = letterMatch ? letterMatch[1].toUpperCase() : acc.name.slice(0, 1).toUpperCase()
+
+                          return (
+                            <div
+                              key={acc.id}
+                              className={`p-3 rounded-xl border transition-all space-y-2 ${
+                                isAccActive
+                                  ? 'border-emerald-500/60 bg-emerald-50/20 dark:bg-emerald-950/20 shadow-2xs ring-1 ring-emerald-500/30'
+                                  : 'border-border/80 bg-card hover:border-border'
+                              }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`size-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
+                                      isAccActive
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                    }`}
+                                  >
+                                    {letter}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-bold text-foreground">{acc.name}</span>
+                                      {isAccActive ? (
+                                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] gap-1 px-1.5 py-0 h-4.5">
+                                          <CheckCircle className="size-2.5" />
+                                          <span>Active Primary</span>
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-indigo-700 dark:text-indigo-300 border-indigo-400/40 bg-indigo-50/50 dark:bg-indigo-950/40 text-[10px] px-1.5 py-0 h-4.5">
+                                          Backup Priority #{acc.backup_priority}
+                                        </Badge>
+                                      )}
+                                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                                        Quota: {acc.daily_send_limit || 2000}/day
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] font-mono text-muted-foreground truncate max-w-sm sm:max-w-md">
+                                      {acc.email}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Actions Toolbar */}
+                                <div className="flex items-center gap-1.5 self-end sm:self-center">
+                                  {!isAccActive && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isSavingAccounts}
+                                      onClick={() => handleSetActiveAccount(acc.id)}
+                                      className="h-7 text-[11px] font-semibold gap-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 border-emerald-300/60 dark:border-emerald-800"
+                                    >
+                                      <Check className="size-3" />
+                                      <span>Set as Active</span>
+                                    </Button>
+                                  )}
+
+                                  {!isAccActive && (
+                                    <div className="flex items-center border border-border/70 rounded-md overflow-hidden bg-background">
+                                      <button
+                                        type="button"
+                                        title="Move up in failover order"
+                                        disabled={isSavingAccounts || acc.backup_priority <= 1}
+                                        onClick={() => handleMoveBackupPriority(acc.id, 'up')}
+                                        className="p-1 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                                      >
+                                        <ArrowUp className="size-3.5" />
+                                      </button>
+                                      <div className="w-px h-3 bg-border/60" />
+                                      <button
+                                        type="button"
+                                        title="Move down in failover order"
+                                        disabled={isSavingAccounts || acc.backup_priority >= backupGoogleAccounts.length}
+                                        onClick={() => handleMoveBackupPriority(acc.id, 'down')}
+                                        className="p-1 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                                      >
+                                        <ArrowDown className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isPingLoading}
+                                    onClick={() => handlePingAccount(acc.id)}
+                                    className="h-7 text-[11px] gap-1 shrink-0 font-medium"
+                                  >
+                                    <RefreshCw className={`size-3 text-indigo-600 dark:text-indigo-400 ${isPingLoading ? 'animate-spin' : ''}`} />
+                                    <span>{isPingLoading ? 'Testing...' : 'Test'}</span>
+                                  </Button>
+
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleOpenEditAccount(acc)}
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                    title="Edit credentials & settings"
+                                  >
+                                    <Edit2 className="size-3.5" />
+                                  </Button>
+
+                                  {googleAccounts.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteAccount(acc.id)}
+                                      className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                      title="Delete account"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Individual Account Ping Result */}
+                              {ping && (
+                                <div
+                                  className={`p-2 rounded-lg text-[11px] flex items-center justify-between gap-2 ${
+                                    ping.ok
+                                      ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                                      : 'bg-rose-50/80 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    {ping.ok ? <CheckCircle className="size-3.5 shrink-0" /> : <AlertTriangle className="size-3.5 shrink-0" />}
+                                    <span className="truncate">{ping.message}</span>
+                                  </div>
+                                  {ping.latencyMs && (
+                                    <span className="text-[10px] font-mono font-bold shrink-0">
+                                      {ping.latencyMs}ms latency
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
+
+                    {/* Environment & Scope Diagnostics */}
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <Code2 className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <span>Google Cloud OAuth 2.0 Client Scope &amp; Redirect Configuration</span>
+                        </span>
+                        <Badge variant="secondary" className="text-[10px] font-mono">
+                          gmail.send
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Outbound mail dispatches are authorized for offline execution with automatic token refresh. If individual account client secrets are not specified above, the engine automatically falls back to system environment variables (<code className="font-mono text-foreground">GOOGLE_CLIENT_ID</code> and <code className="font-mono text-foreground">GOOGLE_CLIENT_SECRET</code>).
+                      </p>
+                    </div>
+
+                    {/* Add / Edit Google Workspace Account Modal Dialog */}
+                    <Dialog open={isAccountModalOpen} onOpenChange={setIsAccountModalOpen}>
+                      <DialogContent className="sm:max-w-md">
+                        <form onSubmit={handleSaveAccountModal} className="space-y-4">
+                          <DialogHeader>
+                            <DialogTitle className="text-base font-bold flex items-center gap-2">
+                              <Mail className="size-4 text-indigo-600" />
+                              <span>{editingAccount ? 'Edit Google Workspace Account' : 'Add Google Workspace Account'}</span>
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground">
+                              Add account credentials to participate in active email dispatching or sequential failover backups.
+                            </DialogDescription>
+                          </DialogHeader>
+
+                          <div className="space-y-3 py-1">
+                            <div className="space-y-1">
+                              <Label className="text-xs font-semibold">Account Label / Name</Label>
+                              <Input
+                                value={accountForm.name}
+                                onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
+                                placeholder="e.g. Account B, Account C..."
+                                className="text-xs h-8.5 font-medium"
+                                required
+                              />
+                              <span className="text-[10px] text-muted-foreground">Sequential name used to identify this account in the failover chain</span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs font-semibold">Google Workspace Email Address</Label>
+                              <Input
+                                type="email"
+                                value={accountForm.email}
+                                onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+                                placeholder="sharmisthamazumdar24@navgurukul.org"
+                                className="text-xs h-8.5 font-mono"
+                                required
+                              />
+                              <span className="text-[10px] text-muted-foreground">The authorized sender address associated with OAuth2 refresh tokens</span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs font-semibold">Daily Send Limit</Label>
+                              <Input
+                                type="number"
+                                min={100}
+                                max={10000}
+                                value={accountForm.daily_send_limit}
+                                onChange={(e) => setAccountForm({ ...accountForm, daily_send_limit: parseInt(e.target.value) || 2000 })}
+                                className="text-xs h-8.5 font-mono"
+                              />
+                              <span className="text-[10px] text-muted-foreground">Google Workspace standard limit is 2,000 emails per 24h rolling window</span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs font-semibold">Custom OAuth2 Refresh Token (Optional)</Label>
+                              <Input
+                                type="password"
+                                value={accountForm.refresh_token}
+                                onChange={(e) => setAccountForm({ ...accountForm, refresh_token: e.target.value })}
+                                placeholder={editingAccount?.refresh_token_preview || 'Leave blank to use system GOOGLE_REFRESH_TOKEN'}
+                                className="text-xs h-8.5 font-mono"
+                              />
+                              <span className="text-[10px] text-muted-foreground">Leave blank to use default system environment variable credentials</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <div className="space-y-1">
+                                <Label className="text-xs font-semibold">Client ID (Optional)</Label>
+                                <Input
+                                  value={accountForm.client_id}
+                                  onChange={(e) => setAccountForm({ ...accountForm, client_id: e.target.value })}
+                                  placeholder="Defaults to env"
+                                  className="text-xs h-8 font-mono truncate"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs font-semibold">Client Secret (Optional)</Label>
+                                <Input
+                                  type="password"
+                                  value={accountForm.client_secret}
+                                  onChange={(e) => setAccountForm({ ...accountForm, client_secret: e.target.value })}
+                                  placeholder="Defaults to env"
+                                  className="text-xs h-8 font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <DialogFooter className="gap-2 sm:gap-0">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsAccountModalOpen(false)}
+                              className="text-xs"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={isSavingAccounts}
+                              className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                            >
+                              {isSavingAccounts && <Loader2 className="size-3 animate-spin" />}
+                              <span>{editingAccount ? 'Save Changes' : 'Add to Failover Pool'}</span>
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
 
