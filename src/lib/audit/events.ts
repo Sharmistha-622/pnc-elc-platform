@@ -59,6 +59,17 @@ function toInput(
 }
 
 /**
+ * Reasons, notes and amounts go to metadata, never the description: the
+ * description is shown more widely than the values behind it (see
+ * auditEventsFor in ./service).
+ */
+function withDetail(opts: BaseOptions, detail: Record<string, unknown>): Record<string, unknown> | null {
+  const defined = Object.fromEntries(Object.entries(detail).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+  if (Object.keys(defined).length === 0) return opts.metadata ?? null;
+  return { ...(opts.metadata ?? {}), ...defined };
+}
+
+/**
  * Record an event for a module that has no dedicated helper yet.
  * Prefer a named helper below when one exists — the action strings it produces
  * are what the audit filters and reports key on.
@@ -120,17 +131,18 @@ export const auditOnboarding = {
     auditEvent(
       'onboarding',
       'onboarding.employment_details.correction_requested',
-      `Candidate requested a correction to their employment terms${o.notes ? `: ${o.notes}` : '.'}`,
-      { ...o, entityType: 'onboarding', actorType: o.actorType || 'candidate', severity: 'notice' }
+      'Candidate requested a correction to their employment terms.',
+      { ...o, metadata: withDetail(o, { notes: o.notes }), entityType: 'onboarding', actorType: o.actorType || 'candidate', severity: 'notice' }
     ),
 
   statusChanged: (o: BaseOptions & { from?: string; to: string; note?: string }) =>
     auditEvent(
       'onboarding',
       'onboarding.status.changed',
-      `Onboarding status changed${o.from ? ` from ${o.from}` : ''} to ${o.to}${o.note ? ` — ${o.note}` : '.'}`,
+      `Onboarding status changed${o.from ? ` from ${o.from}` : ''} to ${o.to}.`,
       {
         ...o,
+        metadata: withDetail(o, { note: o.note }),
         entityType: 'onboarding',
         changes: o.changes || [{ field: 'status', label: 'Onboarding Status', from: o.from, to: o.to }],
       }
@@ -140,9 +152,10 @@ export const auditOnboarding = {
     auditEvent(
       'onboarding',
       `onboarding.document.${o.status}`,
-      `${o.documentType} marked ${o.status}${o.reason ? ` — ${o.reason}` : '.'}`,
+      `${o.documentType} marked ${o.status}.`,
       {
         ...o,
+        metadata: withDetail(o, { reason: o.reason }),
         entityType: 'onboarding_document',
         severity: o.status === 'rejected' ? 'notice' : 'info',
       }
@@ -181,8 +194,8 @@ export const auditOnboarding = {
     auditEvent(
       'onboarding',
       'onboarding.milestone.updated',
-      `${o.milestone} marked ${o.status}${o.notes ? ` — ${o.notes}` : '.'}`,
-      { ...o, entityType: 'probation_milestone' }
+      `${o.milestone} marked ${o.status}.`,
+      { ...o, metadata: withDetail(o, { notes: o.notes }), entityType: 'probation_milestone' }
     ),
 };
 
@@ -293,8 +306,8 @@ export const auditConfirmation = {
     auditEvent(
       'confirmation',
       'confirmation.manager_decision.recorded',
-      `Manager recorded confirmation decision: ${o.decision}${o.notes ? ` — ${o.notes}` : '.'}`,
-      { ...o, entityType: 'confirmation', actorType: o.actorType || 'manager', severity: 'notice' }
+      `Manager recorded confirmation decision: ${o.decision}.`,
+      { ...o, metadata: withDetail(o, { notes: o.notes }), entityType: 'confirmation', actorType: o.actorType || 'manager', severity: 'notice' }
     ),
 
   approved: (o: BaseOptions) =>
@@ -308,8 +321,8 @@ export const auditConfirmation = {
     auditEvent(
       'confirmation',
       'confirmation.extended',
-      `Probation extended${o.until ? ` until ${o.until}` : ''}${o.reason ? ` — ${o.reason}` : '.'}`,
-      { ...o, entityType: 'confirmation', severity: 'warning' }
+      `Probation extended${o.until ? ` until ${o.until}` : ''}.`,
+      { ...o, metadata: withDetail(o, { reason: o.reason }), entityType: 'confirmation', severity: 'warning' }
     ),
 };
 
@@ -402,8 +415,8 @@ export const auditOffboarding = {
     auditEvent(
       'offboarding',
       'offboarding.fnf.settled',
-      `Full & final settlement recorded${o.amount !== undefined ? ` (₹${o.amount.toLocaleString('en-IN')})` : ''}.`,
-      { ...o, entityType: 'offboarding_fnf', severity: 'notice' }
+      'Full & final settlement recorded.',
+      { ...o, metadata: withDetail(o, { amount: o.amount }), entityType: 'offboarding_fnf', severity: 'notice' }
     ),
 
   accessRevoked: (o: BaseOptions & { system?: string }) =>
@@ -500,8 +513,8 @@ export const auditDataManagement = {
     auditEvent(
       'data_management',
       'data.record.rolled_back',
-      `Employee record rolled back to an earlier version${o.reason ? ` — ${o.reason}` : '.'}`,
-      { ...o, entityType: 'rollback', severity: 'warning' }
+      'Employee record rolled back to an earlier version.',
+      { ...o, metadata: withDetail(o, { reason: o.reason }), entityType: 'rollback', severity: 'warning' }
     ),
 
   bulkUpdated: (o: BaseOptions & { summary?: string }) =>
