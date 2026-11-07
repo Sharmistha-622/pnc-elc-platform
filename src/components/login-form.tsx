@@ -21,6 +21,8 @@ export function LoginForm() {
   // Set by the auth callback when a Google account outside the organisation
   // tried to sign in. A fixed message, never the parameter's own text.
   const domainRefused = searchParams.get("error") === "domain";
+  // Set by /auth/signout for an account whose platform access has ended.
+  const accessEnded = searchParams.get("error") === "ended";
 
   const handleGoogleLogin = async () => {
     setIsSocialLoading(true);
@@ -71,6 +73,15 @@ export function LoginForm() {
             <p className="text-xs font-semibold text-rose-700 dark:text-rose-400 leading-tight">
               Sign in with your @{DEFAULT_ALLOWED_DOMAINS[0]} Google account. Personal accounts
               cannot use the platform.
+            </p>
+          </div>
+        )}
+
+        {accessEnded && !error && (
+          <div role="alert" className="w-full mt-4 p-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-lg text-left">
+            <p className="text-xs font-semibold text-rose-700 dark:text-rose-400 leading-tight">
+              This account no longer has access to the platform. If that is a mistake, contact
+              People &amp; Culture.
             </p>
           </div>
         )}

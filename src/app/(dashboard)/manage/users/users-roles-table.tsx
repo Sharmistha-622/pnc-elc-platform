@@ -42,7 +42,10 @@ import {
   Edit3,
   History,
   Compass,
+  RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
+import { restorePlatformAccess } from "@/lib/rbac/restorePlatformAccess";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import {
   DropdownMenu,
@@ -119,6 +122,17 @@ export function UsersRolesTable({
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [auditingUser, setAuditingUser] = useState<UserRow | null>(null);
+
+  // Re-opens an account closed at exit (Super Admin only; the action checks).
+  const handleRestoreAccess = async (user: UserRow) => {
+    const result = await restorePlatformAccess(user.id);
+    if (!result.success) {
+      toast.error(result.error ?? "Could not restore access");
+      return;
+    }
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: "active" } : u)));
+    toast.success("Access restored. Assign a role if they need more than the employee baseline.");
+  };
 
   React.useEffect(() => {
     if (!initialDepartments || initialDepartments.length === 0) {
@@ -484,7 +498,9 @@ export function UsersRolesTable({
                           className={`h-1.5 w-1.5 rounded-full ${
                             user.status === "active" || !user.status
                               ? "bg-emerald-500"
-                              : "bg-amber-500"
+                              : user.status === "access ended"
+                                ? "bg-rose-500"
+                                : "bg-amber-500"
                           }`}
                         />
                         <span className="text-xs font-medium text-muted-foreground capitalize">
@@ -514,6 +530,15 @@ export function UsersRolesTable({
                             <Edit3 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                             <span>Edit Allocations</span>
                           </DropdownMenuItem>
+                          {callerRole === "super_admin" && user.status === "access ended" && (
+                          <DropdownMenuItem
+                            onClick={() => handleRestoreAccess(user)}
+                            className="rounded-lg text-xs cursor-pointer flex items-center gap-2"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Restore access</span>
+                          </DropdownMenuItem>
+                          )}
                           {canManageAccounts && (
                           <DropdownMenuItem
                             onClick={() => setAuditingUser(user)}

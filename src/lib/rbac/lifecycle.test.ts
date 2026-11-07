@@ -7,6 +7,7 @@ import {
   hasJoined,
   isLive,
   deriveRole,
+  accessEndedAt,
   type JoinerStatus,
 } from './lifecycle'
 
@@ -103,5 +104,24 @@ describe('deriveRole', () => {
   // Access is off the same day, whatever else is true of the record.
   it('gives a withdrawn joiner nothing, reportees or not', () => {
     expect(deriveRole({ status: 'withdrawn', reporteeCount: 4 })).toBeNull()
+  })
+
+  it('ends every role at exit, a granted one included', () => {
+    expect(deriveRole({ status: 'confirmed', grantedRole: 'pnc_admin', employmentStatus: 'exited' })).toBeNull()
+    expect(deriveRole({ status: 'confirmed', reporteeCount: 3, employmentStatus: 'exited' })).toBeNull()
+    expect(deriveRole({ status: 'confirmed', grantedRole: 'pnc_admin', employmentStatus: 'active' })).toBe('pnc_admin')
+  })
+})
+
+describe('accessEndedAt', () => {
+  it('reads the marker exit closure writes', () => {
+    expect(accessEndedAt({ role: 'employee', access_ended_at: '2026-11-07T10:00:00Z' })).toBe('2026-11-07T10:00:00Z')
+  })
+
+  it('treats a missing, blank or non-string marker as open', () => {
+    expect(accessEndedAt({ role: 'employee' })).toBeNull()
+    expect(accessEndedAt({ access_ended_at: '' })).toBeNull()
+    expect(accessEndedAt({ access_ended_at: null })).toBeNull()
+    expect(accessEndedAt(undefined)).toBeNull()
   })
 })
