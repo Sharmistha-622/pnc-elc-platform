@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.09.07",
+    "date": "2026-11-07",
+    "title": "Keep the portal link with the candidate; record signatures on the server",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "onboarding portal links and signature records hardened"
+      },
+      {
+        "category": "Fixes",
+        "description": "a candidate's signature records their real network address"
+      }
+    ]
+  },
+  {
     "version": "2.09.06",
     "date": "2026-11-07",
     "title": "End platform access when an exit closes",
