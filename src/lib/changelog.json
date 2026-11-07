@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.09.06",
+    "date": "2026-11-07",
+    "title": "End platform access when an exit closes",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "offboarding and account lifecycle hardened"
+      }
+    ]
+  },
+  {
     "version": "2.09.05",
     "date": "2026-11-04",
     "title": "Every function service-role only, including new ones",
