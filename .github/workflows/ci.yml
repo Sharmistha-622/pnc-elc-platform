@@ -29,6 +29,10 @@ jobs:
 
       - name: Test
         run: npm test
+      # The DPDP checker's static and db checks (scripts/dpdp-check.ts).
+      # Report-only for now; prints ID | status | title, never data.
+      - name: DPDP checks
+        run: npm run dpdp:check
 
       - name: Build
         run: npm run build
