@@ -19,6 +19,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { sendCalendarInvite, sendEmail } from '@/lib/email/sendEmail'
 import { calendarAvailabilityService } from '@/lib/integrations/calendar-availability.server'
 import { auditEvent } from '@/lib/audit/events'
+import { sealFeedbackForConfirmation } from '@/lib/vault/seal-service'
 import {
   DEFAULT_APPRAISAL_CYCLES,
   DEFAULT_APPRAISAL_RULES,
@@ -86,6 +87,11 @@ export type Ctx = {
   pncRecipients?: Recipient[]
   /** Busy blocks for a calendar; the mock service when not given. */
   busy?: (email: string, from: Date, to: Date) => Promise<{ start: string; end: string }[]>
+  /**
+   * Seals a closed confirmation's written peer feedback into the vault.
+   * Absent in tests; defaultCtx uses sealFeedbackForConfirmation.
+   */
+  sealFeedback?: (confirmationId: string, options: { corePersonId: string; cycle?: string | null; event?: string }) => Promise<{ sealed: number; failed: number; errors: string[] }>
 }
 
 /** The production context: service-role client, Gmail, the real clock. */
@@ -98,6 +104,7 @@ export function defaultCtx(actor: string): Ctx | null {
     mail: gmailMailer,
     appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     actor,
+    sealFeedback: (confirmationId, options) => sealFeedbackForConfirmation(confirmationId, options),
   }
 }
 
@@ -922,6 +929,10 @@ export async function closeCycle(ctx: Ctx, cycleId: string, input: { outcome: 'a
   }
   await touchCycle(ctx, cycleId, { stage: 'closed', closed_at: ctx.now.toISOString() })
   await logEvent(ctx, cycleId, 'closed', null, { decision: decision.decision })
+  // The written peer feedback leaves core for the vault now that the cycle
+  // is over. A failed seal is listed in the staged records and retried by
+  // the daily job; it never undoes the close.
+  await sealCycleFeedback(ctx, cycle)
   await auditEvent(
     cycle.kind === 'confirmation' ? 'confirmation' : 'appraisal',
     `${cycle.kind}.review_cycle.closed`,
@@ -1091,6 +1102,8 @@ export async function whoIsDue(db: SupabaseClient, now: Date, settings: ReviewCy
 
 export type AutomationSummary = {
   skipped?: string
+  /** Peer feedback sealed into the vault from closed cycles. */
+  sealed?: number
   opened: number
   openFailures: { name: string; error: string }[]
   reminded: number
@@ -1103,6 +1116,45 @@ export type AutomationSummary = {
  * Safe to run more than once a day: every step is gated by the database
  * (one live cycle per period) or the reminder clock.
  */
+/** Seals one closed confirmation cycle's peer feedback, if there is a sealer. */
+async function sealCycleFeedback(ctx: Ctx, cycle: Pick<CycleRow, 'id' | 'confirmation_id' | 'employee_id' | 'period_label'>): Promise<number> {
+  if (!ctx.sealFeedback || !cycle.confirmation_id) return 0
+  try {
+    const result = await ctx.sealFeedback(cycle.confirmation_id, {
+      corePersonId: cycle.employee_id,
+      cycle: cycle.period_label ?? null,
+      event: 'cycle_closed',
+    })
+    if (result.failed > 0) await logEvent(ctx, cycle.id, 'seal_failed', null, { failed: result.failed })
+    return result.sealed
+  } catch {
+    await logEvent(ctx, cycle.id, 'seal_failed', null, null)
+    return 0
+  }
+}
+
+/** Closed confirmation cycles whose peer feedback is still in core: sealed again by the daily job. */
+async function sealClosedCycles(ctx: Ctx): Promise<number> {
+  if (!ctx.sealFeedback) return 0
+  const { data: staged } = await ctx.db
+    .from('peer_feedback')
+    .select('confirmation_id')
+    .neq('seal_state', 'sealed')
+    .not('feedback_text', 'is', null)
+  const confirmationIds = [...new Set(((staged ?? []) as { confirmation_id: string | null }[]).map((r) => r.confirmation_id).filter((id): id is string => !!id))]
+  if (confirmationIds.length === 0) return 0
+  const { data: cycles } = await ctx.db
+    .from('review_cycles')
+    .select('id, confirmation_id, employee_id, period_label')
+    .eq('stage', 'closed')
+    .in('confirmation_id', confirmationIds)
+  let sealed = 0
+  for (const cycle of (cycles ?? []) as Pick<CycleRow, 'id' | 'confirmation_id' | 'employee_id' | 'period_label'>[]) {
+    sealed += await sealCycleFeedback(ctx, cycle)
+  }
+  return sealed
+}
+
 export async function runAutomation(ctx: Ctx, opts: { force?: boolean } = {}): Promise<AutomationSummary> {
   const settings = await loadSettings(ctx.db)
   const summary: AutomationSummary = { opened: 0, openFailures: [], reminded: 0, escalated: 0, readyChecked: 0 }
@@ -1143,5 +1195,7 @@ export async function runAutomation(ctx: Ctx, opts: { force?: boolean } = {}): P
       summary.readyChecked++
     }
   }
+  // 4. Seal any closed cycle's peer feedback still in core.
+  summary.sealed = await sealClosedCycles(ctx)
   return summary
 }

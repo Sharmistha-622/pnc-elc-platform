@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { createAdminSupabaseClient } from '@/lib/supabase/admin';
+import { logWriter } from '@/lib/logs/writer';
 import {
   AuditEvent,
   AuditEventInput,
@@ -22,16 +22,15 @@ import type { UserRole } from '@/lib/role-constants';
 const AUDIT_TABLE = 'employee_audit_log';
 
 /**
- * The client an audit write goes through.
- *
- * The service-role client when there is one. Events are recorded from the
- * candidate portal and from cron runs too, and neither carries a session: the
- * database refuses the anonymous role everything, so a session-bound write
- * there was silently dropped. This module is not a server action — nothing in
- * the browser can call it — and it only ever appends.
+ * The client an audit write goes through: the service role (see
+ * src/lib/logs/writer.ts). Events are recorded from the candidate portal and
+ * from cron runs too, and sessions cannot write the log. This module is not a
+ * server action — nothing in the browser can call it — and it only appends.
  */
 async function auditWriter() {
-  return createAdminSupabaseClient() ?? (await createServerSupabaseClient());
+  const client = logWriter();
+  if (!client) throw new Error('No service key: audit event kept in memory only.');
+  return client;
 }
 const QUERY_TIMEOUT_MS = 3000;
 

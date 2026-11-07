@@ -113,6 +113,18 @@ real work.** Items are grouped by area.
 - CTCs and letters are still held on the platform, behind role rules, until
   the vault work is done.
 
+## Privacy (DPDP)
+
+- **Retention starts in dry run.** The nightly job reports what is due and
+  deletes nothing until a Super Admin switches it to live.
+- **Exited people's records are erased by hand.** The run report counts the
+  people due under each rule, and the Drive folders and vault records to
+  review; PnC erases them.
+- **Breach messages are drafted, not sent.** Send each one yourself and
+  record the time on the incident.
+- **The outbox no longer keeps message bodies.** A log shows the template the
+  message came from, with sample values, not what the recipient saw.
+
 ## Reporting a new problem
 
 When something doesn't work as this guide describes, send the Platform team:

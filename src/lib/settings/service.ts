@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logWriter } from '@/lib/logs/writer'
 import { revalidatePath } from 'next/cache'
 import { platformConfigRefusal } from './access'
 import { guard } from '@/lib/rbac/guard'
@@ -312,7 +313,9 @@ export async function resendEmailDeliveryLog(
   const refused = await platformConfigRefusal()
   if (refused) return refused
   try {
-    const supabase = await createServerSupabaseClient()
+    // Sessions cannot write email logs; the server does, after the check above.
+    const supabase = logWriter()
+    if (!supabase) return { success: false, error: 'The server is missing its service key.' }
     const { error } = await supabase
       .from('email_delivery_logs')
       .update({
@@ -628,7 +631,6 @@ export async function sendTestEmailVerification(
     }
   }
   try {
-    const supabase = await createServerSupabaseClient()
     const newLogId = `log-test-${Date.now()}`
 
     let realMessageId = `msg-${Date.now()}`
@@ -695,9 +697,6 @@ export async function sendTestEmailVerification(
       category: 'system' as const,
       notification_type: `Provider Verification Test (${provider.toUpperCase()})`,
       subject: `[Test Verification] NavGurukul ELC Email Delivery — ${provider.toUpperCase()}`,
-      body_preview: deliveryStatus === 'delivered'
-        ? `Live verification email successfully dispatched via ${provider.toUpperCase()} (Message ID: ${realMessageId}) to ${recipientEmail}. Delivery pipeline verified.`
-        : `Verification attempt via ${provider.toUpperCase()} failed: ${sendError}`,
       status: deliveryStatus,
       error_message: sendError,
       sent_at: new Date().toISOString(),
@@ -705,7 +704,7 @@ export async function sendTestEmailVerification(
     }
 
     try {
-      await supabase.from('email_delivery_logs').insert(testLog)
+      await logWriter()?.from('email_delivery_logs').insert(testLog)
     } catch {
       // Graceful fallback if table not yet migrated
     }
@@ -755,7 +754,8 @@ async function logSettingsChange(
   changedBy: string
 ) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = logWriter()
+    if (!supabase) return
     await supabase.from('settings_change_log').insert({
       table_name: tableName,
       record_id: recordId,

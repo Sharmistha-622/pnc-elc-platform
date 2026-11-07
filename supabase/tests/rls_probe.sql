@@ -61,6 +61,28 @@ insert into public.review_events (cycle_id, kind) values ('00000000-0000-0000-00
 insert into public.audit_log (table_name, record_id, action)
   values ('employees', '00000000-0000-0000-0000-00000000000b', 'update');
 
+-- DPDP: one published notice (every staff member reads it), one draft
+-- (privacy roles only), and a check result.
+insert into public.dpdp_notices (notice_type, language, version, status, title, published_at, published_by, publish_reason) values
+  ('employee', 'en', 1, 'published', 'Employee privacy notice', now(), 'probe', 'probe'),
+  ('candidate', 'en', 1, 'draft', 'Candidate privacy notice', null, null, null);
+insert into public.dpdp_check_results (check_id, status) values ('DPDP-01', 'pass');
+-- R asked for an access summary and nominated someone.
+insert into public.privacy_requests (principal_type, principal_ref, request_type, channel, due_at)
+  values ('employee', '00000000-0000-0000-0000-00000000000b', 'access', 'app', now() + interval '30 days');
+insert into public.privacy_nominations (principal_type, principal_ref, nominee_name)
+  values ('employee', '00000000-0000-0000-0000-00000000000b', 'N Nominee');
+-- A legal hold on R, and a retention run report.
+insert into public.dpdp_legal_holds (subject_type, subject_ref, reason, review_date, placed_by)
+  values ('employee', '00000000-0000-0000-0000-00000000000b', 'probe hold reason', current_date + 90, 'probe');
+insert into public.retention_runs (mode, status) values ('dry_run', 'ok');
+-- An incident under investigation.
+insert into public.privacy_incidents (title, detected_at, recorded_by)
+  values ('Probe incident', now() - interval '2 hours', 'probe');
+-- R acknowledged the employee notice.
+insert into public.consent_records (principal_type, principal_ref, record_type, notice_type, notice_language, notice_version, channel)
+  values ('employee', '00000000-0000-0000-0000-00000000000b', 'acknowledgment', 'employee', 'en', 1, 'app');
+
 -------------------------------------------------------------------------
 -- Helpers
 -------------------------------------------------------------------------
@@ -177,7 +199,28 @@ insert into pg_temp.expectations values
   ('review_cycle_settings',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   -- Lookups: staff read; the internet and outsiders do not.
   ('ng_locations',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
-  ('indian_states',          '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
+  ('indian_states',          '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- DPDP & Privacy: configuration and counts to the four privacy roles.
+  ('dpdp_settings',          '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_retention_rules',   '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_attestations',      '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_check_results',     '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  -- What every staff member is shown: the published notice, the purposes,
+  -- the processors, and the contact and periods.
+  ('dpdp_notices',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_consent_purposes',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_processors',        '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_public_settings',   '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- Consent records: the person, and the privacy case roles. Not their
+  -- manager, not the platform team, not Exec View.
+  ('consent_records',        '{"employee (R)",pnc_admin,super_admin}'),
+  ('privacy_requests',       '{"employee (R)",pnc_admin,super_admin}'),
+  ('privacy_nominations',    '{"employee (R)",pnc_admin,super_admin}'),
+  -- Legal holds name people: the privacy case roles only, never the subject.
+  ('dpdp_legal_holds',       '{pnc_admin,super_admin}'),
+  -- Incidents: the privacy case roles only.
+  ('privacy_incidents',      '{pnc_admin,super_admin}'),
+  ('retention_runs',         '{pnc_admin,platform_admin,exec_view,super_admin}');
 
 -------------------------------------------------------------------------
 -- Run it

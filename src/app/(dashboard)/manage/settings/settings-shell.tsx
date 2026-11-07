@@ -21,6 +21,7 @@ import {
   Eye,
   ClipboardCheck,
   ShieldAlert,
+  Lock,
   ChevronRight,
   Compass,
 } from 'lucide-react'
@@ -83,17 +84,48 @@ const superAdminSection = {
   icon: ShieldAlert,
 }
 
-export function SettingsShell({ children }: { children: React.ReactNode }) {
+// DPDP & Privacy has its own feature (`privacy`) and its own route group, so it
+// is shown to the roles that reach it, whether or not they reach the rest.
+const privacySection = {
+  label: 'DPDP & Privacy',
+  description: 'Privacy settings & compliance',
+  href: '/manage/settings/dpdp',
+  icon: Lock,
+}
+
+/**
+ * The settings frame and its tab row.
+ * @param canSeePlatform - the role reaches the platform tabs (`platformConfig`)
+ * @param canSeePrivacy - the role reaches DPDP & Privacy (`privacy`)
+ */
+export function SettingsShell({
+  children,
+  canSeePlatform,
+  canSeePrivacy,
+}: {
+  children: React.ReactNode
+  canSeePlatform: boolean
+  canSeePrivacy: boolean
+}) {
   const pathname = usePathname()
   const [tablesExist, setTablesExist] = useState<boolean | null>(null)
   const [canEdit, setCanEdit] = useState<boolean | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const onPrivacyTab = pathname.startsWith(privacySection.href)
 
   useEffect(() => {
+    if (!canSeePlatform) return
     checkSettingsTableExists().then((exists) => setTablesExist(exists))
     canEditPlatformConfig().then((allowed) => setCanEdit(allowed))
     canManageBreakGlass().then((allowed) => setIsSuperAdmin(allowed))
-  }, [])
+  }, [canSeePlatform])
+
+  // Each role sees the sections its features reach (the layouts gate the pages).
+  const sections = [
+    ...(canSeePlatform ? settingsSections : []),
+    ...(canSeePrivacy ? [privacySection] : []),
+  ]
+  const showSuperAdmin = canSeePlatform && isSuperAdmin
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
@@ -104,8 +136,11 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
         icon={<SlidersHorizontal className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
       />
 
-      {/* View-Only Warning Notice Banner */}
-      {canEdit === false && (
+      {/* View-only notice. PnC Admin reaches these screens to read the rules
+          their own process runs on, but the matrix gives them `config: view`.
+          The server actions refuse the write either way; this is so the
+          refusal is not a surprise. DPDP & Privacy has its own edit check. */}
+      {canEdit === false && !onPrivacyTab && (
         <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground animate-in fade-in">
           <Eye className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden="true" />
           <div className="space-y-1">
@@ -119,7 +154,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Migration Notice Banner if tables are not yet created in Supabase */}
-      {tablesExist === false && (
+      {tablesExist === false && !onPrivacyTab && (
         <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs leading-relaxed animate-in fade-in">
           <AlertTriangle className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
@@ -152,7 +187,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
                 </span>
               </div>
               <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-                {isSuperAdmin ? settingsSections.length + 1 : settingsSections.length} sections
+                {showSuperAdmin ? sections.length + 1 : sections.length} sections
               </span>
             </div>
 
@@ -161,7 +196,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
               className="flex lg:flex-col gap-1 overflow-x-auto scrollbar-none scroll-smooth p-0.5"
               aria-label="Settings Sections"
             >
-              {settingsSections.map((section) => {
+              {sections.map((section) => {
                 const isActive =
                   section.href === '/manage/settings'
                     ? pathname === '/manage/settings'
@@ -207,7 +242,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
                 )
               })}
 
-              {isSuperAdmin && (
+              {showSuperAdmin && (
                 <>
                   <div className="h-px bg-border/70 my-1 hidden lg:block" />
                   <div className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hidden lg:block">

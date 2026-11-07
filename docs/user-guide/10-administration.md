@@ -57,6 +57,50 @@ edited. The rules on who may grant which role are in
 
 ---
 
+## DPDP & Privacy (`/manage/settings/dpdp`)
+
+Every privacy setting, in one place. Super Admin and PnC Admin edit; Platform
+Admin and Exec View can look. Values the law fixes (the 90-day ceiling on
+grievance periods, the 1-year floor on deletion, the 6-hour and 72-hour
+breach deadlines, age 18) show a lock and cannot be changed.
+
+| Tab | What's in it |
+|---|---|
+| **Contact & grievance** | The Privacy & Grievance Officer shown everywhere; the grievance and request periods; the Board's complaint link. |
+| **Notices** | Candidate, employee and contractor/volunteer notices, and the three breach templates. Edit a draft, see what changed, and publish once the checklist passes. Published versions never change. |
+| **Consent purposes** | Optional purposes people may agree to. |
+| **Data collection** | Optional portal fields; document types that may be copied to Drive. |
+| **Retention** | Period per rule (counsel to confirm), the dry-run/live switch (Super Admin only), the latest nightly run, and legal holds. |
+| **Children** | Guardian verification methods. |
+| **Links & staging** | Invitation validity; sealing budgets. |
+| **Breach response** | Who to call in an incident. |
+| **Processors** | Each processor's purpose, region, agreement and review date. |
+| **Owner attestations** | Confirmations only an owner can give, each with a review date. |
+| **Compliance checker** | Every DPDP check with its status, when it last passed and how to fix it. Download the report (counts only). |
+
+A reason is asked for when you change a retention rule, the mode, or publish
+a notice. Every change is logged.
+
+## Privacy cases (`/manage/privacy`)
+
+Super Admin and PnC Admin only: these hold personal data.
+
+- **Rights requests:** the queue, soonest due first. Take a request, work it,
+  and answer it; the answer is emailed with the privacy contact. Requests
+  past 80% of their period are escalated. Record requests that arrive by
+  email (from a former employee, say) with **Record a request received by
+  email**. An erasure answer that keeps data must name the law.
+- **Incidents:** record a breach or cyber incident the moment it is noticed.
+  The CERT-In (6 h) and Board (72 h) countdowns start from that time. The
+  page drafts each message from the templates; you send them and record
+  when. See `docs/dpdp/breach-runbook.md`.
+- **Legal holds:** pause retention for a person or a record while a claim or
+  inquiry is open. Release it, with a reason, when it ends.
+- **Guardian consent:** joiners under 18 wait here. Record a guardian's
+  verified consent, or confirm from a document that the joiner is 18 or over.
+
+---
+
 ## Email Center (`/manage/emails`)
 
 | Tab | What it's for |

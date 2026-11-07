@@ -5,6 +5,9 @@ import {
   formatFileSize,
   removeCandidateFile,
 } from '@/lib/onboarding/candidate-storage';
+import { hasAcknowledgedLatest } from '@/lib/dpdp/consent/service';
+import { guardianBlocks } from '@/lib/dpdp/children';
+import { GUARDIAN_HOLD_MESSAGE, guardianStatusOf } from '@/lib/dpdp/guardian';
 
 /**
  * Candidate document upload.
@@ -34,6 +37,19 @@ export async function POST(
         { success: false, error: 'This onboarding is no longer open for uploads.' },
         { status: 409 }
       );
+    }
+
+    // No document is taken before the privacy notice has been read (DPDP Act s. 5(1)).
+    if (!(await hasAcknowledgedLatest({ type: 'candidate', ref: existing.record.id }, 'candidate'))) {
+      return NextResponse.json(
+        { success: false, error: 'Please read and acknowledge the privacy notice first.' },
+        { status: 409 }
+      );
+    }
+
+    // Under 18: no document is taken until a guardian's consent is recorded.
+    if (guardianBlocks(await guardianStatusOf(existing.record.id))) {
+      return NextResponse.json({ success: false, error: GUARDIAN_HOLD_MESSAGE, guardian: 'required' }, { status: 409 });
     }
 
     const form = await req.formData();

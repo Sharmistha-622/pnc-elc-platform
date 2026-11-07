@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logWriter } from '@/lib/logs/writer'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/getCurrentUserRole'
 import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { recordAuditEvent } from '@/lib/audit/service'
@@ -289,7 +290,8 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
 
   // 3. Write Audit Log to public.audit_log
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = logWriter()
+    if (!supabase) throw new Error('No service key: the audit line was not written.')
     const auditRecordId = isValidUuid(targetUserId) ? targetUserId : randomUUID()
     const callerId = caller.userId && isValidUuid(caller.userId) ? caller.userId : null
 

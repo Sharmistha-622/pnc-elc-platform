@@ -15,6 +15,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logWriter } from '@/lib/logs/writer'
 import { guard, passes, type Guarded } from '@/lib/rbac/guard'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { platformConfigRefusal } from '@/lib/settings/access'
@@ -398,7 +399,8 @@ export async function updateReviewCycleSettings(patch: Partial<ReviewCycleSettin
     .update({ ...clean, updated_at: new Date().toISOString(), updated_by: email })
     .eq('id', 'default')
   if (error) return { ok: false, error: 'Could not save the settings.' }
-  await supabase.from('settings_change_log').insert({
+  // Sessions cannot write the change log: the server writes it after the guard above.
+  await logWriter()?.from('settings_change_log').insert({
     table_name: 'review_cycle_settings',
     // A single row with a text id; the log's record_id is a uuid.
     record_id: null,

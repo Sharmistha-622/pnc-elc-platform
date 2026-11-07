@@ -111,8 +111,6 @@ export type EmailDeliveryLog = {
   category: 'onboarding' | 'confirmation' | 'appraisal' | 'offboarding' | 'system'
   notification_type: string
   subject: string
-  body_preview: string
-  body_html?: string | null
   status: 'delivered' | 'sent' | 'failed' | 'queued'
   error_message?: string | null
   sent_at: string
@@ -521,7 +519,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'onboarding',
     notification_type: 'Offer Letter & Portal Access',
     subject: 'Offer of Employment — NavGurukul Foundation',
-    body_preview: 'Dear Kavita, We are pleased to offer you the position of Software Engineering Fellow at NavGurukul Foundation for Social Welfare...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-25T14:30:00.000Z',
@@ -535,7 +532,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'onboarding',
     notification_type: 'Pre-joining Document Reminder',
     subject: 'Action Required: Submit Your Verification Documents Before Joining',
-    body_preview: 'Dear Aarav, This is a gentle reminder that your joining date is in 5 days. Please ensure your Aadhaar and PAN documents are submitted...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-25T11:15:00.000Z',
@@ -549,7 +545,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'onboarding',
     notification_type: 'Hardware & Account Provisioning Alert',
     subject: 'New Joining Alert: Provision G-Suite Account for Rahul Kumar',
-    body_preview: 'Hello IT Team, Rahul Kumar has completed onboarding prerequisites. Please provision rahul.kumar@navgurukul.org and configure laptop access...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-24T16:45:00.000Z',
@@ -563,7 +558,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'onboarding',
     notification_type: 'Day 1 Welcome & Buddy Introduction',
     subject: 'Welcome to NavGurukul! Meet Your Team and Onboarding Buddy',
-    body_preview: 'Welcome Rahul! We are excited to have you join our team. Your onboarding buddy is Sharmistha Mazumdar...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-24T09:00:00.000Z',
@@ -577,7 +571,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'confirmation',
     notification_type: 'Peer Feedback Request',
     subject: 'Peer Feedback Requested for Rahul Kumar (Probation Review)',
-    body_preview: 'Dear Nitin, You have been nominated as a peer reviewer for Rahul Kumar. Please submit your feedback within 7 days...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-23T10:00:00.000Z',
@@ -591,7 +584,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'confirmation',
     notification_type: 'Peer Review Automated Reminder',
     subject: 'Reminder: Peer Feedback Requested for Rahul Kumar',
-    body_preview: 'Hi Sharmistha, This is a reminder to submit your peer evaluation for Rahul Kumar. Deadline expires in 2 days...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-22T08:30:00.000Z',
@@ -605,7 +597,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'appraisal',
     notification_type: 'Appraisal Cycle Launch Announcement',
     subject: 'Annual Performance Appraisal Cycle Now Open — Cycle 2026-H1',
-    body_preview: 'Dear NavGurukul Team, The 2026-H1 Annual Performance Appraisal cycle is now officially open on the ELC platform...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-20T09:00:00.000Z',
@@ -619,7 +610,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'appraisal',
     notification_type: 'Self-Review Deadline Alert',
     subject: 'Reminder: Complete Your Appraisal Self-Evaluation within 3 Days',
-    body_preview: 'Dear Priya, Your self-review submission window closes on 30 Sep 2026. Please finalize your deliverables reflection...',
     status: 'queued',
     error_message: null,
     sent_at: '2026-09-26T06:00:00.000Z',
@@ -633,7 +623,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'offboarding',
     notification_type: 'Resignation Formal Acknowledgment',
     subject: 'Acknowledgment of Resignation — NavGurukul Foundation',
-    body_preview: 'Dear Vikram, We formally acknowledge receipt of your resignation notice dated 20 Sep 2026. Your proposed last working day is...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-21T15:20:00.000Z',
@@ -647,7 +636,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'offboarding',
     notification_type: 'No-Dues Department Clearance Reminder',
     subject: 'Department Clearance Required for Separation of Vikram Patel',
-    body_preview: 'Hello Finance Team, Please verify outstanding expense reports, travel advances, and asset recovery for Vikram Patel...',
     status: 'delivered',
     error_message: null,
     sent_at: '2026-09-22T11:00:00.000Z',
@@ -661,7 +649,6 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
     category: 'confirmation',
     notification_type: 'Peer Review Request',
     subject: 'Peer Feedback Requested for Tanya Sen',
-    body_preview: 'Dear Rohan, You have been invited to participate in the peer evaluation for Tanya Sen...',
     status: 'failed',
     error_message: 'SMTP 550 5.1.1 Recipient mailbox unavailable or user unknown',
     sent_at: '2026-09-24T18:12:00.000Z',

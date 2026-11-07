@@ -1034,15 +1034,10 @@ export function NotificationSettingsForm({
               </div>
             )}
 
-            {/* Message Body Preview */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Message Body
-              </Label>
-              <div className="p-4 rounded-lg border border-border/80 bg-background leading-relaxed text-xs text-foreground whitespace-pre-wrap font-sans shadow-2xs">
-                {selectedLog?.body_preview}
-              </div>
-            </div>
+            {/* Message bodies are not stored: the log keeps the template, recipient, status and error only. */}
+            <p className="text-[11px] text-muted-foreground">
+              The message itself is not kept. Preview its template in Emails → Templates.
+            </p>
           </div>
 
           <DialogFooter className="p-4 border-t border-border/60 bg-muted/20 gap-2">

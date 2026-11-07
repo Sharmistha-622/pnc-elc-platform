@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
+import { logWriter } from '@/lib/logs/writer';
 import { auditOffboarding, auditAccess, auditLetters } from '@/lib/audit/events';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email/sendEmail';
@@ -65,7 +66,8 @@ async function recordAuditLog(
   changedBy: string = 'pnc-user'
 ) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = logWriter();
+    if (!supabase) return;
     await supabase.from('audit_log').insert({
       table_name: tableName,
       record_id: recordId,
@@ -577,7 +579,7 @@ async function openOffboardingCase(
       await supabase.from('offboarding_checklists').insert(defaultChecklist);
       await supabase.from('offboarding_ndc').insert(defaultNdc);
       await supabase.from('offboarding_fnf').insert(defaultFnf);
-      await supabase.from('offboarding_activity_log').insert(initialActivity);
+      await logWriter()?.from('offboarding_activity_log').insert(initialActivity);
     } catch {
       // Table missing - memory store handles it
     }

@@ -37,6 +37,8 @@ import {
   Users,
   Users2,
   type LucideIcon,
+  Lock,
+  Scale,
 } from "lucide-react";
 
 import { canAccessRoute, type UserRole } from "@/lib/role-constants";
@@ -117,6 +119,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // Hidden by `visibleSections` for anyone with no direct reports, however
       // senior: an empty team page is a dead end, not a feature.
       { title: "My Team", url: "/my-team", icon: Users2 },
+    { title: "My Privacy", url: "/my-privacy", icon: ShieldCheck },
     ],
   },
 
@@ -178,7 +181,15 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ShieldCheck,
         alsoActiveFor: ["/manage/roles"],
       },
-      { title: "Settings", url: "/manage/settings", icon: SlidersHorizontal },
+      {
+        title: "Settings",
+        url: "/manage/settings",
+        icon: SlidersHorizontal,
+        // DPDP & Privacy has its own entry, for the roles that reach only it.
+        notActiveFor: ["/manage/settings/dpdp"],
+      },
+      { title: "DPDP & Privacy", url: "/manage/settings/dpdp", icon: Lock },
+      { title: "Privacy Cases", url: "/manage/privacy", icon: Scale },
       { title: "Email Center", url: "/manage/emails", icon: Mail },
       {
         title: "Data Management",

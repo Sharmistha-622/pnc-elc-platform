@@ -1,4 +1,7 @@
 {
+  "regions": [
+    "bom1"
+  ],
   "crons": [
     {
       "path": "/api/cron/peer-reminders",
@@ -7,6 +10,10 @@
     {
       "path": "/api/cron/review-cycles",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/dpdp-retention",
+      "schedule": "30 20 * * *"
     }
   ]
 }

@@ -103,7 +103,8 @@ export default function CreateCandidateOnboardingPage() {
     joining_date: new Date().toISOString().split('T')[0],
     probation_period: '3 Months',
     notice_period: '1 Month',
-    ctc_amount: 60000,
+    // No default: an offer's figure is typed for each candidate, never assumed.
+    ctc_amount: null as number | null,
     ctc_frequency: 'monthly' as CtcFrequency,
     // No default: PnC must answer it for every candidate (it becomes the
     // employee's mandatory alumni status), so a blank cannot pass as "No".
@@ -253,6 +254,10 @@ export default function CreateCandidateOnboardingPage() {
       // The salary split and the employee record are both resolved from this,
       // so creating without it would silently produce an FTE annexure.
       toast.error('Select an employment type');
+      return;
+    }
+    if (!formData.ctc_amount || formData.ctc_amount <= 0) {
+      toast.error('Enter the offered CTC');
       return;
     }
     if (formData.is_alumni === null) {

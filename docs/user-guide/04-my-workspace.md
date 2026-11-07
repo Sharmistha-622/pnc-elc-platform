@@ -1,8 +1,8 @@
 # 4. My Workspace
 
 > **In this chapter.** The screens every staff member has: the Dashboard,
-> your profile, your forms, your reviews, and (if people report to you) your
-> team. If you only ever use the platform to take part in reviews, this is the
+> your profile, your forms, your reviews, your privacy, and (if people report
+> to you) your team. If you only ever use the platform to take part in reviews, this is the
 > only chapter you need after *Getting started*.
 
 These screens are about **you**. Every staff member has them.
@@ -133,6 +133,29 @@ Appears once at least one person reports to you.
 > The *Confirmations* and *New Confirmation* buttons on this page only work
 > for roles that can open Confirmations. If they send you back to the
 > Dashboard, work from **My Reviews** instead.
+
+## My Privacy (`/my-privacy`)
+
+What the platform holds about you, and your rights over it under the Digital
+Personal Data Protection Act.
+
+- **Your data:** a summary of your details on the platform, and what the
+  vault holds for you by type (documents, letters, feedback), with numbers
+  masked.
+- **Who we share it with:** the processors that handle your data (for
+  example Google Workspace and Supabase), what for, and where.
+- **Your consents:** the optional purposes you agreed to. Withdraw one with a
+  single click; it is as easy as giving it.
+- **Make a request:** ask for a copy of your data and who it was shared
+  with, a correction, a completion, an update, erasure, or raise a grievance.
+  You get an acknowledgment by email with a reference such as `PR-00012`,
+  and an answer by the date shown. If the answer keeps some data (the law
+  sometimes requires it), it names the law and how long.
+- **Nominate someone** to act for you if you cannot.
+- **Your requests:** each one with its status and due date.
+
+When a new version of the employee privacy notice is published, a banner
+asks you to read it once. The privacy contact is in the footer of every page.
 
 ## Worked example: Asha's confirmation, from her side
 

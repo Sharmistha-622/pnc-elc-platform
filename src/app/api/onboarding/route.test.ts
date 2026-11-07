@@ -18,7 +18,7 @@ const { POST } = await import('./route')
 const post = (body: Record<string, unknown>) =>
   POST(new NextRequest('http://localhost/api/onboarding', { method: 'POST', body: JSON.stringify(body) }))
 
-const CANDIDATE = { candidate_name: 'Test Candidate', personal_email: 'candidate@example.com', designation: 'Associate' }
+const CANDIDATE = { candidate_name: 'Test Candidate', personal_email: 'candidate@example.com', designation: 'Associate', ctc_amount: 50000 }
 
 describe('POST /api/onboarding: alumni status is mandatory', () => {
   beforeEach(() => createOnboardingRecord.mockClear())
@@ -38,5 +38,19 @@ describe('POST /api/onboarding: alumni status is mandatory', () => {
     const res = await post({ ...CANDIDATE, is_alumni: isAlumni })
     expect(res.status).toBe(200)
     expect(createOnboardingRecord).toHaveBeenCalledWith(expect.objectContaining({ is_alumni: isAlumni }), undefined)
+  })
+})
+
+describe('POST /api/onboarding: the offered CTC is typed, never assumed', () => {
+  beforeEach(() => createOnboardingRecord.mockClear())
+
+  it.each([
+    ['missing', { ctc_amount: undefined }],
+    ['zero', { ctc_amount: 0 }],
+    ['text', { ctc_amount: '60000' }],
+  ])('refuses a candidate whose CTC is %s', async (_label, extra) => {
+    const res = await post({ ...CANDIDATE, is_alumni: false, ...extra })
+    expect(res.status).toBe(400)
+    expect(createOnboardingRecord).not.toHaveBeenCalled()
   })
 })

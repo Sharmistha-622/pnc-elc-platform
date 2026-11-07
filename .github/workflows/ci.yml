@@ -29,6 +29,10 @@ jobs:
 
       - name: Test
         run: npm test
+      # The DPDP checker's static and db checks (scripts/dpdp-check.ts).
+      # Report-only for now; prints ID | status | title, never data.
+      - name: DPDP checks
+        run: npm run dpdp:check
 
       - name: Build
         run: npm run build
@@ -71,6 +75,16 @@ jobs:
       # only, the payroll audit trail append-only, locked runs immutable.
       - name: Vault probe
         run: scripts/vault-probe.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+      # DPDP: the locked statutory limits hold in the database, privacy writes
+      # follow the roles, and every core and vault column is in the data
+      # inventory (src/lib/dpdp/inventory.ts).
+      - name: DPDP probe
+        run: scripts/dpdp-probe.sh
         env:
           PGHOST: localhost
           PGPORT: 5432

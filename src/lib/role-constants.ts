@@ -113,7 +113,11 @@ export type Feature =
   | "dataManagement"
   | "masterData"
   | "platformConfig"
-  | "manageUsers";
+  | "manageUsers"
+  | "privacy"
+  | "privacyEdit"
+  | "privacyCases"
+  | "myPrivacy";
 
 /**
  * Everyone who belongs in the signed-in shell at all.
@@ -223,6 +227,23 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // PnC Admin and Fin Admin reach it to staff their own group: `canGrantRole`
   // limits them to the PnC and the Finance roles respectively.
   manageUsers: ["super_admin", "platform_admin", "pnc_admin", "fin_admin"],
+  // DPDP & Privacy settings and the compliance checker: configuration and
+  // counts, never anyone's personal data. Platform Admin and Exec View read
+  // it (the matrix gives them `privacy: view, settings only`); editing is
+  // `privacyEdit`. PnC Admin edits here although it is view-only on
+  // `platformConfig`: privacy is P&C's process (src/lib/dpdp/access.ts).
+  privacy: ["super_admin", "pnc_admin", "platform_admin", "exec_view"],
+  // Changing a DPDP & Privacy setting. No route of its own; every write in
+  // src/lib/dpdp/settings checks it, and it matches the "privacy editors"
+  // policies in 202611071010_dpdp_settings.sql. The retention mode switch is
+  // narrower still: Super Admin only.
+  privacyEdit: ["super_admin", "pnc_admin"],
+  // Rights requests, incidents and legal holds. These hold people's personal
+  // data, so only the two roles that answer for it.
+  privacyCases: ["super_admin", "pnc_admin"],
+  // My Privacy: every staff member, for their own data only. Scoped by the
+  // data layer (`current_employee_id()`), not by the route.
+  myPrivacy: STAFF,
 };
 
 /**
@@ -292,6 +313,10 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/manage/data-management", "dataManagement"],
 
   ["/manage/settings", "platformConfig"],
+  // Longer than /manage/settings, so it wins there; its own layout gates it.
+  ["/manage/settings/dpdp", "privacy"],
+  ["/manage/privacy", "privacyCases"],
+  ["/my-privacy", "myPrivacy"],
   ["/manage/emails", "platformConfig"],
 
   // Lookup lists every form in the app reads (departments, campuses, ...).

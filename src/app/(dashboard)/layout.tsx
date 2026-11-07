@@ -13,6 +13,9 @@ import { UserProvider, type User } from "@/contexts/user-context"
 import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
 import { getHasReports } from "@/lib/employees/hasReports"
 import { breakGlassCaller } from "@/lib/rbac/breakGlassAccess"
+import { PrivacyContact } from "@/components/shared/privacy/privacy-contact"
+import { NoticeBanner } from "@/components/shared/privacy/notice-banner"
+import { staffPrivacyShell } from "@/lib/dpdp/staff-notice"
 
 export default async function DashboardLayout({
     children,
@@ -87,6 +90,9 @@ export default async function DashboardLayout({
     // Users & Roles stays in the sidebar for a break-glass account while the
     // Super Admin switch is on. Reads the switch only for those accounts.
     const breakGlass = (await breakGlassCaller()) !== null
+    // The privacy contact in the footer (s. 8(9)), and a banner when a newer
+    // notice version is published than the one this person acknowledged.
+    const privacyShell = await staffPrivacyShell(authUser.email)
 
     const userData: User = {
         id: authUser.id,
@@ -108,7 +114,13 @@ export default async function DashboardLayout({
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
                                 <AppSidebar userRole={effectiveRole} hasReports={hasReports} breakGlass={breakGlass} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
-                                    {children}
+                                    {privacyShell.pendingNotice && (
+                                        <NoticeBanner version={privacyShell.pendingNotice.version} title={privacyShell.pendingNotice.title} />
+                                    )}
+                                    <div className="flex-1">{children}</div>
+                                    <footer className="border-t border-border px-4 py-3 md:px-6">
+                                        <PrivacyContact variant="footer" contact={privacyShell.contact} grievanceDays={privacyShell.grievanceDays} />
+                                    </footer>
                                 </SidebarInset>
                             </div>
                         </SidebarProvider>

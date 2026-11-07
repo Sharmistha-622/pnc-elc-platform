@@ -12,8 +12,7 @@
 // ============================================================================
 
 import { google } from 'googleapis'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { logWriter } from '@/lib/logs/writer'
 import { revalidatePath } from 'next/cache'
 import {
   getGoogleWorkspaceAccountsInternal,
@@ -132,15 +131,14 @@ export async function sendEmail(
 
       // Automatically record real successful dispatch in database.
       try {
-        const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-        await supabase.from('email_delivery_logs').insert({
+        const supabase = logWriter()
+        await supabase?.from('email_delivery_logs').insert({
           recipient_name: data.recipient_name || to.split('@')[0],
           recipient_email: to,
           recipient_role: data.recipient_role || null,
           category,
           notification_type: notificationType,
           subject,
-          body_preview: `${isBackup ? `[Sent via Backup ${acc.name} (${acc.email})] ` : ''}${htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200)}`,
           status: 'delivered',
           error_message: null,
           sent_at: new Date().toISOString(),
@@ -179,15 +177,14 @@ export async function sendEmail(
 
   // All accounts failed: record final failure in database
   try {
-    const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-    await supabase.from('email_delivery_logs').insert({
+    const supabase = logWriter()
+    await supabase?.from('email_delivery_logs').insert({
       recipient_name: data.recipient_name || to.split('@')[0],
       recipient_email: to,
       recipient_role: data.recipient_role || null,
       category,
       notification_type: notificationType,
       subject,
-      body_preview: htmlBody.replace(/<[^>]*>?/gm, '').substring(0, 200),
       status: 'failed',
       error_message: `All Google accounts failed. Last error (${attemptChain[attemptChain.length - 1]?.name}): ${lastError}`,
       sent_at: new Date().toISOString(),
@@ -283,8 +280,8 @@ export async function sendCalendarInvite(opts: {
 
   const now = new Date().toISOString()
   try {
-    const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient())
-    await supabase.from('email_delivery_logs').insert(
+    const supabase = logWriter()
+    await supabase?.from('email_delivery_logs').insert(
       opts.to.map((r) => ({
         recipient_name: r.name || r.email.split('@')[0],
         recipient_email: r.email,
@@ -292,7 +289,6 @@ export async function sendCalendarInvite(opts: {
         category: getCategoryFromTemplate(opts.template),
         notification_type: opts.template.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
         subject,
-        body_preview: opts.html.replace(/<[^>]*>?/gm, '').substring(0, 200),
         status: result.success ? 'delivered' : 'failed',
         error_message: result.success ? null : result.error,
         sent_at: now,

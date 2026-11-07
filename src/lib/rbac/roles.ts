@@ -63,6 +63,7 @@ export const RESOURCES = [
   'salary', // CTC, increments
   'performance', // written feedback, decisions
   'config', // templates, automation
+  'privacy', // DPDP settings, consent, rights requests
 ] as const
 
 export type Resource = (typeof RESOURCES)[number]
@@ -84,6 +85,7 @@ export type AccessQualifier =
   | 'via_letters' // reaches the person through a letter, never a screen
   | 'insert_only' // may submit, may not read back
   | 'with_logs' // read carries a log entry the role can also see
+  | 'settings_only' // privacy configuration and counts, never anyone's personal data
 
 export interface Access {
   level: AccessLevel
@@ -111,6 +113,9 @@ export interface RoleDefinition {
 const none: Access = { level: 'none', scope: 'all' }
 const edit: Access = { level: 'edit', scope: 'all' }
 const view: Access = { level: 'view', scope: 'all' }
+// Privacy: their own consents and rights requests (My Privacy, or the portal).
+const ownPrivacy: Access = { level: 'edit', scope: 'own' }
+const privacySettingsView: Access = { level: 'view', scope: 'all', qualifier: 'settings_only' }
 
 export const ROLES: Record<RoleCode, RoleDefinition> = {
   super_admin: {
@@ -120,7 +125,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
     rank: 10,
     login: 'core+vault',
     grantedBy: 'owner',
-    access: { general: edit, identity: edit, bank: edit, salary: edit, performance: edit, config: edit },
+    access: { general: edit, identity: edit, bank: edit, salary: edit, performance: edit, config: edit, privacy: edit },
   },
 
   pnc_admin: {
@@ -140,6 +145,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: edit,
       performance: edit,
       config: view,
+      privacy: edit,
     },
   },
 
@@ -159,6 +165,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       // Chases pending feedback by status; never reads the text.
       performance: { level: 'view', scope: 'all', qualifier: 'status_only' },
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -177,6 +184,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: edit,
       performance: { level: 'view', scope: 'all', qualifier: 'outcomes_only' },
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -195,6 +203,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: { level: 'view', scope: 'all', qualifier: 'payroll_export_only' },
       performance: none,
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -212,6 +221,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: view,
       performance: view,
       config: none,
+      privacy: privacySettingsView,
     },
   },
 
@@ -231,6 +241,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: none,
       performance: none,
       config: edit,
+      privacy: privacySettingsView,
     },
   },
 
@@ -249,6 +260,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: none,
       performance: none,
       config: { level: 'view', scope: 'all', qualifier: 'with_logs' },
+      privacy: ownPrivacy,
     },
   },
 
@@ -268,6 +280,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       // vault function that logs every read.
       performance: { level: 'edit', scope: 'own_team', qualifier: 'with_logs' },
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -286,6 +299,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: { level: 'view', scope: 'own', qualifier: 'via_letters' },
       performance: { level: 'view', scope: 'own', qualifier: 'outcomes_only' },
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -304,6 +318,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: { level: 'view', scope: 'own', qualifier: 'via_letters' },
       performance: none,
       config: none,
+      privacy: ownPrivacy,
     },
   },
 
@@ -321,6 +336,7 @@ export const ROLES: Record<RoleCode, RoleDefinition> = {
       salary: { level: 'view', scope: 'own', qualifier: 'via_letters' },
       performance: none,
       config: none,
+      privacy: ownPrivacy,
     },
   },
 }

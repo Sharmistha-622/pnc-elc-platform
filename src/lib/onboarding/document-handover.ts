@@ -10,15 +10,20 @@
 // boundary, so a verified dossier evaporated at the moment it became useful.
 //
 // The file stays in the private bucket and is served by signed URL. A copy into
-// Drive is attempted as well, because Drive is where P&C expect to find an
-// employee's folder — but it is best-effort: Drive being unconfigured or
-// unreachable must not stop someone from being hired.
+// the employee's Drive folder is attempted for the types Settings → DPDP &
+// Privacy → Data collection allows. Identity and bank documents are never
+// copied, whatever that setting says (`mayCopyToDrive`): Google Workspace has
+// no India data region, and those documents belong in the platform and the
+// vault. The copy is best-effort: Drive being unconfigured or unreachable
+// must not stop someone from being hired.
 // ============================================================================
 
 import { onboardingDb } from './db';
 import { CANDIDATE_BUCKET } from './candidate-storage';
 import { findOrCreatePath, uploadFile } from '@/lib/documents/drive';
 import type { OnboardingDocument } from './types';
+import { mayCopyToDrive } from './document-classes';
+import { getDriveCopyTypes } from '@/lib/dpdp/portal';
 
 interface DocumentTypeRow {
   name: string;
@@ -54,6 +59,7 @@ export async function carryDocumentsToEmployee(
   const types = new Map<string, DocumentTypeRow>(
     ((typeRows as DocumentTypeRow[]) ?? []).map((t) => [t.name, t])
   );
+  const driveTypes = await getDriveCopyTypes();
 
   for (const doc of verified) {
     const type = doc.document_type_key ? types.get(doc.document_type_key) : undefined;
@@ -65,7 +71,7 @@ export async function carryDocumentsToEmployee(
       continue;
     }
 
-    const driveUrl = await copyToDrive(doc, type, employee);
+    const driveUrl = mayCopyToDrive(type.name, driveTypes) ? await copyToDrive(doc, type, employee) : null;
     if (driveUrl) result.copiedToDrive += 1;
 
     const row = {
@@ -107,13 +113,17 @@ export async function carryDocumentsToEmployee(
   return result;
 }
 
-/** Best-effort copy into the employee's Drive folder. Null when unavailable. */
+/**
+ * Best-effort copy into the employee's own Drive folder. Null when unavailable.
+ * Callers check `mayCopyToDrive` first; this refuses an identity or bank type
+ * again, so no caller can skip it.
+ */
 async function copyToDrive(
   doc: OnboardingDocument,
   type: DocumentTypeRow,
   employee: { id: string; name: string }
 ): Promise<string | null> {
-  if (!doc.storage_reference) return null;
+  if (!doc.storage_reference || !mayCopyToDrive(type.name, [type.name])) return null;
 
   try {
     const { data, error } = await onboardingDb()
@@ -122,9 +132,7 @@ async function copyToDrive(
     if (error || !data) return null;
 
     const label = `${employee.name} (${employee.id.slice(0, 8)})`;
-    const folderPath =
-      type.destination === 'team_member' ? ['Team Member', label] : ['Verification Docs'];
-    const folderId = await findOrCreatePath(folderPath);
+    const folderId = await findOrCreatePath(['Team Member', label]);
 
     const extension = doc.storage_reference.includes('.')
       ? doc.storage_reference.slice(doc.storage_reference.lastIndexOf('.'))
