@@ -462,6 +462,16 @@ export const DPDP_TABLES: InventoryTable[] = [
     meta: 'id, principal_type, principal_ref, record_type, purpose_code, notice_type, notice_language, notice_version, given_at, withdrawn_at, channel, method, created_at',
     general: 'recorded_by, evidence_note',
   }),
+  personal('core', 'privacy_requests', { principals: ['candidate', 'employee', 'contractor', 'volunteer'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE_MAIL, note: 'Rights requests and grievances (s. 11-14).' }, {
+    meta: 'id, reference, principal_type, principal_ref, request_type, channel, status, received_at, due_at, verified_at, escalated_at, acknowledged_at, retain_until, answered_at, closed_at, created_at, updated_at, statute_cited',
+    general: 'requester_name, details, answer, assigned_to, answered_by, recorded_by',
+    contact: 'requester_email',
+  }),
+  personal('core', 'privacy_nominations', { principals: ['employee', 'candidate'], basis: 'legal_obligation', retention: 'dependant_nominee', processors: CORE, note: 'The person nominated to exercise rights (s. 14).' }, {
+    meta: 'id, principal_type, principal_ref, recorded_at, revoked_at',
+    general: 'nominee_name, nominee_relation, recorded_by',
+    contact: 'nominee_contact',
+  }),
 ]
 
 export const INVENTORY: InventoryTable[] = [...CORE_TABLES, ...DPDP_TABLES, ...VAULT_TABLES]

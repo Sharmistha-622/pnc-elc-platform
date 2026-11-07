@@ -9,6 +9,7 @@ import { NoticeRenderer } from '@/components/shared/privacy/notice-renderer'
 import { ConsentChoices } from '@/components/shared/privacy/consent-choices'
 import { PrivacyContact } from '@/components/shared/privacy/privacy-contact'
 import type { PortalNoticeState, PortalPrivacySettings } from '@/lib/dpdp/portal'
+import { PortalRequest } from './portal-request'
 
 /**
  * Step 0 of the portal: the candidate privacy notice, before any data field.
@@ -92,6 +93,7 @@ export const NoticeStep = ({
             />
           </div>
         )}
+        <PortalRequest token={token} requestIdentifier={settings.request_identifier} />
       </CardContent>
       <CardFooter className="pt-4 border-t border-border/50 flex justify-end gap-2">
         {shown && !notice.acknowledged ? (

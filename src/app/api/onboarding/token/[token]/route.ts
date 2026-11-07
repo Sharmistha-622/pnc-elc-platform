@@ -12,6 +12,8 @@ import {
 import type { FullOnboardingData } from '@/lib/onboarding/types';
 import { getPortalNoticeState, getPortalPrivacySettings } from '@/lib/dpdp/portal';
 import { hasAcknowledgedLatest, recordAcknowledgment, setConsent } from '@/lib/dpdp/consent/service';
+import { createRequest } from '@/lib/dpdp/requests/service';
+import { REQUEST_TYPES, type RequestType } from '@/lib/dpdp/requests/types';
 import { buildPersonalDetailsSchema } from '@/lib/onboarding/personal-details-schema';
 import { fieldErrors } from '@/lib/dpdp/settings/schemas';
 
@@ -70,6 +72,18 @@ export async function POST(
         shown ? { type: 'candidate', language: shown.language, version: shown.version } : null);
       if (!result.ok) return NextResponse.json({ success: false, error: result.error }, { status: 400 });
       return NextResponse.json({ success: true, notice: await getPortalNoticeState(id, settings.notice_languages) });
+    }
+
+    // A rights request does not wait for the notice: rights do not depend on it.
+    if (action === 'submit_request') {
+      const type = String(body.request_type ?? '') as RequestType;
+      const details = typeof body.details === 'string' ? body.details.trim().slice(0, 2000) : '';
+      if (!(REQUEST_TYPES as readonly string[]).includes(type) || type === 'nomination') {
+        return NextResponse.json({ success: false, error: 'Choose what you are asking for' }, { status: 400 });
+      }
+      const created = await createRequest({ principal, type, details, channel: 'portal' });
+      if (!created.ok) return NextResponse.json({ success: false, error: created.error }, { status: 500 });
+      return NextResponse.json({ success: true, reference: created.request.reference, due_at: created.request.due_at });
     }
 
     // Nothing else is processed until the latest notice has been read.

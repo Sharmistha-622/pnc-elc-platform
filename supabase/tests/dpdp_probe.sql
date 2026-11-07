@@ -281,7 +281,25 @@ begin
 end $$;
 
 -------------------------------------------------------------------------
--- 6. The data inventory covers the schema
+-- 6. Rights requests: due within 90 days, written by the server
+-------------------------------------------------------------------------
+do $$ begin
+  insert into public.privacy_requests (principal_type, principal_ref, request_type, channel, due_at)
+    values ('employee', '20000000-0000-0000-0000-000000000005', 'grievance', 'app', now() + interval '91 days');
+  insert into pg_temp.failures values ('a request is due within 90 days of receipt', '91 days accepted');
+exception when check_violation then null; end $$;
+
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-emp@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$ begin
+  insert into public.privacy_requests (principal_type, principal_ref, request_type, channel, due_at)
+    values ('employee', '20000000-0000-0000-0000-000000000005', 'access', 'app', now() + interval '30 days');
+  insert into pg_temp.failures values ('rights requests are written by the server only', 'session insert accepted');
+exception when insufficient_privilege then null; end $$;
+reset role;
+
+-------------------------------------------------------------------------
+-- 7. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

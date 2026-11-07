@@ -175,8 +175,8 @@ describe('visibleSections', () => {
   it('gives an Employee only what is theirs, and their team if they have one', () => {
     const titles = (hasReports: boolean) =>
       visibleSections('employee', { hasReports }).flatMap((s) => s.items).map((i) => i.title)
-    expect(titles(false)).toEqual(['Dashboard', 'My Forms', 'My Reviews'])
-    expect(titles(true)).toEqual(['Dashboard', 'My Forms', 'My Reviews', 'My Team'])
+    expect(titles(false)).toEqual(['Dashboard', 'My Forms', 'My Reviews', 'My Privacy'])
+    expect(titles(true)).toEqual(['Dashboard', 'My Forms', 'My Reviews', 'My Team', 'My Privacy'])
   })
 
   it('keeps the platform team out of the People section entirely', () => {
