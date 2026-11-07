@@ -428,7 +428,30 @@ exception when insufficient_privilege then null; end $$;
 reset role;
 
 -------------------------------------------------------------------------
--- 9. The data inventory covers the schema
+-- 9. A joiner under 18 waits for a guardian's consent
+-------------------------------------------------------------------------
+insert into public.onboarding_records (id, candidate_name, personal_email, designation, joining_date, invitation_token, status, guardian_consent_status)
+  values ('40000000-0000-0000-0000-000000000001', 'Minor Example', 'minor@example.com', 'Associate', '2026-12-01', 'probe-minor-token', 'in_progress', 'required');
+
+do $$ begin
+  update public.onboarding_records set status = 'submitted' where id = '40000000-0000-0000-0000-000000000001';
+  insert into pg_temp.failures values ('a minor''s record waits for guardian consent', 'submitted without consent');
+exception when check_violation then null; end $$;
+
+do $$ begin
+  update public.onboarding_records set guardian_consent_status = 'unknown' where id = '40000000-0000-0000-0000-000000000001';
+  insert into pg_temp.failures values ('a minor''s record waits for guardian consent', 'unknown status accepted');
+exception when check_violation then null; end $$;
+
+do $$ begin
+  update public.onboarding_records set guardian_consent_status = 'given' where id = '40000000-0000-0000-0000-000000000001';
+  update public.onboarding_records set status = 'submitted' where id = '40000000-0000-0000-0000-000000000001';
+exception when others then
+  insert into pg_temp.failures values ('a minor''s record waits for guardian consent', 'refused after consent: ' || sqlerrm);
+end $$;
+
+-------------------------------------------------------------------------
+-- 10. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

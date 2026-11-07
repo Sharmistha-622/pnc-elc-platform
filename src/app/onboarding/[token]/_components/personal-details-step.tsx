@@ -36,12 +36,15 @@ export const PersonalDetailsStep = ({
   optionalFields,
   disabled,
   onSaved,
+  onGuardianRequired,
 }: {
   token: string
   data: FullOnboardingData
   optionalFields: OptionalFieldSettings
   disabled?: boolean
   onSaved: (data: FullOnboardingData, advance: boolean) => void
+  /** The joiner is under 18: nothing was saved, and the portal waits for a guardian. */
+  onGuardianRequired?: (message: string) => void
 }) => {
   const [pending, startTransition] = useTransition()
   const schema = useMemo(() => buildPersonalDetailsSchema(optionalFields, new Date()), [optionalFields])
@@ -70,6 +73,10 @@ export const PersonalDetailsStep = ({
           if (json.success) {
             toast.success('Personal details saved')
             onSaved(json.data, advance)
+            return
+          }
+          if (res.status === 409 && json.guardian === 'required') {
+            onGuardianRequired?.(json.error)
             return
           }
           for (const [name, message] of Object.entries((json.fieldErrors ?? {}) as Record<string, string>)) {

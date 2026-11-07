@@ -48,6 +48,8 @@ import {
 import { toast } from 'sonner';
 import { PersonalDetailsStep } from './_components/personal-details-step';
 import { NoticeStep } from './_components/notice-step';
+import { GuardianHold } from './_components/guardian-hold';
+import { GUARDIAN_HOLD_MESSAGE } from '@/lib/dpdp/children';
 import type { PortalNoticeState, PortalPrivacySettings } from '@/lib/dpdp/portal';
 import { DEFAULT_OPTIONAL_FIELDS, normaliseOptionalFields, type OptionalFieldSettings } from '@/lib/dpdp/optional-fields';
 
@@ -79,6 +81,8 @@ export default function CandidateOnboardingPortalPage({
   const [currentStep, setCurrentStep] = useState(0);
   const [privacy, setPrivacy] = useState<PortalPrivacySettings | null>(null);
   const [notice, setNotice] = useState<PortalNoticeState | null>(null);
+  // Under 18: everything after the notice waits for a guardian's consent.
+  const [guardianHold, setGuardianHold] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Which optional fields the portal collects (Settings → DPDP & Privacy → Data collection).
@@ -116,10 +120,12 @@ export default function CandidateOnboardingPortalPage({
         const r = json.data.record;
         setOptionalFields(normaliseOptionalFields(json.privacy?.optional_fields));
         if (json.privacy) {
-          const { notice: noticeState, ...settings } = json.privacy;
+          const { notice: noticeState, guardian, ...settings } = json.privacy;
           setPrivacy(settings as PortalPrivacySettings);
           setNotice(noticeState as PortalNoticeState);
-          setCurrentStep((step) => (noticeState?.acknowledged ? (step === 0 ? 1 : step) : 0));
+          const held = guardian === 'required';
+          setGuardianHold(held ? GUARDIAN_HOLD_MESSAGE : null);
+          setCurrentStep((step) => (noticeState?.acknowledged && !held ? (step === 0 ? 1 : step) : 0));
         }
         setSignerFullName(p?.full_name || r.candidate_name || '');
       } else {
@@ -444,14 +450,14 @@ export default function CandidateOnboardingPortalPage({
         {STEPS.map((s) => {
           const Icon = s.icon;
           const isActive = currentStep === s.id;
-          const locked = s.id > 0 && !!notice && !notice.acknowledged;
+          const locked = s.id > 0 && ((!!notice && !notice.acknowledged) || !!guardianHold);
 
           return (
             <button
               key={s.id}
               type="button"
               disabled={locked}
-              title={locked ? 'Read the privacy notice first' : undefined}
+              title={locked ? (guardianHold ? 'Waiting for your parent or guardian\'s consent' : 'Read the privacy notice first') : undefined}
               onClick={() => setCurrentStep(s.id)}
               className={`p-3 rounded-lg border text-left transition-all flex flex-col items-start gap-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive
@@ -471,6 +477,8 @@ export default function CandidateOnboardingPortalPage({
         })}
       </div>
 
+      {guardianHold && <GuardianHold message={guardianHold} />}
+
       {/* STEP 0: Privacy notice, before any data field */}
       {currentStep === 0 && privacy && notice && (
         <NoticeStep
@@ -478,7 +486,7 @@ export default function CandidateOnboardingPortalPage({
           settings={privacy}
           notice={notice}
           onChange={setNotice}
-          onContinue={() => setCurrentStep(1)}
+          onContinue={() => { if (!guardianHold) setCurrentStep(1); }}
         />
       )}
 
@@ -491,6 +499,10 @@ export default function CandidateOnboardingPortalPage({
           onSaved={(next, advance) => {
             setData(next);
             if (advance) setCurrentStep(2);
+          }}
+          onGuardianRequired={(message) => {
+            setGuardianHold(message);
+            setCurrentStep(0);
           }}
         />
       )}

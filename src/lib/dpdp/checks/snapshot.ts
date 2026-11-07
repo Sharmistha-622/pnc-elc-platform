@@ -197,13 +197,13 @@ function countPast(rows: DocRow[], periodDays: number, today: Date): number {
 }
 
 async function minorsWithoutGuardianConsent(db: Db): Promise<number | null> {
-  // Held at the notice step is fine; past it without consent is not.
+  // Held in the portal is fine; submitted or further without consent is not.
   return headCount(
     db
       .from('onboarding_records')
       .select('id', { count: 'exact', head: true })
       .eq('guardian_consent_status', 'required')
-      .not('status', 'in', '(draft,invited)'),
+      .in('status', ['submitted', 'under_review', 'approved', 'account_provisioning', 'completed']),
   )
 }
 

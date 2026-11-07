@@ -312,7 +312,7 @@ export const CHECKS: CheckDefinition[] = [
     area: 'Children',
     modes: ['static', 'runtime'],
     required: true,
-    howToFix: 'Record guardian consent for the held records in the candidate review.',
+    howToFix: 'Record guardian consent for the held records in Privacy cases → Guardian consent.',
     static: S.ageCheckedOnServer,
     runtime: R.minorsHeld,
   },

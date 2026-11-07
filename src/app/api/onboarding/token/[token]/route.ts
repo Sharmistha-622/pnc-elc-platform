@@ -16,6 +16,8 @@ import { createRequest } from '@/lib/dpdp/requests/service';
 import { REQUEST_TYPES, type RequestType } from '@/lib/dpdp/requests/types';
 import { buildPersonalDetailsSchema } from '@/lib/onboarding/personal-details-schema';
 import { fieldErrors } from '@/lib/dpdp/settings/schemas';
+import { guardianBlocks, guardianStatusFor } from '@/lib/dpdp/children';
+import { GUARDIAN_HOLD_MESSAGE, guardianStatusOf, setGuardianStatus } from '@/lib/dpdp/guardian';
 
 export async function GET(
   req: NextRequest,
@@ -31,7 +33,8 @@ export async function GET(
     }
     const settings = await getPortalPrivacySettings();
     const notice = await getPortalNoticeState(visited.record.id, settings.notice_languages);
-    return NextResponse.json({ success: true, data: toPortalView(visited), privacy: { ...settings, notice } });
+    const guardian = await guardianStatusOf(visited.record.id);
+    return NextResponse.json({ success: true, data: toPortalView(visited), privacy: { ...settings, notice, guardian } });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -94,6 +97,13 @@ export async function POST(
       );
     }
 
+    // Under 18: nothing more is taken until a guardian's consent is recorded
+    // (DPDP Act s. 9(1); Rules r. 10). Only PnC clears this.
+    const guardian = await guardianStatusOf(id);
+    if (guardianBlocks(guardian)) {
+      return NextResponse.json({ success: false, error: GUARDIAN_HOLD_MESSAGE, guardian }, { status: 409 });
+    }
+
     let result = null;
 
     if (action === 'update_personal') {
@@ -106,6 +116,13 @@ export async function POST(
           { success: false, error: 'Check the highlighted fields.', fieldErrors: fieldErrors(parsed.error) },
           { status: 400 }
         );
+      }
+      // The age check comes before anything is stored: a child's details are
+      // not saved until a guardian has consented.
+      const next = guardianStatusFor(guardian, String(parsed.data.date_of_birth), new Date());
+      if (next !== guardian) await setGuardianStatus(id, next);
+      if (guardianBlocks(next)) {
+        return NextResponse.json({ success: false, error: GUARDIAN_HOLD_MESSAGE, guardian: next }, { status: 409 });
       }
       result = await updatePersonalDetails(id, parsed.data as Parameters<typeof updatePersonalDetails>[1]);
     } else if (action === 'confirm_employment') {

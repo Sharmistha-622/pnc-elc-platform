@@ -637,6 +637,7 @@ insert into dpdp_inventory (store, table_name, column_name, class, staged, perso
   ('core', 'onboarding_records', 'role_responsibilities', 'general', false, true),
   ('core', 'onboarding_records', 'manager_name', 'general', false, true),
   ('core', 'onboarding_records', 'buddy_name', 'general', false, true),
+  ('core', 'onboarding_records', 'guardian_consent_status', 'general', false, true),
   ('core', 'onboarding_records', 'personal_email', 'contact', false, true),
   ('core', 'onboarding_records', 'phone', 'contact', false, true),
   ('core', 'onboarding_records', 'ctc', 'salary', false, true),
