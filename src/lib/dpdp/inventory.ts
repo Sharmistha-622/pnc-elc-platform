@@ -458,6 +458,10 @@ export const DPDP_TABLES: InventoryTable[] = [
   nonPersonal('core', 'dpdp_processors', 'The processor register.', 'code, name, purpose, data_categories, hosting_region, dpa_status, dpa_date, next_review_date, notes, active, created_at, updated_at, updated_by'),
   nonPersonal('core', 'dpdp_attestations', 'Owner confirmations; records which staff member confirmed.', 'code, label, description, check_ids, review_interval_days, confirmed_by, confirmed_at, next_review_at, evidence_note, sort_order, created_at, updated_at'),
   nonPersonal('core', 'dpdp_check_results', 'Compliance check results: counts only.', 'check_id, status, detail, last_run_at, last_passed_at'),
+  personal('core', 'consent_records', { principals: ['candidate', 'employee', 'contractor', 'volunteer', 'dependant'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE, note: 'Proof of notice and consent (s. 6(10)).' }, {
+    meta: 'id, principal_type, principal_ref, record_type, purpose_code, notice_type, notice_language, notice_version, given_at, withdrawn_at, channel, method, created_at',
+    general: 'recorded_by, evidence_note',
+  }),
 ]
 
 export const INVENTORY: InventoryTable[] = [...CORE_TABLES, ...DPDP_TABLES, ...VAULT_TABLES]

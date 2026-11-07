@@ -65,6 +65,9 @@ insert into public.dpdp_notices (notice_type, language, version, status, title, 
   ('employee', 'en', 1, 'published', 'Employee privacy notice', now(), 'probe', 'probe'),
   ('candidate', 'en', 1, 'draft', 'Candidate privacy notice', null, null, null);
 insert into public.dpdp_check_results (check_id, status) values ('DPDP-01', 'pass');
+-- R acknowledged the employee notice.
+insert into public.consent_records (principal_type, principal_ref, record_type, notice_type, notice_language, notice_version, channel)
+  values ('employee', '00000000-0000-0000-0000-00000000000b', 'acknowledgment', 'employee', 'en', 1, 'app');
 
 -------------------------------------------------------------------------
 -- Helpers
@@ -183,7 +186,10 @@ insert into pg_temp.expectations values
   ('dpdp_notices',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   ('dpdp_consent_purposes',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   ('dpdp_processors',        '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
-  ('dpdp_public_settings',   '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
+  ('dpdp_public_settings',   '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- Consent records: the person, and the privacy case roles. Not their
+  -- manager, not the platform team, not Exec View.
+  ('consent_records',        '{"employee (R)",pnc_admin,super_admin}');
 
 -------------------------------------------------------------------------
 -- Run it

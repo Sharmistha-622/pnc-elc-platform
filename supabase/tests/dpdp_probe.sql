@@ -228,7 +228,60 @@ exception when insufficient_privilege then null; end $$;
 reset role;
 
 -------------------------------------------------------------------------
--- 5. The data inventory covers the schema
+-- 5. Consent records: written by the server, read by the person
+-------------------------------------------------------------------------
+insert into public.employees (id, name, email, employee_type, joining_date, status, is_alumni)
+  values ('20000000-0000-0000-0000-000000000005', 'E Example', 'dp-emp@navgurukul.org', 'fte', '2025-01-01', 'active', false)
+  on conflict do nothing;
+insert into public.consent_records (id, principal_type, principal_ref, record_type, purpose_code, channel)
+  values ('30000000-0000-0000-0000-000000000001', 'employee', '20000000-0000-0000-0000-000000000005', 'consent', 'alumni_network', 'app');
+
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-emp@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.consent_records;
+  if n <> 1 then insert into pg_temp.failures values ('a person reads their own consent records', n || ' rows'); end if;
+  begin
+    insert into public.consent_records (principal_type, principal_ref, record_type, purpose_code, channel)
+      values ('employee', '20000000-0000-0000-0000-000000000005', 'consent', 'donor_stories', 'app');
+    insert into pg_temp.failures values ('consent records are written by the server only', 'session insert accepted');
+  exception when insufficient_privilege then null; end;
+  begin
+    update public.consent_records set withdrawn_at = now();
+    get diagnostics n = row_count;
+    if n > 0 then insert into pg_temp.failures values ('consent records are written by the server only', 'session update accepted'); end if;
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-plat@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.consent_records;
+  if n <> 0 then insert into pg_temp.failures values ('consent records reach the person and privacy case roles only', 'platform admin read ' || n); end if;
+end $$;
+reset role;
+
+-- The server may withdraw once; nothing else changes and nothing is deleted.
+do $$
+begin
+  update public.consent_records set withdrawn_at = now() where id = '30000000-0000-0000-0000-000000000001';
+  begin
+    update public.consent_records set withdrawn_at = now() where id = '30000000-0000-0000-0000-000000000001';
+    insert into pg_temp.failures values ('a consent is withdrawn once and otherwise unchanged', 'second withdrawal accepted');
+  exception when insufficient_privilege then null; end;
+  begin
+    delete from public.consent_records where id = '30000000-0000-0000-0000-000000000001';
+    insert into pg_temp.failures values ('consent records are kept, not deleted', 'delete accepted');
+  exception when insufficient_privilege then null; end;
+end $$;
+
+-------------------------------------------------------------------------
+-- 6. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

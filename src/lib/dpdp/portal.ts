@@ -54,3 +54,39 @@ export async function getDriveCopyTypes(): Promise<string[]> {
     return toSettings(null).drive_copy_document_types
   }
 }
+
+export interface PortalNoticeState {
+  /** The latest published candidate notice, one per language offered. */
+  versions: { id: string; language: string; version: number; title: string; sections: Record<string, string> }[]
+  /** The newest version this candidate has acknowledged, if any. */
+  acknowledgedVersion: number | null
+  /** True when nothing is published, or the latest version is acknowledged. */
+  acknowledged: boolean
+  purposes: { code: string; label: string; description: string }[]
+  /** Purpose codes with a live consent. */
+  consents: string[]
+}
+
+/** The candidate's notice, acknowledgment and consents, for the portal. */
+export async function getPortalNoticeState(onboardingId: string, languages: string[]): Promise<PortalNoticeState> {
+  const { latestPublishedNotices, listRecords, purposesFor } = await import('./consent/service')
+  const principal = { type: 'candidate' as const, ref: onboardingId }
+  const [notices, records, purposes] = await Promise.all([
+    latestPublishedNotices('candidate'),
+    listRecords(principal),
+    purposesFor('candidate'),
+  ])
+  const versions = notices
+    .filter((n) => languages.includes(n.language))
+    .map((n) => ({ id: n.id, language: n.language, version: n.version, title: n.title, sections: n.sections }))
+  const newest = notices.length ? Math.max(...notices.map((n) => n.version)) : null
+  const acks = records.filter((r) => r.record_type === 'acknowledgment' && r.notice_type === 'candidate')
+  const acknowledgedVersion = acks.length ? Math.max(...acks.map((r) => r.notice_version ?? 0)) : null
+  return {
+    versions,
+    acknowledgedVersion,
+    acknowledged: newest === null || (acknowledgedVersion ?? 0) >= newest,
+    purposes: purposes.map((p) => ({ code: p.code, label: p.label, description: p.description })),
+    consents: records.filter((r) => r.record_type === 'consent' && !r.withdrawn_at && r.purpose_code).map((r) => r.purpose_code as string),
+  }
+}

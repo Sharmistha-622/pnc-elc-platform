@@ -5,6 +5,7 @@ import {
   formatFileSize,
   removeCandidateFile,
 } from '@/lib/onboarding/candidate-storage';
+import { hasAcknowledgedLatest } from '@/lib/dpdp/consent/service';
 
 /**
  * Candidate document upload.
@@ -32,6 +33,14 @@ export async function POST(
     if (!['draft', 'invited', 'in_progress', 'changes_requested'].includes(existing.record.status)) {
       return NextResponse.json(
         { success: false, error: 'This onboarding is no longer open for uploads.' },
+        { status: 409 }
+      );
+    }
+
+    // No document is taken before the privacy notice has been read (DPDP Act s. 5(1)).
+    if (!(await hasAcknowledgedLatest({ type: 'candidate', ref: existing.record.id }, 'candidate'))) {
+      return NextResponse.json(
+        { success: false, error: 'Please read and acknowledge the privacy notice first.' },
         { status: 409 }
       );
     }

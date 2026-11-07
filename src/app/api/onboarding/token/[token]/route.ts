@@ -10,7 +10,8 @@ import {
   toPortalView,
 } from '@/lib/onboarding/service';
 import type { FullOnboardingData } from '@/lib/onboarding/types';
-import { getPortalPrivacySettings } from '@/lib/dpdp/portal';
+import { getPortalNoticeState, getPortalPrivacySettings } from '@/lib/dpdp/portal';
+import { hasAcknowledgedLatest, recordAcknowledgment, setConsent } from '@/lib/dpdp/consent/service';
 import { buildPersonalDetailsSchema } from '@/lib/onboarding/personal-details-schema';
 import { fieldErrors } from '@/lib/dpdp/settings/schemas';
 
@@ -26,7 +27,9 @@ export async function GET(
     if (!visited) {
       return NextResponse.json({ success: false, error: 'Invalid invitation link' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, data: toPortalView(visited), privacy: await getPortalPrivacySettings() });
+    const settings = await getPortalPrivacySettings();
+    const notice = await getPortalNoticeState(visited.record.id, settings.notice_languages);
+    return NextResponse.json({ success: true, data: toPortalView(visited), privacy: { ...settings, notice } });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -46,6 +49,36 @@ export async function POST(
     const body = await req.json();
     const { action } = body;
     const id = existing.record.id;
+    const principal = { type: 'candidate' as const, ref: id };
+
+    // The privacy notice comes first (DPDP Act s. 5(1)). Acknowledging it
+    // records the version read; optional consents are separate choices.
+    if (action === 'acknowledge_notice') {
+      const ack = await recordAcknowledgment(principal, String(body.notice_id ?? ''), 'candidate', 'portal');
+      if (!ack.ok) return NextResponse.json({ success: false, error: ack.error }, { status: 400 });
+      const settings = await getPortalPrivacySettings();
+      return NextResponse.json({ success: true, notice: await getPortalNoticeState(id, settings.notice_languages) });
+    }
+    if (action === 'set_consent') {
+      if (typeof body.purpose_code !== 'string' || typeof body.given !== 'boolean') {
+        return NextResponse.json({ success: false, error: 'Invalid choice' }, { status: 400 });
+      }
+      const settings = await getPortalPrivacySettings();
+      const state = await getPortalNoticeState(id, settings.notice_languages);
+      const shown = state.versions.find((v) => v.language === body.language) ?? state.versions[0];
+      const result = await setConsent(principal, body.purpose_code, body.given, 'portal',
+        shown ? { type: 'candidate', language: shown.language, version: shown.version } : null);
+      if (!result.ok) return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+      return NextResponse.json({ success: true, notice: await getPortalNoticeState(id, settings.notice_languages) });
+    }
+
+    // Nothing else is processed until the latest notice has been read.
+    if (!(await hasAcknowledgedLatest(principal, 'candidate'))) {
+      return NextResponse.json(
+        { success: false, error: 'Please read and acknowledge the privacy notice first.' },
+        { status: 409 }
+      );
+    }
 
     let result = null;
 

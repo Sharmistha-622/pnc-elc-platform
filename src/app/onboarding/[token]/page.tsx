@@ -47,6 +47,8 @@ import {
 } from '@/lib/onboarding/types';
 import { toast } from 'sonner';
 import { PersonalDetailsStep } from './_components/personal-details-step';
+import { NoticeStep } from './_components/notice-step';
+import type { PortalNoticeState, PortalPrivacySettings } from '@/lib/dpdp/portal';
 import { DEFAULT_OPTIONAL_FIELDS, normaliseOptionalFields, type OptionalFieldSettings } from '@/lib/dpdp/optional-fields';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -54,6 +56,7 @@ const ACCEPTED_UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'im
 const ACCEPT_ATTRIBUTE = '.pdf,.jpg,.jpeg,.png,.webp';
 
 const STEPS = [
+  { id: 0, label: 'Privacy Notice', icon: ShieldCheck },
   { id: 1, label: 'Personal Information', icon: User },
   { id: 2, label: 'Document Dossier', icon: Upload },
   { id: 3, label: 'Employment Terms', icon: Briefcase },
@@ -72,7 +75,10 @@ export default function CandidateOnboardingPortalPage({
 
   const [data, setData] = useState<FullOnboardingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
+  // Step 0 is the privacy notice: nothing else opens until it is acknowledged.
+  const [currentStep, setCurrentStep] = useState(0);
+  const [privacy, setPrivacy] = useState<PortalPrivacySettings | null>(null);
+  const [notice, setNotice] = useState<PortalNoticeState | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Which optional fields the portal collects (Settings → DPDP & Privacy → Data collection).
@@ -109,6 +115,12 @@ export default function CandidateOnboardingPortalPage({
         const p = json.data.personalDetails;
         const r = json.data.record;
         setOptionalFields(normaliseOptionalFields(json.privacy?.optional_fields));
+        if (json.privacy) {
+          const { notice: noticeState, ...settings } = json.privacy;
+          setPrivacy(settings as PortalPrivacySettings);
+          setNotice(noticeState as PortalNoticeState);
+          setCurrentStep((step) => (noticeState?.acknowledged ? (step === 0 ? 1 : step) : 0));
+        }
         setSignerFullName(p?.full_name || r.candidate_name || '');
       } else {
         toast.error('Invalid or expired onboarding link');
@@ -428,17 +440,20 @@ export default function CandidateOnboardingPortalPage({
       )}
 
       {/* Step Navigation Wizard (rounded-lg) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {STEPS.map((s) => {
           const Icon = s.icon;
           const isActive = currentStep === s.id;
+          const locked = s.id > 0 && !!notice && !notice.acknowledged;
 
           return (
             <button
               key={s.id}
               type="button"
+              disabled={locked}
+              title={locked ? 'Read the privacy notice first' : undefined}
               onClick={() => setCurrentStep(s.id)}
-              className={`p-3 rounded-lg border text-left transition-all flex flex-col items-start gap-1 cursor-pointer ${
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col items-start gap-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive
                   ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-xs ring-1 ring-indigo-500'
                   : 'border-border/70 hover:bg-muted/30 bg-card'
@@ -455,6 +470,17 @@ export default function CandidateOnboardingPortalPage({
           );
         })}
       </div>
+
+      {/* STEP 0: Privacy notice, before any data field */}
+      {currentStep === 0 && privacy && notice && (
+        <NoticeStep
+          token={token}
+          settings={privacy}
+          notice={notice}
+          onChange={setNotice}
+          onContinue={() => setCurrentStep(1)}
+        />
+      )}
 
       {/* STEP 1: Personal Information */}
       {currentStep === 1 && (
