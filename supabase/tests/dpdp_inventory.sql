@@ -136,8 +136,6 @@ insert into dpdp_inventory (store, table_name, column_name, class, staged, perso
   ('core', 'email_delivery_logs', 'recipient_role', 'general', false, true),
   ('core', 'email_delivery_logs', 'recipient_email', 'contact', false, true),
   ('core', 'email_delivery_logs', 'subject', 'log', false, true),
-  ('core', 'email_delivery_logs', 'body_preview', 'log', false, true),
-  ('core', 'email_delivery_logs', 'body_html', 'log', false, true),
   ('core', 'email_delivery_logs', 'error_message', 'log', false, true),
   ('core', 'email_provider_config', 'id', 'none', false, false),
   ('core', 'email_provider_config', 'active_provider', 'none', false, false),

@@ -148,7 +148,7 @@ const CORE_TABLES: InventoryTable[] = [
     meta: 'id, category, notification_type, status, sent_at, created_at',
     general: 'recipient_name, recipient_role',
     contact: 'recipient_email',
-    log: 'subject, body_preview, body_html, error_message',
+    log: 'subject, error_message',
   }),
   nonPersonal('core', 'email_provider_config', 'Sending configuration for organisation mailboxes; closed to sessions.', 'id, active_provider, from_name, from_email, reply_to_email, gmail_account, gmail_app_password, gmail_client_id, gmail_client_secret, gmail_auth_status, gmail_scope, gmail_refresh_token_preview, ses_region, ses_access_key_id, ses_secret_access_key, ses_configuration_set, ses_verification_status, ses_endpoint, resend_api_key, smtp_host, smtp_port, smtp_secure, smtp_username, smtp_password, daily_send_limit, daily_sent_count, dkim_verified, spf_verified, dmarc_verified, mx_verified, domain_name, updated_at'),
   nonPersonal('core', 'email_templates', 'Message templates.', 'id, key, action_name, category, description, subject, body_text, available_variables, is_active, cadence, updated_at'),

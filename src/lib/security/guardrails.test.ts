@@ -122,7 +122,7 @@ describe('server actions', () => {
 
   it('never puts the service-role client behind an unguarded action', () => {
     const risky = actions
-      .filter((a) => /createAdminSupabaseClient|onboardingDb\(/.test(a.body) && !GUARD.test(a.body) && !(a.id in EXEMPT))
+      .filter((a) => /createAdminSupabaseClient|onboardingDb\(|logWriter\(/.test(a.body) && !GUARD.test(a.body) && !(a.id in EXEMPT))
       .map((a) => a.id)
     expect(risky).toEqual([])
   })

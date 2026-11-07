@@ -451,7 +451,42 @@ exception when others then
 end $$;
 
 -------------------------------------------------------------------------
--- 10. The data inventory covers the schema
+-- 10. Log tables are written by the server only
+-------------------------------------------------------------------------
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-sa@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$
+declare t text;
+begin
+  foreach t in array array['audit_log', 'employee_audit_log', 'roles_history', 'email_delivery_logs',
+                           'settings_change_log', 'onboarding_activity_log', 'offboarding_activity_log', 'review_events'] loop
+    begin
+      execute format('insert into public.%I default values', t);
+      insert into pg_temp.failures values ('log tables are written by the server only', t || ': session insert accepted');
+    exception
+      when insufficient_privilege then null;
+      when not_null_violation or check_violation or foreign_key_violation then
+        insert into pg_temp.failures values ('log tables are written by the server only', t || ': session insert reached the table');
+    end;
+  end loop;
+end $$;
+reset role;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['audit_log', 'employee_audit_log', 'roles_history', 'email_delivery_logs',
+                           'settings_change_log', 'onboarding_activity_log', 'offboarding_activity_log', 'review_events'] loop
+    if has_table_privilege('authenticated', 'public.' || t, 'INSERT')
+       or has_table_privilege('authenticated', 'public.' || t, 'UPDATE')
+       or has_table_privilege('authenticated', 'public.' || t, 'DELETE') then
+      insert into pg_temp.failures values ('log tables are written by the server only', t || ': write privilege granted');
+    end if;
+  end loop;
+end $$;
+
+-------------------------------------------------------------------------
+-- 11. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

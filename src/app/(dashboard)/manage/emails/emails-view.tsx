@@ -4324,30 +4324,28 @@ export function EmailsView({
                 </div>
               </div>
 
-              {/* Right Column: Delivered Body */}
+              {/* Right Column: the template this message used, with sample values.
+                  Message bodies are not stored: the log keeps the template,
+                  recipient, status and error only. */}
               <div className="lg:col-span-7 flex flex-col space-y-2 border-t lg:border-t-0 lg:border-l border-border/60 pt-4 lg:pt-0 lg:pl-6">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-foreground">
-                    Delivered Notification Content
-                  </Label>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => {
-                      if (selectedLog?.body_preview) {
-                        navigator.clipboard.writeText(selectedLog.body_preview)
-                        toast.success('Body copied to clipboard')
-                      }
-                    }}
-                    className="h-7 text-[11px] gap-1"
-                  >
-                    <Copy className="size-3" />
-                    <span>Copy Text</span>
-                  </Button>
-                </div>
-                <div className="p-4 rounded-xl border border-border/80 bg-background text-xs leading-relaxed text-foreground whitespace-pre-wrap font-sans flex-1 overflow-y-auto min-h-[300px]">
-                  {selectedLog?.body_preview}
-                </div>
+                <Label className="text-xs font-bold text-foreground">
+                  Template, with sample values
+                </Label>
+                {(() => {
+                  const humanise = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                  const template = selectedLog ? templates.find((t) => humanise(t.key) === selectedLog.notification_type) : undefined
+                  const preview = template ? renderInterpolatedPreview(template.subject, template.body_text) : null
+                  return (
+                    <>
+                      <p className="text-[11px] text-muted-foreground">
+                        The message itself is not kept. This is the template it was sent from, filled with sample values, not what the recipient saw.
+                      </p>
+                      <div className="p-4 rounded-xl border border-border/80 bg-background text-xs leading-relaxed text-foreground whitespace-pre-wrap font-sans flex-1 overflow-y-auto min-h-[300px]">
+                        {preview ? preview.body : 'No template matches this message.'}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>
