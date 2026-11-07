@@ -339,7 +339,7 @@ given the role that panel. Say so in the loader's header comment.
 1. Update `docs/user-guide/04-my-workspace.md`: add a role → panels table
    under *At a glance*, in its plain style, and fix
    `docs/user-guide/03-where-to-go.md` if a row there changes.
-2. Run all four, and paste the results in the PR:
+2. Run these and paste the results in the PR:
    ```bash
    npm test
    npm run lint
