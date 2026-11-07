@@ -67,25 +67,31 @@ export const DpdpSettings = ({
   return (
     <div className="space-y-4">
       {!canEdit && <ReadOnlyNote />}
-      <Tabs value={tab} onValueChange={select}>
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
+      <Tabs value={tab} onValueChange={select} className="w-full">
+        <TabsList className="group-data-[orientation=horizontal]/tabs:!h-auto !h-auto w-full flex-wrap justify-start gap-1.5 p-1.5 bg-muted/60 dark:bg-muted/40 rounded-xl border border-border/50">
           {DPDP_TABS.map((t) => (
-            <TabsTrigger key={t.id} value={t.id} className="text-xs">{t.label}</TabsTrigger>
+            <TabsTrigger
+              key={t.id}
+              value={t.id}
+              className="text-xs px-3 py-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs transition-all"
+            >
+              {t.label}
+            </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value="contact"><ContactTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="notices"><NoticesTab bundle={bundle} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="purposes"><PurposesTab purposes={bundle.purposes} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="collection"><CollectionTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="retention">
+        <TabsContent value="contact" className="mt-4"><ContactTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="notices" className="mt-4"><NoticesTab bundle={bundle} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="purposes" className="mt-4"><PurposesTab purposes={bundle.purposes} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="collection" className="mt-4"><CollectionTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="retention" className="mt-4">
           <RetentionTab settings={bundle.settings} rules={bundle.rules} canEdit={canEdit} isSuperAdmin={isSuperAdmin} holds={holds} />
         </TabsContent>
-        <TabsContent value="children"><ChildrenTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="links"><LinksTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="breach"><BreachTab bundle={bundle} canEdit={canEdit} /></TabsContent>
-        <TabsContent value="processors"><ProcessorsTab processors={bundle.processors} canEdit={canEdit} today={today} /></TabsContent>
-        <TabsContent value="attestations"><AttestationsTab attestations={bundle.attestations} canEdit={canEdit} today={today} /></TabsContent>
-        <TabsContent value="checker">{checker}</TabsContent>
+        <TabsContent value="children" className="mt-4"><ChildrenTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="links" className="mt-4"><LinksTab settings={bundle.settings} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="breach" className="mt-4"><BreachTab bundle={bundle} canEdit={canEdit} /></TabsContent>
+        <TabsContent value="processors" className="mt-4"><ProcessorsTab processors={bundle.processors} canEdit={canEdit} today={today} /></TabsContent>
+        <TabsContent value="attestations" className="mt-4"><AttestationsTab attestations={bundle.attestations} canEdit={canEdit} today={today} /></TabsContent>
+        <TabsContent value="checker" className="mt-4">{checker}</TabsContent>
       </Tabs>
     </div>
   )

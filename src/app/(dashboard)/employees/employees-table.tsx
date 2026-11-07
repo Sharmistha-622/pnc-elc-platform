@@ -119,7 +119,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
         if (statusFilter === 'confirmed' && !isConfirmed) {
           return false;
         }
-        if (statusFilter === 'active' && isConfirmed) {
+        if ((statusFilter === 'probation') && isConfirmed) {
           return false;
         }
       }
@@ -303,7 +303,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-9 pr-8 h-9 rounded-lg bg-card text-xs sm:text-sm"
+              className="pl-9 pr-8 h-8 rounded-lg bg-card text-xs"
             />
             {search && (
               <button
@@ -330,7 +330,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                 setCurrentPage(1);
               }}
             >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[160px]">
+              <SelectTrigger className="h-8 text-xs rounded-lg bg-card min-w-[150px]">
                 <div className="flex items-center gap-1.5 truncate">
                   <Filter className="size-3 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">Type:</span>
@@ -355,7 +355,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                 setCurrentPage(1);
               }}
             >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[150px]">
+              <SelectTrigger className="h-8 text-xs rounded-lg bg-card min-w-[140px]">
                 <div className="flex items-center gap-1.5 truncate">
                   <span className="text-muted-foreground">Team:</span>
                   <SelectValue placeholder="All Teams" />
@@ -380,7 +380,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[140px]">
+                <SelectTrigger className="h-8 text-xs rounded-lg bg-card min-w-[130px]">
                   <div className="flex items-center gap-1.5 truncate">
                     <span className="text-muted-foreground">Status:</span>
                     <SelectValue placeholder="All Statuses" />
@@ -388,8 +388,8 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                 </SelectTrigger>
                 <SelectContent position="popper" className="text-xs">
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="probation">Probation</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -402,7 +402,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                 setCurrentPage(1);
               }}
             >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[145px]">
+              <SelectTrigger className="h-8 text-xs rounded-lg bg-card min-w-[135px]">
                 <div className="flex items-center gap-1.5 truncate">
                   <GraduationCap className="size-3 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">Alumni:</span>
@@ -435,13 +435,13 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
 
         {/* Tab Content: ACTIVE EMPLOYEES */}
         <TabsContent value="active" className="mt-4">
-          <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
+          <div className="rounded-lg border border-border bg-card/60 backdrop-blur-md shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase font-semibold">
+                <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground uppercase tracking-wider font-bold">
                   <tr>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center">
@@ -450,7 +450,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('type')}
                     >
                       <div className="flex items-center">
@@ -459,7 +459,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('team')}
                     >
                       <div className="flex items-center">
@@ -468,7 +468,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('tenure')}
                     >
                       <div className="flex items-center">
@@ -477,7 +477,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center">
@@ -485,7 +485,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                         {renderSortIcon('status')}
                       </div>
                     </th>
-                    <th className="py-3 px-4 text-right">Profile</th>
+                    <th className="py-2.5 px-3 text-right">Profile</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -518,14 +518,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
 
                       return (
                         <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-foreground">
+                          <td className="py-2.5 px-3 font-semibold text-foreground">
                             <div className="flex items-center gap-2.5">
                               <div className="size-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 ring-1 ring-indigo-500/20">
                                 {emp.name?.charAt(0) || 'U'}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="truncate text-foreground text-sm font-semibold">
+                                  <span className="truncate text-foreground text-xs font-semibold">
                                     {emp.name}
                                   </span>
                                   {emp.is_alumni && (
@@ -542,13 +542,13 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 px-4">{renderTypeBadge(emp.employee_type)}</td>
-                          <td className="py-3 px-4 text-muted-foreground font-medium">
+                          <td className="py-2.5 px-3">{renderTypeBadge(emp.employee_type)}</td>
+                          <td className="py-2.5 px-3 text-muted-foreground font-medium">
                             {emp.team || '—'}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-2.5 px-3">
                             <div>
-                              <span className="font-semibold text-foreground text-xs sm:text-sm">
+                              <span className="font-semibold text-foreground text-xs">
                                 {tenureText}
                               </span>
                               <span className="block text-[11px] text-muted-foreground font-normal">
@@ -556,18 +556,23 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                               </span>
                             </div>
                           </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold capitalize ${
-                                emp.status?.toLowerCase() === 'confirmed'
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                  : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                              }`}
-                            >
-                              {emp.status || 'Active'}
-                            </span>
+                          <td className="py-2.5 px-3">
+                            {(() => {
+                                const isConfirmed = emp.status?.toLowerCase() === 'confirmed' || Boolean(emp.confirmation_date);
+                                return (
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold capitalize ${
+                                      isConfirmed
+                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                        : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                                    }`}
+                                  >
+                                    {isConfirmed ? 'Confirmed' : 'Probation'}
+                                  </span>
+                                );
+                              })()}
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-2.5 px-3 text-right">
                             <Link
                               href={`/employees/${emp.id}/profile`}
                               className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
@@ -605,13 +610,13 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
 
         {/* Tab Content: EXITED EMPLOYEES */}
         <TabsContent value="exited" className="mt-4">
-          <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
+          <div className="rounded-lg border border-border bg-card/60 backdrop-blur-md shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase font-semibold">
+                <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground uppercase tracking-wider font-bold">
                   <tr>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center">
@@ -620,7 +625,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('type')}
                     >
                       <div className="flex items-center">
@@ -629,7 +634,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('team')}
                     >
                       <div className="flex items-center">
@@ -638,7 +643,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('joining_date')}
                     >
                       <div className="flex items-center">
@@ -647,7 +652,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('exit_date')}
                     >
                       <div className="flex items-center">
@@ -656,7 +661,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                       </div>
                     </th>
                     <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort('tenure')}
                     >
                       <div className="flex items-center">
@@ -664,7 +669,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                         {renderSortIcon('tenure')}
                       </div>
                     </th>
-                    <th className="py-3 px-4 text-right">Profile</th>
+                    <th className="py-2.5 px-3 text-right">Profile</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -697,14 +702,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
 
                       return (
                         <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-foreground">
+                          <td className="py-2.5 px-3 font-semibold text-foreground">
                             <div className="flex items-center gap-2.5">
                               <div className="size-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center font-bold text-xs shrink-0">
                                 {emp.name?.charAt(0) || 'U'}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="truncate text-foreground text-sm font-semibold">
+                                  <span className="truncate text-foreground text-xs font-semibold">
                                     {emp.name}
                                   </span>
                                   {emp.is_alumni && (
@@ -721,14 +726,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 px-4">{renderTypeBadge(emp.employee_type)}</td>
-                          <td className="py-3 px-4 text-muted-foreground font-medium">
+                          <td className="py-2.5 px-3">{renderTypeBadge(emp.employee_type)}</td>
+                          <td className="py-2.5 px-3 text-muted-foreground font-medium">
                             {emp.team || '—'}
                           </td>
-                          <td className="py-3 px-4 text-muted-foreground">
+                          <td className="py-2.5 px-3 text-muted-foreground">
                             {formatDate(emp.joining_date)}
                           </td>
-                          <td className="py-3 px-4 text-muted-foreground">
+                          <td className="py-2.5 px-3 text-muted-foreground">
                             {emp.exit_date ? (
                               <span className="font-medium text-rose-600 dark:text-rose-400">
                                 {formatDate(emp.exit_date)}
@@ -737,12 +742,12 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                               '—'
                             )}
                           </td>
-                          <td className="py-3 px-4">
-                            <span className="font-semibold text-foreground text-xs sm:text-sm">
+                          <td className="py-2.5 px-3">
+                            <span className="font-semibold text-foreground text-xs">
                               {tenureText}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-2.5 px-3 text-right">
                             <Link
                               href={`/employees/${emp.id}/profile`}
                               className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"

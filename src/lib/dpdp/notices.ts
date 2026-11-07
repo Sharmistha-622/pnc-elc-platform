@@ -28,31 +28,10 @@ export function isPrivacyNotice(type: NoticeType): type is PrivacyNoticeType {
   return (PRIVACY_NOTICE_TYPES as readonly string[]).includes(type)
 }
 
-/** English and the Eighth Schedule languages (DPDP Act s. 5(3)). */
+/** English and Hindi (DPDP Act s. 5(3)). */
 export const NOTICE_LANGUAGES: Record<string, string> = {
   en: 'English',
   hi: 'हिन्दी (Hindi)',
-  as: 'অসমীয়া (Assamese)',
-  bn: 'বাংলা (Bengali)',
-  brx: 'बड़ो (Bodo)',
-  doi: 'डोगरी (Dogri)',
-  gu: 'ગુજરાતી (Gujarati)',
-  kn: 'ಕನ್ನಡ (Kannada)',
-  ks: 'کٲشُر (Kashmiri)',
-  kok: 'कोंकणी (Konkani)',
-  mai: 'मैथिली (Maithili)',
-  ml: 'മലയാളം (Malayalam)',
-  mni: 'মৈতৈলোন্ (Manipuri)',
-  mr: 'मराठी (Marathi)',
-  ne: 'नेपाली (Nepali)',
-  or: 'ଓଡ଼ିଆ (Odia)',
-  pa: 'ਪੰਜਾਬੀ (Punjabi)',
-  sa: 'संस्कृतम् (Sanskrit)',
-  sat: 'ᱥᱟᱱᱛᱟᱲᱤ (Santali)',
-  sd: 'سنڌي (Sindhi)',
-  ta: 'தமிழ் (Tamil)',
-  te: 'తెలుగు (Telugu)',
-  ur: 'اردو (Urdu)',
 }
 
 export interface NoticeSection {

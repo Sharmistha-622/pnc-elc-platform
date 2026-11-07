@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/select'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import type { EmployeeProfileData } from '@/lib/profile/profileActions'
-import { formatDate } from '@/lib/employees/tenure'
+import { formatDate, formatEmploymentType } from '@/lib/employees/tenure'
 
 interface MyTeamClientProps {
   currentManagerName: string
@@ -61,10 +61,12 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
-  // Stats
+  // Stats: Active employees are either Confirmed or on Probation
   const total = reportees.length
-  const probationCount = reportees.filter((r) => r.status.toLowerCase().includes('probation')).length
-  const activeCount = reportees.filter((r) => r.status.toLowerCase() === 'active').length
+  const confirmedCount = reportees.filter(
+    (r) => r.status?.toLowerCase() === 'confirmed' || Boolean(r.confirmationDate)
+  ).length
+  const probationCount = total - confirmedCount
 
   const filteredReportees = useMemo(() => {
     return reportees.filter((r) => {
@@ -74,7 +76,11 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
       const term = searchTerm.toLowerCase().trim()
       const matchesSearch = !term || name.includes(term) || email.includes(term) || team.includes(term)
 
-      const matchesStatus = statusFilter === 'ALL' || r.status.toLowerCase() === statusFilter.toLowerCase()
+      const isConfirmed = r.status?.toLowerCase() === 'confirmed' || Boolean(r.confirmationDate)
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'confirmed' && isConfirmed) ||
+        (statusFilter === 'probation' && !isConfirmed)
 
       return matchesSearch && matchesStatus
     })
@@ -94,6 +100,31 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
       .slice(0, 2)
       .join('')
       .toUpperCase()
+  }
+
+  // Badges for employment type (matching /employees directory)
+  const renderTypeBadge = (type?: string | null) => {
+    const formatted = formatEmploymentType(type)
+    const clean = (type || '').toLowerCase()
+
+    let colorClasses = 'border-slate-500/30 bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
+    if (clean === 'fte' || clean.includes('fte') || clean.includes('full-time')) {
+      colorClasses = 'border-blue-500/30 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+    } else if (clean === 'ftc') {
+      colorClasses = 'border-purple-500/30 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+    } else if (clean.includes('apprentice')) {
+      colorClasses = 'border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+    } else if (clean === 'intern' || clean.includes('intern')) {
+      colorClasses = 'border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+    } else if (clean === 'contractor' || clean.includes('contract')) {
+      colorClasses = 'border-zinc-500/30 bg-zinc-50 text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300'
+    }
+
+    return (
+      <Badge variant="outline" className={`text-xs font-semibold rounded-lg px-2 py-0.5 ${colorClasses}`}>
+        {formatted}
+      </Badge>
+    )
   }
 
   return (
@@ -116,22 +147,22 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
         <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
           <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Confirmed / Active
+              Confirmed Staff
             </span>
             <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
           <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-            {activeCount}
+            {confirmedCount}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1">Active confirmed roster</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Completed probation review</p>
         </div>
 
         <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
           <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Probation Reviews
+              On Probation
             </span>
             <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
               <AlertCircle className="h-4 w-4" />
@@ -140,7 +171,7 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
           <div className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
             {probationCount}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1">Due for confirmation</p>
+          <p className="text-[11px] text-muted-foreground mt-1">In-flight probation review</p>
         </div>
 
         <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
@@ -192,7 +223,7 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
             </SelectTrigger>
             <SelectContent className="rounded-lg">
               <SelectItem value="ALL" className="rounded-lg">All Statuses</SelectItem>
-              <SelectItem value="active" className="rounded-lg">Active</SelectItem>
+              <SelectItem value="confirmed" className="rounded-lg">Confirmed</SelectItem>
               <SelectItem value="probation" className="rounded-lg">Probation</SelectItem>
             </SelectContent>
           </Select>
@@ -235,70 +266,71 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers }: MyT
           </TableHeader>
           <TableBody>
             {paginatedReportees.length > 0 ? (
-              paginatedReportees.map((rep) => (
-                <TableRow key={rep.id} className="hover:bg-muted/30 transition-colors">
-                  <TableCell className="py-2.5 px-3">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600">
-                        <AvatarFallback className="text-[11px] font-bold">
-                          {getInitials(rep.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="text-xs font-semibold text-foreground">{rep.name}</div>
-                        <div className="text-[11px] text-muted-foreground">{rep.email || 'No email registered'}</div>
+              paginatedReportees.map((rep) => {
+                const isConfirmed = rep.status?.toLowerCase() === 'confirmed' || Boolean(rep.confirmationDate)
+                return (
+                  <TableRow key={rep.id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="py-2.5 px-3">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600">
+                          <AvatarFallback className="text-[11px] font-bold">
+                            {getInitials(rep.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-xs font-semibold text-foreground">{rep.name}</div>
+                          <div className="text-[11px] text-muted-foreground">{rep.email || 'No email registered'}</div>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
+                    </TableCell>
 
-                  <TableCell className="py-2.5 px-3">
-                    <Badge variant="outline" className="text-[11px] rounded-lg font-medium">
-                      {rep.employeeType}
-                    </Badge>
-                  </TableCell>
+                    <TableCell className="py-2.5 px-3">
+                      {renderTypeBadge(rep.employeeType)}
+                    </TableCell>
 
-                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground">
-                    {rep.team || 'None'}
-                  </TableCell>
+                    <TableCell className="py-2.5 px-3 text-xs text-muted-foreground">
+                      {rep.team || 'None'}
+                    </TableCell>
 
-                  <TableCell className="py-2.5 px-3 text-xs text-muted-foreground font-mono" suppressHydrationWarning>
-                    {rep.joiningDate ? formatDate(rep.joiningDate) : '—'}
-                  </TableCell>
+                    <TableCell className="py-2.5 px-3 text-xs text-muted-foreground font-mono" suppressHydrationWarning>
+                      {rep.joiningDate ? formatDate(rep.joiningDate) : '—'}
+                    </TableCell>
 
-                  <TableCell className="py-2.5 px-3">
-                    <Badge
-                      className={`text-[10px] font-semibold border-none rounded-md capitalize ${
-                        rep.status === 'active'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
-                      }`}
-                    >
-                      {rep.status}
-                    </Badge>
-                  </TableCell>
+                    <TableCell className="py-2.5 px-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold capitalize ${
+                          isConfirmed
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                        }`}
+                      >
+                        {isConfirmed ? 'Confirmed' : 'Probation'}
+                      </span>
+                    </TableCell>
 
-                  <TableCell className="py-2.5 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {canOpenDocuments && (
-                        <Link href={`/employees/${rep.id}/documents`}>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
-                            <FolderOpen className="h-3 w-3" />
-                            <span>Docs</span>
-                          </Button>
-                        </Link>
-                      )}
-                      {canOpenProfiles && (
-                        <Link href={`/employees/${rep.id}/profile`}>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 gap-1">
-                            <span>Profile</span>
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    <TableCell className="py-2.5 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {canOpenDocuments && (
+                          <Link href={`/employees/${rep.id}/documents`}>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
+                              <FolderOpen className="h-3 w-3" />
+                              <span>Docs</span>
+                            </Button>
+                          </Link>
+                        )}
+                        {canOpenProfiles && (
+                          <Link href={`/employees/${rep.id}/profile`}>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 gap-1">
+                              <span>Profile</span>
+                              <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">

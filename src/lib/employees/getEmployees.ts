@@ -16,13 +16,14 @@ export type Employee = {
 export async function getEmployees(): Promise<Employee[]> {
   const supabase = await createServerSupabaseClient()
 
-  // Attempt query with exit_date and email
+  // Attempt query with exit_date, email, and team text column
   const withExit = await supabase
     .from('employees')
     .select(`
       id,
       name,
       email,
+      team,
       joining_date,
       exit_date,
       is_alumni,
@@ -44,6 +45,7 @@ export async function getEmployees(): Promise<Employee[]> {
         id,
         name,
         email,
+        team,
         joining_date,
         confirmation_date,
         status,
@@ -67,7 +69,7 @@ export async function getEmployees(): Promise<Employee[]> {
     name: row.name,
     email: row.email || null,
     employee_type: row.employee_types?.name || 'Full-Time',
-    team: row.teams?.name || null,
+    team: row.team || row.teams?.name || null,
     joining_date: row.joining_date,
     exit_date: row.exit_date || null,
     confirmation_date: row.confirmation_date,

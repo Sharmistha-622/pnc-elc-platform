@@ -31,6 +31,7 @@ export interface EmployeeProfileData {
     employeeType: string | null
     status: string
     joiningDate: string | null
+    confirmationDate?: string | null
   }[]
 }
 
@@ -130,6 +131,7 @@ export async function getMyProfileData(): Promise<{
       team,
       status,
       joining_date,
+      confirmation_date,
       employee_type,
       teams(name),
       employee_types(name)
@@ -145,6 +147,7 @@ export async function getMyProfileData(): Promise<{
     employeeType: (r as any).employee_types?.name || (r as any).employee_type || 'FTE',
     status: r.status || 'active',
     joiningDate: r.joining_date ?? null,
+    confirmationDate: r.confirmation_date ?? null,
   }))
 
   const profile: EmployeeProfileData = {
