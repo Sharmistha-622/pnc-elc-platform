@@ -1,42 +1,30 @@
-import { Lock } from 'lucide-react'
-import {
-  BOARD_DETAILED_REPORT_HOURS,
-  CERT_IN_REPORT_HOURS,
-  CHILD_AGE_YEARS,
-  DELETE_FLOOR_DAYS,
-  GRIEVANCE_MAX_DAYS,
-  MAIN_DUTIES_FROM,
-  type LockedValue,
-} from '@/lib/dpdp/constants'
+import { redirect } from 'next/navigation'
+import { getDpdpSettingsBundle } from '@/lib/dpdp/settings/queries'
+import { privacyEditRefusal } from '@/lib/dpdp/access'
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
+import { isoDate } from '@/lib/dpdp/dates'
+import { DpdpSettings } from './_components/dpdp-settings'
 
-const LOCKED: LockedValue<number | string>[] = [
-  MAIN_DUTIES_FROM,
-  DELETE_FLOOR_DAYS,
-  GRIEVANCE_MAX_DAYS,
-  BOARD_DETAILED_REPORT_HOURS,
-  CERT_IN_REPORT_HOURS,
-  CHILD_AGE_YEARS,
-]
+export const dynamic = 'force-dynamic'
 
-/** DPDP & Privacy: the values the law fixes. */
-export default function DpdpSettingsPage() {
+/**
+ * Settings → DPDP & Privacy. Gated by `privacy` in the layout; the bundle
+ * read checks again, and every write checks `privacyEdit` for itself.
+ */
+export default async function DpdpSettingsPage() {
+  const bundle = await getDpdpSettingsBundle()
+  if (!bundle) redirect('/')
+
+  const [refusal, { role, originalRole }] = await Promise.all([privacyEditRefusal(), getCurrentUserRole()])
+  const isSuperAdmin = role === 'super_admin' && originalRole === 'super_admin'
+
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-foreground">Locked by law</h2>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-        {LOCKED.map((v) => (
-          <li key={v.label} className="flex items-start justify-between gap-4 p-3 text-xs">
-            <span className="flex items-start gap-2">
-              <Lock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span>
-                <span className="block font-medium text-foreground">{v.label}</span>
-                <span className="text-muted-foreground">{v.ref}</span>
-              </span>
-            </span>
-            <span className="font-mono font-semibold text-foreground">{String(v.value)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <DpdpSettings
+      bundle={bundle}
+      canEdit={refusal === null}
+      isSuperAdmin={isSuperAdmin}
+      today={isoDate(new Date())}
+      checker={<p className="text-xs text-muted-foreground">The compliance checker runs here.</p>}
+    />
   )
 }
