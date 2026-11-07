@@ -4,6 +4,7 @@ import { privacyEditRefusal } from '@/lib/dpdp/access'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { isoDate } from '@/lib/dpdp/dates'
 import { DpdpSettings } from './_components/dpdp-settings'
+import { CheckerTab } from './_components/checker-tab'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export default async function DpdpSettingsPage() {
       canEdit={refusal === null}
       isSuperAdmin={isSuperAdmin}
       today={isoDate(new Date())}
-      checker={<p className="text-xs text-muted-foreground">The compliance checker runs here.</p>}
+      checker={<CheckerTab />}
     />
   )
 }

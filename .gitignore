@@ -56,3 +56,6 @@ graphify-out/
 
 # Supabase CLI working files (written when the CLI runs from the repo root)
 supabase/.temp/
+
+# DPDP checker: static results written by `npm run build` (prebuild)
+src/lib/dpdp/checks/static-results.generated.json

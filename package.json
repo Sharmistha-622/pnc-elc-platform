@@ -4,13 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "node --max-http-header-size=65536 node_modules/next/dist/bin/next dev",
+    "prebuild": "tsx scripts/dpdp-check.ts --quiet --json src/lib/dpdp/checks/static-results.generated.json",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "rbac:matrix": "UPDATE_DOCS=1 vitest run src/lib/rbac/roles.doc.test.ts",
-    "dpdp:inventory": "UPDATE_DOCS=1 vitest run src/lib/dpdp/inventory.doc.test.ts"
+    "dpdp:inventory": "UPDATE_DOCS=1 vitest run src/lib/dpdp/inventory.doc.test.ts",
+    "dpdp:check": "tsx scripts/dpdp-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.2",
