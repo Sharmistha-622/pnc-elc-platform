@@ -7,11 +7,13 @@ import { getHasReports } from "@/lib/employees/hasReports";
 import { TONES } from "@/lib/ui/tone";
 import { AtAGlance } from "./_components/dashboard/at-a-glance";
 import { WaitingOnYou } from "./_components/dashboard/waiting-on-you";
-import { RoleDashboardView } from "./_components/dashboard/role-dashboard-view";
+import { DashboardPanels } from "./_components/dashboard/panels/dashboard-panels";
+import { QuickLinks } from "./_components/dashboard/panels/quick-links";
 
 /**
  * The home screen, customized per role.
- * Shows role-appropriate people data and activities without crossing over to world data.
+ * Shows role-appropriate people data and activities registered in one place
+ * and guarded against the RBAC matrix.
  */
 export default async function DashboardPage({
   searchParams,
@@ -36,7 +38,8 @@ export default async function DashboardPage({
           <p className="-mt-2 text-sm text-muted-foreground">{data.focus}</p>
           <WaitingOnYou groups={data.tasks} />
           <AtAGlance stats={data.stats} />
-          {role && <RoleDashboardView role={role} data={data.roleCustomData} />}
+          <DashboardPanels panels={data.panels} />
+          <QuickLinks links={data.quickLinks} />
         </>
       )}
     </div>

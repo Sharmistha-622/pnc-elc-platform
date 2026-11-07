@@ -32,14 +32,14 @@ function StatTile({ stat }: { stat: StatResult }) {
   return (
     <Link
       href={stat.href}
-      className="group flex flex-col justify-between gap-2 rounded-xl border border-border/70 bg-card p-4 shadow-2xs transition-all hover:border-indigo-300 dark:hover:border-indigo-800 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="group flex flex-col justify-between gap-2 rounded-lg border border-border/80 bg-card p-4 shadow-2xs transition-all hover:bg-muted/40 hover:border-border hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors truncate">
           {stat.label}
         </span>
         <ArrowUpRight
-          className="size-3.5 shrink-0 text-muted-foreground opacity-40 transition-all group-hover:opacity-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          className="size-3.5 shrink-0 text-muted-foreground opacity-40 transition-all group-hover:opacity-100 group-hover:text-foreground group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
           aria-hidden="true"
         />
       </div>
@@ -50,7 +50,7 @@ function StatTile({ stat }: { stat: StatResult }) {
         >
           {unavailable ? "—" : formatter.format(stat.value!)}
         </span>
-        <span className="text-[11px] text-muted-foreground block truncate">{stat.hint}</span>
+        <span className="text-xs text-muted-foreground block truncate">{stat.hint}</span>
       </div>
     </Link>
   );
