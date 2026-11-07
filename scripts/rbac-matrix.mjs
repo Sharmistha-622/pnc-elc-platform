@@ -39,6 +39,7 @@ const RESOURCE_LABELS = {
   salary: 'Salary<br>(CTC, increments)',
   performance: 'Performance<br>(feedback, decisions)',
   config: 'Config<br>(templates, automation)',
+  privacy: 'Privacy<br>(DPDP settings, requests)',
 }
 
 const QUALIFIER_LABELS = {
@@ -48,6 +49,7 @@ const QUALIFIER_LABELS = {
   via_letters: 'via letters',
   insert_only: 'insert-only',
   with_logs: '+ logs',
+  settings_only: 'settings only',
 }
 
 const GRANT_LABELS = {

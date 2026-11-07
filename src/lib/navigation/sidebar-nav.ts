@@ -37,6 +37,7 @@ import {
   Users,
   Users2,
   type LucideIcon,
+  Lock,
 } from "lucide-react";
 
 import { canAccessRoute, type UserRole } from "@/lib/role-constants";
@@ -178,7 +179,14 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ShieldCheck,
         alsoActiveFor: ["/manage/roles"],
       },
-      { title: "Settings", url: "/manage/settings", icon: SlidersHorizontal },
+      {
+        title: "Settings",
+        url: "/manage/settings",
+        icon: SlidersHorizontal,
+        // DPDP & Privacy has its own entry, for the roles that reach only it.
+        notActiveFor: ["/manage/settings/dpdp"],
+      },
+      { title: "DPDP & Privacy", url: "/manage/settings/dpdp", icon: Lock },
       { title: "Email Center", url: "/manage/emails", icon: Mail },
       {
         title: "Data Management",

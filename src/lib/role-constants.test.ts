@@ -287,3 +287,36 @@ describe('assignableRoles', () => {
     }
   })
 })
+
+describe('privacy (DPDP)', () => {
+  it('opens the DPDP & Privacy settings to the four roles that hold privacy, and no one else', () => {
+    expect(FEATURE_ACCESS.privacy).toEqual(['super_admin', 'pnc_admin', 'platform_admin', 'exec_view'])
+    for (const role of ROLE_CODES) {
+      expect(canAccessRoute(role, '/manage/settings/dpdp'), role).toBe(FEATURE_ACCESS.privacy.includes(role))
+    }
+  })
+
+  it('lets Exec View reach the DPDP tab without reaching the platform settings', () => {
+    expect(canAccessRoute('exec_view', '/manage/settings/dpdp')).toBe(true)
+    expect(canAccessRoute('exec_view', '/manage/settings')).toBe(false)
+    expect(canAccessRoute('exec_view', '/manage/settings/confirmation')).toBe(false)
+  })
+
+  it('gives editing to Super Admin and PnC Admin only', () => {
+    expect(FEATURE_ACCESS.privacyEdit).toEqual(['super_admin', 'pnc_admin'])
+  })
+
+  it('keeps requests, incidents and legal holds to the roles that answer for them', () => {
+    expect(FEATURE_ACCESS.privacyCases).toEqual(['super_admin', 'pnc_admin'])
+    expect(canAccessRoute('platform_admin', '/manage/privacy/requests')).toBe(false)
+    expect(canAccessRoute('exec_view', '/manage/privacy/incidents')).toBe(false)
+    expect(canAccessRoute('pnc_admin', '/manage/privacy/requests')).toBe(true)
+  })
+
+  it('opens My Privacy to every staff role and to no portal role', () => {
+    for (const role of ROLE_CODES) {
+      const portal = role === 'candidate' || role === 'pre_joiner'
+      expect(canAccessRoute(role, '/my-privacy'), role).toBe(!portal)
+    }
+  })
+})

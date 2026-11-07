@@ -4,8 +4,8 @@ The readable copy of the role model. The matrix below is **generated from
 `src/lib/rbac/roles.ts`**; `roles.doc.test.ts` regenerates it and fails if the
 two disagree, so this document cannot drift from the code.
 
-To change a role: edit `roles.ts`, run `node scripts/rbac-matrix.mjs --write`,
-and say why in the pull request. Reviewing the diff of this file is reviewing
+To change a role: edit `roles.ts`, run `npm run rbac:matrix`, and say why in
+the pull request. Reviewing the diff of this file is reviewing
 the diff of the policy.
 
 ## At a glance
@@ -25,28 +25,28 @@ Two things are deliberately separate:
 
 <!-- MATRIX:START -->
 
-| Role | Rank | Login | General<br>(name, team, email) | Identity & docs<br>(phone, ID) | Bank<br>(account, IFSC) | Salary<br>(CTC, increments) | Performance<br>(feedback, decisions) | Config<br>(templates, automation) | Granted by |
-|---|---:|---|---|---|---|---|---|---|---|
-| **Owner** | | | | | | | | | |
-| Super Admin `super_admin` | 10 | core+vault | Edit | Edit | Edit | Edit | Edit | Edit | Owner (Nitin) |
-| **PnC** | | | | | | | | | |
-| PnC Admin `pnc_admin` | 8 | core+vault | Edit | Edit | View | Edit | Edit | View | Super Admin, PnC Admin |
-| PnC Ops `pnc_ops` | 6 | core | Edit | Edit | — | — | View (status only) | — | Super Admin, PnC Admin |
-| **Finance** | | | | | | | | | |
-| Fin Admin `fin_admin` | 8 | core+vault | View | — | Edit | Edit | View (outcomes) | — | Super Admin, Fin Admin |
-| Fin Ops `fin_ops` | 6 | core+vault | View | — | View | View (payroll export) | — | — | Super Admin, Fin Admin |
-| **Leadership** | | | | | | | | | |
-| Exec View `exec_view` | 7 | core+vault | View | — | — | View | View | — | Super Admin |
-| **Platform** | | | | | | | | | |
-| Platform Admin `platform_admin` | 8 | core | View | — | — | — | — | Edit | Super Admin |
-| Platform Ops `platform_ops` | 6 | core | View | — | — | — | — | View (+ logs) | Platform Admin |
-| **Line** | | | | | | | | | |
-| Manager `manager` | 5 | core | Own team view | — | — | — | Own team edit (+ logs) | — | Auto |
-| **Employee** | | | | | | | | | |
-| Employee `employee` | 3 | core | Own edit | Own view | Own view | Own view (via letters) | Own view (outcomes) | — | Auto |
-| **Onboarding** | | | | | | | | | |
-| Pre-joiner `pre_joiner` | 2 | core | Own edit | Own edit (insert-only) | Own edit (insert-only) | Own view (via letters) | — | — | Auto |
-| Candidate `candidate` | 1 | core | Own view | — | — | Own view (via letters) | — | — | Auto |
+| Role | Rank | Login | General<br>(name, team, email) | Identity & docs<br>(phone, ID) | Bank<br>(account, IFSC) | Salary<br>(CTC, increments) | Performance<br>(feedback, decisions) | Config<br>(templates, automation) | Privacy<br>(DPDP settings, requests) | Granted by |
+|---|---:|---|---|---|---|---|---|---|---|---|
+| **Owner** | | | | | | | | | | |
+| Super Admin `super_admin` | 10 | core+vault | Edit | Edit | Edit | Edit | Edit | Edit | Edit | Owner (Nitin) |
+| **PnC** | | | | | | | | | | |
+| PnC Admin `pnc_admin` | 8 | core+vault | Edit | Edit | View | Edit | Edit | View | Edit | Super Admin, PnC Admin |
+| PnC Ops `pnc_ops` | 6 | core | Edit | Edit | — | — | View (status only) | — | Own edit | Super Admin, PnC Admin |
+| **Finance** | | | | | | | | | | |
+| Fin Admin `fin_admin` | 8 | core+vault | View | — | Edit | Edit | View (outcomes) | — | Own edit | Super Admin, Fin Admin |
+| Fin Ops `fin_ops` | 6 | core+vault | View | — | View | View (payroll export) | — | — | Own edit | Super Admin, Fin Admin |
+| **Leadership** | | | | | | | | | | |
+| Exec View `exec_view` | 7 | core+vault | View | — | — | View | View | — | View (settings only) | Super Admin |
+| **Platform** | | | | | | | | | | |
+| Platform Admin `platform_admin` | 8 | core | View | — | — | — | — | Edit | View (settings only) | Super Admin |
+| Platform Ops `platform_ops` | 6 | core | View | — | — | — | — | View (+ logs) | Own edit | Platform Admin |
+| **Line** | | | | | | | | | | |
+| Manager `manager` | 5 | core | Own team view | — | — | — | Own team edit (+ logs) | — | Own edit | Auto |
+| **Employee** | | | | | | | | | | |
+| Employee `employee` | 3 | core | Own edit | Own view | Own view | Own view (via letters) | Own view (outcomes) | — | Own edit | Auto |
+| **Onboarding** | | | | | | | | | | |
+| Pre-joiner `pre_joiner` | 2 | core | Own edit | Own edit (insert-only) | Own edit (insert-only) | Own view (via letters) | — | — | Own edit | Auto |
+| Candidate `candidate` | 1 | core | Own view | — | — | Own view (via letters) | — | — | Own edit | Auto |
 
 <!-- MATRIX:END -->
 
@@ -98,6 +98,27 @@ staged resource the route changes once it is sealed. `canReach(role, resource,
 So a manager reads in-flight feedback straight from core, and the same feedback
 through a logged function once the cycle has closed. PnC Ops can chase a
 pending submission without ever being able to read it.
+
+## Privacy (DPDP)
+
+The `Privacy` column covers the DPDP Act work: the settings, consent records,
+rights requests, incidents and legal holds. It maps to four features in
+`FEATURE_ACCESS`:
+
+| Feature | Roles | Reaches |
+|---|---|---|
+| `privacy` | Super Admin, PnC Admin, Platform Admin, Exec View | **Settings → DPDP & Privacy** (`/manage/settings/dpdp`) and the compliance checker: configuration and counts, never anyone's personal data |
+| `privacyEdit` | Super Admin, PnC Admin | Changing a DPDP & Privacy setting. The retention mode switch (dry-run or live) is Super Admin's alone |
+| `privacyCases` | Super Admin, PnC Admin | Rights requests, incidents and legal holds (`/manage/privacy`), which hold people's personal data |
+| `myPrivacy` | every staff role | **My Privacy** (`/my-privacy`): their own data, consents and requests |
+
+Candidates and pre-joiners reach their notice, consents and requests through
+the token portal, never a feature.
+
+PnC Admin edits DPDP & Privacy although it is view-only on the platform
+settings: privacy is P&C's own process. `src/lib/dpdp/access.ts` holds the
+write checks (`privacyEditRefusal`, `retentionModeRefusal`), and the database
+repeats them (`202611071010_dpdp_settings.sql`).
 
 ## Granting
 
