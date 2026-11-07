@@ -41,3 +41,16 @@ export async function getPortalPrivacySettings(): Promise<PortalPrivacySettings>
     invitation_validity_days: s.invitation_validity_days,
   }
 }
+
+/**
+ * Document types that may be copied to an employee's Drive folder: the
+ * Data collection setting, which can never hold an identity or bank type.
+ */
+export async function getDriveCopyTypes(): Promise<string[]> {
+  try {
+    const { data } = await onboardingDb().from('dpdp_settings').select('drive_copy_document_types').eq('id', 'default').maybeSingle()
+    return toSettings((data as Record<string, unknown> | null) ?? null).drive_copy_document_types
+  } catch {
+    return toSettings(null).drive_copy_document_types
+  }
+}
