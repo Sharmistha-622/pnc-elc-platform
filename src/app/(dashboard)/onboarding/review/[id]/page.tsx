@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCheck2,
-  ExternalLink,
   ShieldCheck,
   FileText,
   Sparkles,
@@ -55,9 +54,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { FullOnboardingData, OnboardingStatus } from '@/lib/onboarding/types';
 import { toast } from 'sonner';
 
-export default function OnboardingReviewPage({ params }: { params: Promise<{ token: string }> }) {
+export default function OnboardingReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const token = resolvedParams.token;
+  const recordId = resolvedParams.id;
   const router = useRouter();
 
   const [data, setData] = useState<FullOnboardingData | null>(null);
@@ -101,7 +100,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/onboarding/${token}`);
+      const res = await fetch(`/api/onboarding/${recordId}`);
       const json = await res.json();
       if (json.success && json.data) {
         setData(json.data);
@@ -117,7 +116,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
 
   useEffect(() => {
     fetchData();
-  }, [token]);
+  }, [recordId]);
 
   const handleSendInvitation = async () => {
     if (!data) return;
@@ -326,10 +325,6 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
           <ArrowLeft className="size-3.5" />
           <span>Back to Candidate Onboardings</span>
         </Link>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-          <span>Token:</span>
-          <code className="px-2 py-0.5 rounded bg-muted text-foreground font-bold">{record.invitation_token}</code>
-        </div>
       </div>
 
       {/* Header PageBanner */}
@@ -366,14 +361,6 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ tok
         icon={<User className="size-6 text-indigo-600 dark:text-indigo-400" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {/* Candidate Link Button */}
-            <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs rounded-lg font-semibold shadow-xs">
-              <Link href={`/onboarding/${record.invitation_token}`} target="_blank" rel="noreferrer">
-                <span>Candidate Form</span>
-                <ExternalLink className="size-3.5 text-indigo-700 dark:text-indigo-300" />
-              </Link>
-            </Button>
-
             {/* Resend / Send Button */}
             <Button
               size="sm"

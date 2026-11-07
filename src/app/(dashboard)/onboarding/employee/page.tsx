@@ -618,7 +618,7 @@ function EmployeeOnboardingContent() {
                                   <DropdownMenuSeparator />
 
                                   <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                                    <Link href={`/onboarding/review/${item.record.invitation_token || item.record.id}`}>
+                                    <Link href={`/onboarding/review/${item.record.id}`}>
                                       <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                                       <span>View Complete Dossier</span>
                                     </Link>

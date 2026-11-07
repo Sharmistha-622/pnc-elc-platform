@@ -38,3 +38,22 @@ export function redactSalary(data: FullOnboardingData): FullOnboardingData {
     })),
   }
 }
+
+// ============================================================================
+// The portal link stays with the candidate.
+// ----------------------------------------------------------------------------
+// The invitation token is the candidate's key to their own portal, which shows
+// their CTC, letters and personal details. No dashboard response carries it,
+// for any role: staff reach a record by its id, and the link reaches the
+// candidate only by email (`sendOnboardingInvitation`).
+// ============================================================================
+
+export function withoutPortalToken<T extends { invitation_token?: string | null }>(record: T): T {
+  const copy = { ...record } as Record<string, unknown>
+  delete copy.invitation_token
+  return copy as T
+}
+
+export function redactPortalToken(data: FullOnboardingData): FullOnboardingData {
+  return { ...data, record: withoutPortalToken(data.record) }
+}

@@ -8,21 +8,9 @@ export default function LegacyOnboardingDetailRedirectPage({ params }: { params:
   const id = resolvedParams.id;
   const router = useRouter();
 
+  // The review console is addressed by the record id.
   useEffect(() => {
-    async function redirect() {
-      try {
-        const res = await fetch(`/api/onboarding/${id}`);
-        const json = await res.json();
-        if (json.success && json.data?.record?.invitation_token) {
-          router.replace(`/onboarding/review/${json.data.record.invitation_token}`);
-        } else {
-          router.replace(`/onboarding/review/${id}`);
-        }
-      } catch (err) {
-        router.replace(`/onboarding/review/${id}`);
-      }
-    }
-    redirect();
+    router.replace(`/onboarding/review/${id}`);
   }, [id, router]);
 
   return (

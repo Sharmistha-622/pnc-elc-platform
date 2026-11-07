@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { redactSalary, redactRecordSalary } from './redact'
+import { redactSalary, redactRecordSalary, redactPortalToken, withoutPortalToken } from './redact'
 import type { FullOnboardingData } from './types'
 
 const full = {
-  record: { id: 'r1', candidate_name: 'A Candidate', ctc: '₹60,000 / month', ctc_amount: 60000, ctc_frequency: 'monthly' },
+  record: { id: 'r1', candidate_name: 'A Candidate', invitation_token: 'portal-token-r1', ctc: '₹60,000 / month', ctc_amount: 60000, ctc_frequency: 'monthly' },
   employmentDetails: { id: 'e1', ctc: '₹60,000 / month', ctc_amount: 60000, designation: 'Associate' },
   documents: [],
   policies: [],
@@ -39,5 +39,22 @@ describe('redactSalary', () => {
 describe('redactRecordSalary', () => {
   it('strips the figure from a list row', () => {
     expect(redactRecordSalary(full.record)).not.toHaveProperty('ctc_amount')
+  })
+})
+
+describe('withoutPortalToken', () => {
+  it('drops the invitation token and keeps the rest', () => {
+    const row = { id: 'r1', candidate_name: 'A Candidate', invitation_token: 'secret-token' }
+    const out = withoutPortalToken(row)
+    expect(out).toEqual({ id: 'r1', candidate_name: 'A Candidate' })
+    expect(row.invitation_token).toBe('secret-token')
+  })
+})
+
+describe('redactPortalToken', () => {
+  it('leaves no token in a full record, for any caller', () => {
+    const out = redactPortalToken(full)
+    expect(JSON.stringify(out)).not.toContain(full.record.invitation_token)
+    expect(out.record.id).toBe(full.record.id)
   })
 })

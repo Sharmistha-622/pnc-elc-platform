@@ -12,7 +12,6 @@ import {
   Clock,
   Send,
   AlertCircle,
-  ExternalLink,
   ChevronRight,
   ShieldCheck,
   Building,
@@ -24,8 +23,6 @@ import {
   Briefcase,
   MoreVertical,
   ArrowLeft,
-  Copy,
-  Check,
 } from 'lucide-react';
 import { PageBanner } from '@/components/shared/page-banner';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
@@ -46,7 +43,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -139,7 +135,6 @@ function CandidateOnboardingContent() {
   const [teamFilter, setTeamFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const fetchRecords = async () => {
     try {
@@ -190,14 +185,6 @@ function CandidateOnboardingContent() {
     } catch (err) {
       toast.error('Network error sending invitation');
     }
-  };
-
-  const copyInviteLink = (token: string) => {
-    const fullUrl = `${window.location.origin}/onboarding/${token}`;
-    navigator.clipboard.writeText(fullUrl);
-    setCopiedToken(token);
-    toast.success('Candidate invitation link copied to clipboard');
-    setTimeout(() => setCopiedToken(null), 2000);
   };
 
   const filteredRecords = records.filter((r) => {
@@ -464,7 +451,7 @@ function CandidateOnboardingContent() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <Link
-                                href={`/onboarding/review/${item.invitation_token || item.id}`}
+                                href={`/onboarding/review/${item.id}`}
                                 className="font-semibold text-xs text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate"
                               >
                                 {item.candidate_name}
@@ -519,7 +506,7 @@ function CandidateOnboardingContent() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <Button asChild size="sm" variant="outline" className="h-7 text-xs font-semibold rounded-lg px-2.5">
-                            <Link href={`/onboarding/review/${item.invitation_token || item.id}`}>
+                            <Link href={`/onboarding/review/${item.id}`}>
                               Review
                             </Link>
                           </Button>
@@ -531,35 +518,6 @@ function CandidateOnboardingContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
-                              {item.invitation_token && (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={() => copyInviteLink(item.invitation_token)}
-                                    className="text-xs cursor-pointer gap-2"
-                                  >
-                                    {copiedToken === item.invitation_token ? (
-                                      <Check className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
-                                    ) : (
-                                      <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                                    )}
-                                    <span>Copy Candidate Portal Link</span>
-                                  </DropdownMenuItem>
-
-                                  <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                                    <Link
-                                      href={`/onboarding/${item.invitation_token}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="flex items-center gap-2"
-                                    >
-                                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span>Preview Candidate View</span>
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                </>
-                              )}
-
                               <DropdownMenuItem
                                 onClick={() => handleSendInvitation(item.id, item.personal_email)}
                                 className="text-xs cursor-pointer gap-2"
