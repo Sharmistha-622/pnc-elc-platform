@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { updateGeneralSetting } from '@/lib/settings/service'
-import type { GeneralSetting } from '@/lib/settings/types'
+import { DEFAULT_GENERAL_SETTINGS, type GeneralSetting } from '@/lib/settings/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,15 +18,16 @@ import {
   AtSign,
 } from 'lucide-react'
 
-export function GeneralSettingsForm({ initialSettings }: { initialSettings: GeneralSetting[] }) {
+export function GeneralSettingsForm({ initialSettings }: { initialSettings?: GeneralSetting[] }) {
+  const safeSettings = initialSettings && initialSettings.length > 0 ? initialSettings : DEFAULT_GENERAL_SETTINGS
   const [values, setValues] = useState<Record<string, string>>(
-    Object.fromEntries(initialSettings.map((s) => [s.key, s.value]))
+    Object.fromEntries(safeSettings.map((s) => [s.key, s.value]))
   )
   const [saved, setSaved] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const originalValues = Object.fromEntries(initialSettings.map((s) => [s.key, s.value]))
+  const originalValues = Object.fromEntries(safeSettings.map((s) => [s.key, s.value]))
 
   const editableKeys = [
     'default_probation_period',
@@ -64,7 +65,7 @@ export function GeneralSettingsForm({ initialSettings }: { initialSettings: Gene
   return (
     <div className="space-y-6">
       {/* 1. Organization Identity Card */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-2">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
@@ -80,7 +81,7 @@ export function GeneralSettingsForm({ initialSettings }: { initialSettings: Gene
         </CardHeader>
         <CardContent className="p-5 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Organization Name (Non-editable, no badge) */}
+            {/* Organization Name */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Organization Name
@@ -93,13 +94,14 @@ export function GeneralSettingsForm({ initialSettings }: { initialSettings: Gene
               </p>
             </div>
 
-            {/* Email Domain (Non-editable, no badge) */}
+            {/* Email Domain */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Official Email Domain
               </Label>
-              <div className="h-10 px-3.5 flex items-center rounded-lg bg-muted/40 border border-border/80 text-sm font-mono font-medium text-foreground select-all shadow-2xs">
-                @{values.organization_email_domain || 'navgurukul.org'}
+              <div className="h-10 px-3.5 flex items-center gap-2 rounded-lg bg-muted/40 border border-border/80 text-sm font-medium text-foreground select-all shadow-2xs font-mono">
+                <AtSign className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>{values.organization_domain || 'navgurukul.org'}</span>
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Standard organizational domain assigned during candidate account provisioning and notifications.
@@ -109,116 +111,124 @@ export function GeneralSettingsForm({ initialSettings }: { initialSettings: Gene
         </CardContent>
       </Card>
 
-      {/* 2. Probation & Notice Period Defaults */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      {/* 2. Employment Durations & Default Timelines */}
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-2">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+            <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-bold">Lifecycle & Period Defaults</CardTitle>
+              <CardTitle className="text-base font-bold">Default Lifecycle Durations</CardTitle>
               <CardDescription className="text-xs">
-                Standard contractual probation and resignation notice periods applied during onboarding.
+                Baseline duration parameters applied across newly provisioned onboarding candidates and employment terms.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-5 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Probation Period */}
             <div className="space-y-1.5">
               <Label htmlFor="default_probation_period" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Default Probation Period
+                Standard Probation Window
               </Label>
               <Input
                 id="default_probation_period"
-                value={values.default_probation_period || ''}
+                value={values.default_probation_period || '3 months'}
                 onChange={(e) => handleChange('default_probation_period', e.target.value)}
-                className="h-10 rounded-lg text-sm bg-background border-border/80 shadow-2xs"
-                placeholder="e.g. 3 Months"
+                placeholder="e.g., 3 months"
+                className="h-10 text-sm rounded-lg shadow-2xs"
               />
               <p className="text-[11px] text-muted-foreground">
-                Default probation period prefilled when drafting new candidate offers.
+                Applied as initial probation milestone unless overridden in candidate offer generation.
               </p>
             </div>
 
+            {/* Notice Period */}
             <div className="space-y-1.5">
               <Label htmlFor="default_notice_period" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Default Notice Period
+                Standard Notice Period
               </Label>
               <Input
                 id="default_notice_period"
-                value={values.default_notice_period || ''}
+                value={values.default_notice_period || '30 days'}
                 onChange={(e) => handleChange('default_notice_period', e.target.value)}
-                className="h-10 rounded-lg text-sm bg-background border-border/80 shadow-2xs"
-                placeholder="e.g. 1 Month"
+                placeholder="e.g., 30 days"
+                className="h-10 text-sm rounded-lg shadow-2xs"
               />
               <p className="text-[11px] text-muted-foreground">
-                Standard resignation and separation notice requirement specified in appointment letters.
+                Standard contractual separation notice duration enforced in separation flows.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 3. Review & Workplace Defaults */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      {/* 3. Operational Defaults */}
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-2">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
               <Briefcase className="w-4 h-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-bold">Review & Workplace Governance</CardTitle>
+              <CardTitle className="text-base font-bold">Operational Defaults</CardTitle>
               <CardDescription className="text-xs">
-                Operational review meeting durations and fallback workplace premises.
+                Default location and coordination parameters used in check-ins and performance discussions.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-5 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Review Meeting Duration */}
             <div className="space-y-1.5">
               <Label htmlFor="default_meeting_duration_minutes" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Review Meeting Duration (Minutes)
+                Default Check-in Meeting Duration
               </Label>
-              <Input
-                id="default_meeting_duration_minutes"
-                type="number"
-                min={15}
-                max={120}
-                step={5}
-                value={values.default_meeting_duration_minutes || ''}
-                onChange={(e) => handleChange('default_meeting_duration_minutes', e.target.value)}
-                className="h-10 rounded-lg text-sm bg-background border-border/80 shadow-2xs"
-                placeholder="30"
-              />
+              <div className="relative">
+                <Input
+                  id="default_meeting_duration_minutes"
+                  type="number"
+                  min={15}
+                  max={120}
+                  step={15}
+                  value={values.default_meeting_duration_minutes || '45'}
+                  onChange={(e) => handleChange('default_meeting_duration_minutes', e.target.value)}
+                  className="h-10 pr-16 text-sm rounded-lg shadow-2xs"
+                />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+                  minutes
+                </span>
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Default time slot reserved on Google Calendar invites during manager evaluations.
+                Suggested duration preselected when scheduling manager and peer review deliberations.
               </p>
             </div>
 
+            {/* Default Work Location */}
             <div className="space-y-1.5">
               <Label htmlFor="default_work_location" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Default Work Location Fallback
+                Default Work Location
               </Label>
               <Input
                 id="default_work_location"
-                value={values.default_work_location || ''}
+                value={values.default_work_location || 'Remote'}
                 onChange={(e) => handleChange('default_work_location', e.target.value)}
-                className="h-10 rounded-lg text-sm bg-background border-border/80 shadow-2xs"
-                placeholder="e.g. NavGurukul Campus / Remote"
+                placeholder="e.g., Remote / Head Office"
+                className="h-10 text-sm rounded-lg shadow-2xs"
               />
               <p className="text-[11px] text-muted-foreground">
-                Fallback assigned work premises if not explicitly specified in the candidate profile.
+                Fallback location tag assigned to new profiles when no specific branch or campus is defined.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Save Action Bar matching Candidate Onboarding & Employees design */}
-      <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border/80 shadow-xs">
+      {/* Save Action Bar */}
+      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/80 shadow-xs">
         <div className="flex items-center gap-2">
           {saved && (
             <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
