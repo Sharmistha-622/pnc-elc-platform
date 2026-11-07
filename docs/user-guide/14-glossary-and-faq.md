@@ -70,9 +70,9 @@ Open the review and use **Reschedule and re-send invite**. The invite updates
 for everyone.
 
 **A candidate says they didn't get the invitation.**
-Check **Email Center › Delivery Monitor & Outbox**. Then use **Resend
-Invitation Email** on the candidate, or copy their portal link and send it
-yourself. (*Resend* in the outbox doesn't send anything.)
+Check **Email Center › Delivery Monitor & Outbox**, and the email address on
+the candidate. Then use **Resend Invitation Email** on the candidate. (*Resend*
+in the outbox doesn't send anything.)
 
 **Why can't PnC Ops make an offer?**
 Making an offer means entering the CTC, which is salary data. Only PnC Admin

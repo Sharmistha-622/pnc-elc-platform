@@ -13,9 +13,8 @@ import { requireFeature } from '@/lib/rbac/requireFeature'
  * joining.
  */
 export default async function OnboardingPage() {
-  // Gated here rather than in a layout: a layout would also cover
-  // /onboarding/review/[token], which candidates open with an invitation token
-  // and no staff role.
+  // The onboarding layout gates every screen under it; this page checks again
+  // for itself.
   await requireFeature('onboarding')
 
   return (

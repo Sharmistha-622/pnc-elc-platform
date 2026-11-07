@@ -10,6 +10,7 @@ import {
   toPortalView,
 } from '@/lib/onboarding/service';
 import type { FullOnboardingData } from '@/lib/onboarding/types';
+import { buildSignatureMetadata } from '@/lib/onboarding/signature-metadata';
 
 export async function GET(
   req: NextRequest,
@@ -63,7 +64,8 @@ export async function POST(
         body.document_type,
         body.signer_name,
         body.signature_data_url,
-        body.signature_metadata
+        // From the request itself, never from the body.
+        buildSignatureMetadata(req.headers, new Date())
       );
     } else if (action === 'submit_onboarding') {
       result = await submitCandidateOnboarding(id);

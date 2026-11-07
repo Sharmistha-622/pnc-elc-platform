@@ -25,7 +25,7 @@ const PUBLIC_PREFIXES = [
  * The public portal is `app/onboarding/[token]`, a single dynamic segment, and
  * the dashboard's own onboarding screens sit at the same depth under the
  * `(dashboard)` route group. Next resolves the static segments first, so this
- * list has to name them or `/onboarding/review/<token>` — the P&C audit screen —
+ * list has to name them or `/onboarding/review/<id>` — the P&C audit screen —
  * would read as a candidate token and open to anyone.
  */
 const DASHBOARD_ONBOARDING_SEGMENTS = ['candidate', 'employee', 'review']
