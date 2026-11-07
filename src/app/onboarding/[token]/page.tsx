@@ -13,7 +13,6 @@ import {
   Upload,
   Eye,
   AlertCircle,
-  Save,
   Send,
   Building,
   Calendar,
@@ -22,8 +21,6 @@ import {
   PenTool,
   Clock,
   ShieldCheck,
-  MapPin,
-  HeartHandshake,
   FileEdit,
   Loader2,
 } from 'lucide-react';
@@ -33,7 +30,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
   Dialog,
@@ -50,6 +46,8 @@ import {
   type OnboardingGeneratedDocument,
 } from '@/lib/onboarding/types';
 import { toast } from 'sonner';
+import { PersonalDetailsStep } from './_components/personal-details-step';
+import { DEFAULT_OPTIONAL_FIELDS, normaliseOptionalFields, type OptionalFieldSettings } from '@/lib/dpdp/optional-fields';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -77,30 +75,8 @@ export default function CandidateOnboardingPortalPage({
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Address sync toggle: Current address is same as permanent address
-  const [sameAsPermanent, setSameAsPermanent] = useState(false);
-
-  // Form states (Removed preferred name, is_alumni handled by P&C)
-  const [personalForm, setPersonalForm] = useState({
-    full_name: '',
-    date_of_birth: '',
-    gender: 'Male',
-    blood_group: 'O+',
-    phone: '',
-    personal_email: '',
-    permanent_address: '',
-    permanent_city: '',
-    permanent_state: '',
-    permanent_pincode: '',
-    current_address: '',
-    current_city: '',
-    current_state: '',
-    current_pincode: '',
-    emergency_contact_name: '',
-    emergency_contact_relation: 'Parent',
-    emergency_contact_phone: '',
-    emergency_contact_email: '',
-  });
+  // Which optional fields the portal collects (Settings → DPDP & Privacy → Data collection).
+  const [optionalFields, setOptionalFields] = useState<OptionalFieldSettings>(DEFAULT_OPTIONAL_FIELDS);
 
   const [employmentCorrection, setEmploymentCorrection] = useState('');
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
@@ -132,32 +108,7 @@ export default function CandidateOnboardingPortalPage({
         setData(json.data);
         const p = json.data.personalDetails;
         const r = json.data.record;
-
-        const permAddr = p?.permanent_address || '';
-        const currAddr = p?.current_address || '';
-        const isSame = permAddr !== '' && permAddr === currAddr;
-        setSameAsPermanent(isSame);
-
-        setPersonalForm({
-          full_name: p?.full_name || r.candidate_name || '',
-          date_of_birth: p?.date_of_birth || '1999-05-15',
-          gender: p?.gender || 'Male',
-          blood_group: p?.blood_group || 'O+',
-          phone: p?.phone || r.phone || '',
-          personal_email: p?.personal_email || r.personal_email || '',
-          permanent_address: p?.permanent_address || '',
-          permanent_city: p?.city || '',
-          permanent_state: p?.state || '',
-          permanent_pincode: p?.pincode || '',
-          current_address: p?.current_address || '',
-          current_city: p?.city || '',
-          current_state: p?.state || '',
-          current_pincode: p?.pincode || '',
-          emergency_contact_name: p?.emergency_contact_name || '',
-          emergency_contact_relation: p?.emergency_contact_relation || 'Parent',
-          emergency_contact_phone: p?.emergency_contact_phone || '',
-          emergency_contact_email: p?.emergency_contact_email || '',
-        });
+        setOptionalFields(normaliseOptionalFields(json.privacy?.optional_fields));
         setSignerFullName(p?.full_name || r.candidate_name || '');
       } else {
         toast.error('Invalid or expired onboarding link');
@@ -172,20 +123,6 @@ export default function CandidateOnboardingPortalPage({
   useEffect(() => {
     fetchData();
   }, [token]);
-
-  // Handle address sync
-  const handleToggleSameAsPermanent = (checked: boolean) => {
-    setSameAsPermanent(checked);
-    if (checked) {
-      setPersonalForm((prev) => ({
-        ...prev,
-        current_address: prev.permanent_address,
-        current_city: prev.permanent_city,
-        current_state: prev.permanent_state,
-        current_pincode: prev.permanent_pincode,
-      }));
-    }
-  };
 
   // Canvas Drawing Handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -233,52 +170,6 @@ export default function CandidateOnboardingPortalPage({
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
-  };
-
-  const handleSavePersonal = async (advance: boolean = false) => {
-    if (!personalForm.full_name || !personalForm.permanent_address || !personalForm.emergency_contact_name) {
-      toast.error('Please fill in mandatory fields (*)');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const res = await fetch(`/api/onboarding/token/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_personal',
-          personal_details: {
-            full_name: personalForm.full_name,
-            date_of_birth: personalForm.date_of_birth,
-            gender: personalForm.gender,
-            blood_group: personalForm.blood_group,
-            phone: personalForm.phone,
-            personal_email: personalForm.personal_email,
-            is_alumni: data?.record.is_alumni ?? false,
-            permanent_address: personalForm.permanent_address,
-            current_address: sameAsPermanent ? personalForm.permanent_address : personalForm.current_address,
-            city: personalForm.permanent_city || personalForm.current_city,
-            state: personalForm.permanent_state || personalForm.current_state,
-            pincode: personalForm.permanent_pincode || personalForm.current_pincode,
-            emergency_contact_name: personalForm.emergency_contact_name,
-            emergency_contact_relation: personalForm.emergency_contact_relation,
-            emergency_contact_phone: personalForm.emergency_contact_phone,
-            emergency_contact_email: personalForm.emergency_contact_email,
-          },
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('Personal details saved!');
-        setData(json.data);
-        if (advance) setCurrentStep(2);
-      }
-    } catch (err) {
-      toast.error('Error saving personal details');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleConfirmEmployment = async (confirmed: boolean, notes?: string) => {
@@ -567,288 +458,15 @@ export default function CandidateOnboardingPortalPage({
 
       {/* STEP 1: Personal Information */}
       {currentStep === 1 && (
-        <Card className="rounded-lg border border-border bg-card shadow-xs animate-in fade-in duration-200">
-          <CardHeader className="pb-4 border-b border-border/50">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <User className="size-5 text-indigo-700 dark:text-indigo-300" />
-              1. Personal, Address & Emergency Contact Details
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Permanent address is collected first, followed by your current residential address.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            {/* Identity & Basic Contact */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">
-                  Full Legal Name <span className="text-rose-700 dark:text-rose-300">*</span>
-                </Label>
-                <Input
-                  className="rounded-lg"
-                  value={personalForm.full_name}
-                  onChange={(e) => setPersonalForm({ ...personalForm, full_name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Date of Birth</Label>
-                <Input
-                  type="date"
-                  className="rounded-lg"
-                  value={personalForm.date_of_birth}
-                  onChange={(e) => setPersonalForm({ ...personalForm, date_of_birth: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Gender</Label>
-                <Input
-                  className="rounded-lg"
-                  value={personalForm.gender}
-                  onChange={(e) => setPersonalForm({ ...personalForm, gender: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Blood Group</Label>
-                <Input
-                  className="rounded-lg"
-                  placeholder="e.g. O+, B+, A+"
-                  value={personalForm.blood_group}
-                  onChange={(e) => setPersonalForm({ ...personalForm, blood_group: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Personal Email</Label>
-                <Input
-                  type="email"
-                  value={personalForm.personal_email}
-                  disabled
-                  className="rounded-lg bg-muted/50 font-mono text-xs"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Phone / Mobile Number</Label>
-                <Input
-                  className="rounded-lg"
-                  value={personalForm.phone}
-                  onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {/* Permanent Address Section */}
-            <div className="p-4 rounded-lg border border-border/70 bg-muted/10 space-y-4">
-              <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider">
-                <MapPin className="size-4 text-indigo-700 dark:text-indigo-300" />
-                <span>Permanent Address (As per official ID proof)</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="col-span-1 md:col-span-4 space-y-2">
-                  <Label className="text-xs font-semibold">
-                    Permanent Address Line <span className="text-rose-700 dark:text-rose-300">*</span>
-                  </Label>
-                  <Textarea
-                    rows={2}
-                    className="rounded-lg"
-                    placeholder="House / Flat No, Street, Locality..."
-                    value={personalForm.permanent_address}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPersonalForm((prev) => ({
-                        ...prev,
-                        permanent_address: val,
-                        ...(sameAsPermanent ? { current_address: val } : {}),
-                      }));
-                    }}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">City</Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. Jaipur"
-                    value={personalForm.permanent_city}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPersonalForm((prev) => ({
-                        ...prev,
-                        permanent_city: val,
-                        ...(sameAsPermanent ? { current_city: val } : {}),
-                      }));
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">State</Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. Rajasthan"
-                    value={personalForm.permanent_state}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPersonalForm((prev) => ({
-                        ...prev,
-                        permanent_state: val,
-                        ...(sameAsPermanent ? { current_state: val } : {}),
-                      }));
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Pincode</Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. 302001"
-                    value={personalForm.permanent_pincode}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPersonalForm((prev) => ({
-                        ...prev,
-                        permanent_pincode: val,
-                        ...(sameAsPermanent ? { current_pincode: val } : {}),
-                      }));
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Same as Permanent Toggle */}
-            <div className="flex items-center justify-between p-3.5 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/30">
-              <div className="space-y-0.5">
-                <Label className="text-xs font-bold text-foreground cursor-pointer">
-                  Current address is same as permanent address
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Toggle on to automatically mirror permanent address details to current residential address.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-muted-foreground">{sameAsPermanent ? 'Yes' : 'No'}</span>
-                <Switch checked={sameAsPermanent} onCheckedChange={handleToggleSameAsPermanent} />
-              </div>
-            </div>
-
-            {/* Current Address Section */}
-            {!sameAsPermanent && (
-              <div className="p-4 rounded-lg border border-border/70 bg-card space-y-4">
-                <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider">
-                  <MapPin className="size-4 text-purple-700 dark:text-purple-300" />
-                  <span>Current Residential Address</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="col-span-1 md:col-span-4 space-y-2">
-                    <Label className="text-xs font-semibold">Current Address Line</Label>
-                    <Textarea
-                      rows={2}
-                      className="rounded-lg"
-                      placeholder="Current accommodation, flat/PG, street..."
-                      value={personalForm.current_address}
-                      onChange={(e) => setPersonalForm({ ...personalForm, current_address: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">City</Label>
-                    <Input
-                      className="rounded-lg"
-                      placeholder="e.g. Bangalore"
-                      value={personalForm.current_city}
-                      onChange={(e) => setPersonalForm({ ...personalForm, current_city: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">State</Label>
-                    <Input
-                      className="rounded-lg"
-                      placeholder="e.g. Karnataka"
-                      value={personalForm.current_state}
-                      onChange={(e) => setPersonalForm({ ...personalForm, current_state: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">Pincode</Label>
-                    <Input
-                      className="rounded-lg"
-                      placeholder="e.g. 560038"
-                      value={personalForm.current_pincode}
-                      onChange={(e) => setPersonalForm({ ...personalForm, current_pincode: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Emergency Contact */}
-            <div className="p-4 rounded-lg border border-border/70 bg-muted/10 space-y-4">
-              <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider">
-                <HeartHandshake className="size-4 text-rose-700 dark:text-rose-300" />
-                <span>Emergency Contact Person</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">
-                    Contact Name <span className="text-rose-700 dark:text-rose-300">*</span>
-                  </Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. Suresh Sharma"
-                    value={personalForm.emergency_contact_name}
-                    onChange={(e) => setPersonalForm({ ...personalForm, emergency_contact_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Relationship</Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. Father, Mother, Spouse"
-                    value={personalForm.emergency_contact_relation}
-                    onChange={(e) => setPersonalForm({ ...personalForm, emergency_contact_relation: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">
-                    Emergency Phone <span className="text-rose-700 dark:text-rose-300">*</span>
-                  </Label>
-                  <Input
-                    className="rounded-lg"
-                    placeholder="e.g. +91 94140 12345"
-                    value={personalForm.emergency_contact_phone}
-                    onChange={(e) => setPersonalForm({ ...personalForm, emergency_contact_phone: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="pt-4 border-t border-border/50 flex justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSavePersonal(false)}
-              disabled={saving}
-              className="gap-1.5 rounded-lg"
-            >
-              <Save className="size-3.5" />
-              <span>Save Progress</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => handleSavePersonal(true)}
-              disabled={saving}
-              className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg"
-            >
-              <span>Save & Continue to Documents</span>
-              <ChevronRight className="size-4" />
-            </Button>
-          </CardFooter>
-        </Card>
+        <PersonalDetailsStep
+          token={token}
+          data={data}
+          optionalFields={optionalFields}
+          onSaved={(next, advance) => {
+            setData(next);
+            if (advance) setCurrentStep(2);
+          }}
+        />
       )}
 
       {/* STEP 2: Document Upload */}

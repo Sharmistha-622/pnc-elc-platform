@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // The offered figure is typed for each candidate; there is no default.
+    if (typeof payload.ctc_amount !== 'number' || !Number.isFinite(payload.ctc_amount) || payload.ctc_amount <= 0) {
+      return NextResponse.json({ success: false, error: 'Enter the offered CTC.' }, { status: 400 });
+    }
     const created = await createOnboardingRecord(payload, customLetters);
     return NextResponse.json({ success: true, data: created });
   } catch (error: any) {

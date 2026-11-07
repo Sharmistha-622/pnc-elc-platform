@@ -10,6 +10,9 @@ import {
   toPortalView,
 } from '@/lib/onboarding/service';
 import type { FullOnboardingData } from '@/lib/onboarding/types';
+import { getPortalPrivacySettings } from '@/lib/dpdp/portal';
+import { buildPersonalDetailsSchema } from '@/lib/onboarding/personal-details-schema';
+import { fieldErrors } from '@/lib/dpdp/settings/schemas';
 
 export async function GET(
   req: NextRequest,
@@ -23,7 +26,7 @@ export async function GET(
     if (!visited) {
       return NextResponse.json({ success: false, error: 'Invalid invitation link' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, data: toPortalView(visited) });
+    return NextResponse.json({ success: true, data: toPortalView(visited), privacy: await getPortalPrivacySettings() });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -47,7 +50,17 @@ export async function POST(
     let result = null;
 
     if (action === 'update_personal') {
-      result = await updatePersonalDetails(id, body.personal_details);
+      // Parsed against the Data collection settings: unknown and uncollected
+      // fields are dropped, and nothing is stored that the candidate did not type.
+      const { optional_fields } = await getPortalPrivacySettings();
+      const parsed = buildPersonalDetailsSchema(optional_fields, new Date()).safeParse(body.personal_details ?? {});
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, error: 'Check the highlighted fields.', fieldErrors: fieldErrors(parsed.error) },
+          { status: 400 }
+        );
+      }
+      result = await updatePersonalDetails(id, parsed.data as Parameters<typeof updatePersonalDetails>[1]);
     } else if (action === 'confirm_employment') {
       result = await confirmEmploymentDetails(
         id,
