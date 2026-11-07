@@ -20,7 +20,9 @@ set client_min_messages = warning;
 insert into public.employees (id, name, email, employee_type, joining_date, status, manager_id, is_alumni) values
   ('00000000-0000-0000-0000-00000000000a', 'M Manager', 'm@navgurukul.org', 'fte', '2025-01-01', 'active', null, false),
   ('00000000-0000-0000-0000-00000000000b', 'R Report',  'r@navgurukul.org', 'fte', '2026-06-01', 'active', '00000000-0000-0000-0000-00000000000a', true),
-  ('00000000-0000-0000-0000-00000000000c', 'X Peer',    'x@navgurukul.org', 'fte', '2025-01-01', 'active', null, false);
+  ('00000000-0000-0000-0000-00000000000c', 'X Peer',    'x@navgurukul.org', 'fte', '2025-01-01', 'active', null, false),
+  -- G has left: their record is exited; their account still carries a stored role.
+  ('00000000-0000-0000-0000-00000000000d', 'G Gone',    'g@navgurukul.org', 'fte', '2024-01-01', 'exited', null, false);
 
 insert into public.employee_profiles (employee_id, contact_number, id_proof_number)
   values ('00000000-0000-0000-0000-00000000000b', '+91 90000 00000', 'ID-NUMBER-R');
@@ -111,12 +113,22 @@ insert into pg_temp.cast_list (persona, email, stored_role, token_role, db_role)
   ('exec_view',       'ex@navgurukul.org',     'exec_view',      'exec_view',     'authenticated'),
   ('platform_admin',  'plat@navgurukul.org',   'platform_admin', 'platform_admin','authenticated'),
   ('platform_ops',    'plops@navgurukul.org',  'platform_ops',   'platform_ops',  'authenticated'),
-  ('super_admin',     'sa@navgurukul.org',     'super_admin',    'super_admin',   'authenticated');
+  ('super_admin',     'sa@navgurukul.org',     'super_admin',    'super_admin',   'authenticated'),
+  -- Exit: access ended on the account (the app's path), and an exited record
+  -- with nothing else (the database's own backstop). Both see nothing.
+  ('access ended',    'left@navgurukul.org',   'pnc_admin',      'pnc_admin',     'authenticated'),
+  ('exited record',   'g@navgurukul.org',      'pnc_admin',      'pnc_admin',     'authenticated'),
+  ('banned',          'ban@navgurukul.org',    'super_admin',    'super_admin',   'authenticated');
 
 -- Their accounts, as Supabase Auth would hold them.
 insert into auth.users (id, email, raw_app_meta_data)
   select id, email, jsonb_build_object('role', stored_role)
     from pg_temp.cast_list where email is not null;
+
+update auth.users set raw_app_meta_data = raw_app_meta_data
+       || '{"access_ended_at": "2026-11-07T00:00:00Z"}'::jsonb
+ where email = 'left@navgurukul.org';
+update auth.users set banned_until = now() + interval '1 day' where email = 'ban@navgurukul.org';
 
 -- Become a persona the way PostgREST does: claims first, then the role.
 create function pg_temp.claims(p_email text) returns text

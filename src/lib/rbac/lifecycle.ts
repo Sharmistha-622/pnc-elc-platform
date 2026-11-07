@@ -112,17 +112,41 @@ export function hasManagerRole(reporteeCount: number): boolean {
  * The role a person should hold, given their lifecycle status and reporting
  * line. Returns null when they should hold no role at all.
  *
- * A granted role always wins: someone who is both an employee and a PnC Admin
- * is a PnC Admin. The lifecycle only ever sets the baseline.
+ * A granted role wins over the baseline: someone who is both an employee and a
+ * PnC Admin is a PnC Admin. Exit is the exception — once the employee record
+ * is `exited`, no role survives, granted or not.
  */
 export function deriveRole(input: {
   status: JoinerStatus
   reporteeCount?: number
   grantedRole?: RoleCode | null
+  employmentStatus?: EmploymentStatus | null
 }): RoleCode | null {
+  // Exit ends every role, a granted one included.
+  if (input.employmentStatus === 'exited') return null
   if (input.grantedRole) return input.grantedRole
 
   const base = roleForStatus(input.status)
   if (base === 'employee' && hasManagerRole(input.reporteeCount ?? 0)) return 'manager'
   return base
+}
+
+// ---------------------------------------------------------------------------
+// Exit
+// ---------------------------------------------------------------------------
+
+/** `employees.status`. */
+export type EmploymentStatus = 'active' | 'exited'
+
+/**
+ * When the account's platform access was ended, or null while it is open.
+ *
+ * Exit closure writes `access_ended_at` into the auth user's `app_metadata`
+ * (`endPlatformAccess`). An org account without a stored role still resolves
+ * to the `employee` baseline, so clearing the role alone would not end access;
+ * this marker is what does, in the app and in `current_app_role()` alike.
+ */
+export function accessEndedAt(appMetadata: Record<string, unknown> | null | undefined): string | null {
+  const value = appMetadata?.access_ended_at
+  return typeof value === 'string' && value.trim() !== '' ? value : null
 }
