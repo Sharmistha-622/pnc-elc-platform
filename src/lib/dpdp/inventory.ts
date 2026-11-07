@@ -312,7 +312,7 @@ const CORE_TABLES: InventoryTable[] = [
   personal('core', 'settings_change_log', { principals: ['employee'], ...LOGS, processors: CORE, note: 'Configuration history; names the person who made each change.' }, {
     meta: 'id, table_name, record_id, setting_key, changed_at',
     general: 'changed_by',
-    log: 'old_value, new_value',
+    log: 'old_value, new_value, reason',
   }),
   nonPersonal('core', 'teams', 'Lookup values.', 'id, name, created_at'),
 ]
@@ -445,7 +445,20 @@ export const BUCKETS: InventoryBucket[] = [
 ]
 
 /** Tables added by the DPDP migrations. Kept apart so the lists above stay a record of what predates them. */
-export const DPDP_TABLES: InventoryTable[] = []
+export const DPDP_TABLES: InventoryTable[] = [
+  personal('core', 'dpdp_settings', { principals: ['employee'], basis: 'legal_obligation', retention: 'employment_records', processors: CORE, note: 'Configuration; names the Privacy & Grievance Officer, a published business contact (s. 8(9), r. 9).' }, {
+    meta: 'id, updated_at, updated_by',
+    general: 'contact_name, contact_role, escalation_name',
+    contact: 'contact_email, contact_phone, escalation_email, breach_internal_contacts, certin_contact, board_contact',
+    none: 'grievance_days, access_days, correction_days, erasure_days, nomination_days, board_complaint_url, request_identifier, notice_languages, child_age_years, guardian_methods, invitation_validity_days, staging_budget_document_days, staging_budget_feedback_days, retention_mode, optional_fields, drive_copy_document_types',
+  }),
+  nonPersonal('core', 'dpdp_retention_rules', 'Retention configuration.', 'id, label, clock_start, period_days, consent_period_days, action, floor_days, statutory_ref, note, counsel_to_confirm, updated_at, updated_by'),
+  nonPersonal('core', 'dpdp_notices', 'Notice texts and breach templates; no personal data.', 'id, notice_type, language, version, status, title, sections, published_at, published_by, publish_reason, created_at, created_by, updated_at'),
+  nonPersonal('core', 'dpdp_consent_purposes', 'Consent purpose configuration.', 'code, label, description, principal_types, lawful_basis, required, active, sort_order, created_at, updated_at, updated_by'),
+  nonPersonal('core', 'dpdp_processors', 'The processor register.', 'code, name, purpose, data_categories, hosting_region, dpa_status, dpa_date, next_review_date, notes, active, created_at, updated_at, updated_by'),
+  nonPersonal('core', 'dpdp_attestations', 'Owner confirmations; records which staff member confirmed.', 'code, label, description, check_ids, review_interval_days, confirmed_by, confirmed_at, next_review_at, evidence_note, sort_order, created_at, updated_at'),
+  nonPersonal('core', 'dpdp_check_results', 'Compliance check results: counts only.', 'check_id, status, detail, last_run_at, last_passed_at'),
+]
 
 export const INVENTORY: InventoryTable[] = [...CORE_TABLES, ...DPDP_TABLES, ...VAULT_TABLES]
 

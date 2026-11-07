@@ -76,3 +76,13 @@ jobs:
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
+      # DPDP: the locked statutory limits hold in the database, privacy writes
+      # follow the roles, and every core and vault column is in the data
+      # inventory (src/lib/dpdp/inventory.ts).
+      - name: DPDP probe
+        run: scripts/dpdp-probe.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres

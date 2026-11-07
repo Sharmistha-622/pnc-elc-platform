@@ -59,6 +59,13 @@ insert into public.review_events (cycle_id, kind) values ('00000000-0000-0000-00
 insert into public.audit_log (table_name, record_id, action)
   values ('employees', '00000000-0000-0000-0000-00000000000b', 'update');
 
+-- DPDP: one published notice (every staff member reads it), one draft
+-- (privacy roles only), and a check result.
+insert into public.dpdp_notices (notice_type, language, version, status, title, published_at, published_by, publish_reason) values
+  ('employee', 'en', 1, 'published', 'Employee privacy notice', now(), 'probe', 'probe'),
+  ('candidate', 'en', 1, 'draft', 'Candidate privacy notice', null, null, null);
+insert into public.dpdp_check_results (check_id, status) values ('DPDP-01', 'pass');
+
 -------------------------------------------------------------------------
 -- Helpers
 -------------------------------------------------------------------------
@@ -165,7 +172,18 @@ insert into pg_temp.expectations values
   ('review_cycle_settings',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   -- Lookups: staff read; the internet and outsiders do not.
   ('ng_locations',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
-  ('indian_states',          '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
+  ('indian_states',          '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- DPDP & Privacy: configuration and counts to the four privacy roles.
+  ('dpdp_settings',          '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_retention_rules',   '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_attestations',      '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  ('dpdp_check_results',     '{pnc_admin,platform_admin,exec_view,super_admin}'),
+  -- What every staff member is shown: the published notice, the purposes,
+  -- the processors, and the contact and periods.
+  ('dpdp_notices',           '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_consent_purposes',  '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_processors',        '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  ('dpdp_public_settings',   '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}');
 
 -------------------------------------------------------------------------
 -- Run it

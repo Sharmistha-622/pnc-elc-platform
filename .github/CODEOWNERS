@@ -11,6 +11,8 @@
 # The database: schema, policies, and the vault.
 /supabase/                         @Nitinsudarshan @Sharmistha-622
 /scripts/rls-probe.sh              @Nitinsudarshan @Sharmistha-622
+/scripts/dpdp-probe.sh             @Nitinsudarshan @Sharmistha-622
+/src/lib/dpdp/                     @Nitinsudarshan @Sharmistha-622
 /scripts/vault-*.sh               @Nitinsudarshan @Sharmistha-622
 
 # Who a request is, and what their role reaches.
