@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.11.00",
+    "date": "2026-11-07",
+    "title": "Role-specific dashboards with registry-driven panels",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Each role's dashboard shows lists and charts from its own work, and every link opens."
+      },
+      {
+        "category": "Fixes",
+        "description": "Dashboard panels that were always empty now load, or say they couldn't."
+      }
+    ]
+  },
+  {
     "version": "2.10.01",
     "date": "2026-11-07",
     "title": "Fix the check count in the role-dashboards workflow",
