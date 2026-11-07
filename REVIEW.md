@@ -49,6 +49,12 @@ treated as a defect, never as a known issue.
   belongs in the vault ([`docs/vault-inventory.md`](docs/vault-inventory.md)),
   not in core. If it truly must be staged in core, it gets a seal trigger and
   an `exposed_records` entry.
+- **A new personal-data column** is added to the data inventory
+  (`src/lib/dpdp/inventory.ts`) in the same change, with its category and
+  retention rule; `npm run dpdp:inventory` regenerates the probe's copy. A new
+  log write goes through `logWriter()` (`src/lib/logs/writer.ts`).
+  *CI: `scripts/dpdp-probe.sh` fails on any column the inventory does not
+  name, and on any session that can write a log table.*
 - **A new SQL function** is not `security definer` unless it has to be. If it
   is, it checks the caller itself and sets `search_path`.
 - **Migrations are new files.** An applied migration is never edited. Every

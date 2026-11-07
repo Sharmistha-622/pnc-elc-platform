@@ -47,11 +47,30 @@ review, **without a vault login**.
 |---|---|
 | ID documents sealed on verification | Built |
 | Logged reading of salary and feedback from the vault | Built |
-| Older peer-feedback sealing | Built, but nothing triggers it yet |
+| Peer feedback sealed when a confirmation review closes | Built; failed seals are retried nightly |
 | New review-form answers and decision notes | **Still on the platform**, not yet sealed |
 | Bank details entered straight into the vault | **Not built.** Bank proof is an uploaded document for now. |
 | Salaries (CTC) stored in the vault | **Not built.** CTCs and letters are still on the platform, protected by role rules. |
 | Payroll export | Not built |
+
+## Data protection (DPDP)
+
+The platform follows the Digital Personal Data Protection Act 2023:
+
+- **Notices first.** Candidates read the privacy notice before they enter
+  anything; staff are shown each new version once.
+- **Consent is separate and unticked**, and can be withdrawn in one click.
+- **Rights.** Everyone can see what is held about them and ask for a copy,
+  a correction or erasure, in **My Privacy** or the portal.
+- **Retention.** Each kind of data has a period (Settings → DPDP & Privacy →
+  Retention). A nightly job reports, and in live mode deletes, what is due.
+  Nothing is deleted before it is a year old, and a legal hold pauses it.
+- **Breaches** are recorded in Privacy cases → Incidents, with the CERT-In
+  and Board deadlines.
+- **Under 18.** A joiner under 18 waits for a guardian's consent before
+  anything more is taken.
+
+The full map is in `docs/dpdp/README.md`.
 
 ## Your responsibilities
 
