@@ -260,7 +260,7 @@ const CORE_TABLES: InventoryTable[] = [
     none: 'title, description, content',
   }),
   personal('core', 'onboarding_records', { principals: ['candidate'], basis: '7a', retention: 'rejected_candidates', processors: CORE_MAIL }, {
-    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status`,
+    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status, withdrawn_at`,
     general: 'candidate_name, designation, department, location, joining_date, probation_period, notice_period, is_alumni, role_responsibilities, manager_name, buddy_name',
     contact: 'personal_email, phone',
     salary: 'ctc, ctc_amount, ctc_frequency',
@@ -472,6 +472,11 @@ export const DPDP_TABLES: InventoryTable[] = [
     general: 'nominee_name, nominee_relation, recorded_by',
     contact: 'nominee_contact',
   }),
+  personal('core', 'dpdp_legal_holds', { principals: ['employee', 'candidate'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE, note: 'Which people or records are under a legal hold (s. 17(1)(a)).' }, {
+    meta: 'id, subject_type, subject_ref, record_table, record_id, review_date, placed_at, released_at',
+    general: 'reason, placed_by, released_by, release_reason',
+  }),
+  nonPersonal('core', 'retention_runs', 'Retention job reports: mode and counts only.', 'id, started_at, finished_at, mode, status, counts, instructions, triggered_by'),
 ]
 
 export const INVENTORY: InventoryTable[] = [...CORE_TABLES, ...DPDP_TABLES, ...VAULT_TABLES]

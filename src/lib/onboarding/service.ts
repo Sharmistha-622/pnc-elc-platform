@@ -931,7 +931,8 @@ export async function withdrawJoiner(
     throw new Error(`Cannot withdraw from ${current}.`);
   }
 
-  await touchRecord(id, { joiner_status: 'withdrawn' });
+  // withdrawn_at starts the withdrawn-joiner retention clock.
+  await touchRecord(id, { joiner_status: 'withdrawn', withdrawn_at: new Date().toISOString() });
 
   await logActivity(
     id,

@@ -299,7 +299,80 @@ exception when insufficient_privilege then null; end $$;
 reset role;
 
 -------------------------------------------------------------------------
--- 7. The data inventory covers the schema
+-- 7. Audit tables are append-only; the purge path keeps the 1-year floor
+-------------------------------------------------------------------------
+insert into public.employee_audit_log (employee_email, module, action, description, occurred_at, created_at)
+  values ('old@example.com', 'settings', 'probe.old', 'probe', now() - interval '800 days', now() - interval '800 days'),
+         ('new@example.com', 'settings', 'probe.new', 'probe', now(), now());
+insert into public.employee_audit_log (employee_id, employee_email, module, action, description, occurred_at, created_at)
+  values ('20000000-0000-0000-0000-000000000005', 'dp-emp@navgurukul.org', 'settings', 'probe.held', 'probe', now() - interval '800 days', now() - interval '800 days');
+insert into public.dpdp_legal_holds (subject_type, subject_ref, reason, review_date, placed_by)
+  values ('employee', '20000000-0000-0000-0000-000000000005', 'Probe: claim pending', current_date + 30, 'probe');
+
+do $$ begin
+  update public.employee_audit_log set description = 'changed' where action = 'probe.new';
+  insert into pg_temp.failures values ('audit tables are append-only', 'update accepted');
+exception when insufficient_privilege then null; end $$;
+
+do $$ begin
+  delete from public.employee_audit_log where action = 'probe.new';
+  insert into pg_temp.failures values ('audit tables are append-only', 'delete accepted');
+exception when insufficient_privilege then null; end $$;
+
+do $$ begin
+  update public.settings_change_log set new_value = 'x';
+  if found then insert into pg_temp.failures values ('audit tables are append-only', 'settings log update accepted'); end if;
+exception when insufficient_privilege then null; end $$;
+
+do $$ begin
+  perform public.dpdp_purge_rows('employee_audit_log', now() - interval '100 days');
+  insert into pg_temp.failures values ('nothing younger than one year is purged', 'purge under the floor accepted');
+exception when others then null; end $$;
+
+do $$
+declare n int;
+begin
+  n := public.dpdp_purge_rows('employee_audit_log', now() - interval '730 days');
+  if n <> 1 then insert into pg_temp.failures values ('logs past their period are purged through dpdp_purge_rows', n || ' rows'); end if;
+  if not exists (select 1 from public.employee_audit_log where action = 'probe.new') then
+    insert into pg_temp.failures values ('nothing younger than one year is purged', 'recent row deleted');
+  end if;
+  if not exists (select 1 from public.employee_audit_log where action = 'probe.held') then
+    insert into pg_temp.failures values ('the purge path keeps rows under a legal hold', 'held row deleted');
+  end if;
+end $$;
+
+do $$ begin
+  update public.dpdp_legal_holds set reason = 'Probe: changed reason' where placed_by = 'probe';
+  insert into pg_temp.failures values ('a legal hold is released, never edited or deleted', 'edit accepted');
+exception when insufficient_privilege then null; end $$;
+
+do $$ begin
+  delete from public.dpdp_legal_holds where placed_by = 'probe';
+  insert into pg_temp.failures values ('a legal hold is released, never edited or deleted', 'delete accepted');
+exception when insufficient_privilege then null; end $$;
+
+do $$ begin
+  update public.dpdp_legal_holds set released_at = now(), released_by = 'probe', release_reason = 'Probe: claim settled' where placed_by = 'probe';
+exception when others then
+  insert into pg_temp.failures values ('a legal hold is released, never edited or deleted', 'release refused: ' || sqlerrm);
+end $$;
+
+do $$ begin
+  perform public.dpdp_purge_rows('employees', now() - interval '800 days');
+  insert into pg_temp.failures values ('only log and privacy-record tables are purgeable', 'employees accepted');
+exception when others then null; end $$;
+
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-pa@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$ begin
+  perform public.dpdp_purge_rows('employee_audit_log', now() - interval '800 days');
+  insert into pg_temp.failures values ('the purge path is for the server only', 'session call accepted');
+exception when insufficient_privilege then null; end $$;
+reset role;
+
+-------------------------------------------------------------------------
+-- 8. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

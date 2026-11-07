@@ -225,26 +225,32 @@ export { VaultUnavailable }
  * nobody verifies the documents of someone who never joined, so they would sit
  * in core forever with no event coming.
  *
- * This is **not** called automatically. Whether and when to purge is open
- * decision #6; this is the mechanism, invoked by a person who has decided.
+ * Two callers: a person purging a withdrawn joiner's documents by hand, and
+ * the daily retention job in live mode, once the withdrawn-joiner rule's
+ * period and the 1-year floor have both passed for each document
+ * (`src/lib/dpdp/retention/`). The job passes `documentIds` so only the
+ * documents that are due go.
  *
  * The rows survive — the fact that a document was submitted and then purged is
  * part of the record. Only the files go.
  */
 export async function purgeStagedDocuments(
   onboardingId: string,
-  options: { purgedBy: string; reason: string }
+  options: { purgedBy: string; reason: string; documentIds?: string[] }
 ): Promise<{ purged: number; errors: string[] }> {
   const db = onboardingDb()
   const summary = { purged: 0, errors: [] as string[] }
+  if (options.documentIds && options.documentIds.length === 0) return summary
 
-  const { data: docs, error } = await db
+  let query = db
     .from('onboarding_documents')
     .select('id, document_type, storage_reference, seal_state')
     .eq('onboarding_id', onboardingId)
     .neq('seal_state', 'sealed')
     .not('storage_reference', 'is', null)
     .is('purged_at', null)
+  if (options.documentIds) query = query.in('id', options.documentIds)
+  const { data: docs, error } = await query
   assertOk(error, 'Failed to list documents to purge')
 
   for (const doc of docs ?? []) {

@@ -5,6 +5,7 @@ import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { isoDate } from '@/lib/dpdp/dates'
 import { DpdpSettings } from './_components/dpdp-settings'
 import { CheckerTab } from './_components/checker-tab'
+import { RetentionStatusPanel } from './_components/retention-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,7 @@ export default async function DpdpSettingsPage() {
       isSuperAdmin={isSuperAdmin}
       today={isoDate(new Date())}
       checker={<CheckerTab />}
+      holds={<RetentionStatusPanel />}
     />
   )
 }
