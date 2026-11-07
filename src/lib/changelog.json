@@ -1,5 +1,69 @@
 [
   {
+    "version": "2.10.00",
+    "date": "2026-11-07",
+    "title": "Privacy settings, rights requests, retention and compliance checker",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Settings → DPDP & Privacy. It holds the privacy contact, request periods, notices and breach templates (versioned, published only when complete), consent purposes, data collection, retention rules, children, links, breach contacts, processors and owner attestations. Values the law fixes are locked."
+      },
+      {
+        "category": "Features",
+        "description": "A DPDP compliance checker in Settings and CI. It shows a score for each check, when the check last passed and how to fix it, and offers a counts-only report download."
+      },
+      {
+        "category": "Features",
+        "description": "The candidate portal opens with the privacy notice. Optional consents are separate and unticked, and candidates can make a rights request from the portal."
+      },
+      {
+        "category": "Features",
+        "description": "My Privacy, for every staff member: their data summary, processors, consents (with one-click withdrawal), rights requests and nomination."
+      },
+      {
+        "category": "Features",
+        "description": "Privacy cases, for Super Admin and PnC Admin: a rights request queue with due dates and escalation, an incident register with live CERT-In and Board countdowns and drafted messages, legal holds, and guardian consent for joiners under 18."
+      },
+      {
+        "category": "Features",
+        "description": "A nightly retention job, dry run by default. It never deletes anything under a year old, skips anything under a legal hold, and writes a counts-only report."
+      },
+      {
+        "category": "Improvements",
+        "description": "Closing a confirmation review seals its peer feedback into the vault."
+      },
+      {
+        "category": "Improvements",
+        "description": "The email outbox shows each message's template with sample values in place of a stored body."
+      },
+      {
+        "category": "Fixes",
+        "description": "Candidate personal-details fields start empty."
+      },
+      {
+        "category": "Fixes",
+        "description": "Identity and bank documents are never copied to Drive."
+      },
+      {
+        "category": "Fixes",
+        "description": "Server functions run in the Mumbai region."
+      },
+      {
+        "category": "Security",
+        "description": "The audit, activity, settings-change and email logs are written by the server only."
+      },
+      {
+        "category": "Security",
+        "description": "Email logs keep no message bodies."
+      },
+      {
+        "category": "Security",
+        "description": "Audit descriptions carry no reasons or amounts."
+      }
+    ]
+  },
+  {
     "version": "2.09.08",
     "date": "2026-11-07",
     "title": "Add role-dashboards IDE workflow",
