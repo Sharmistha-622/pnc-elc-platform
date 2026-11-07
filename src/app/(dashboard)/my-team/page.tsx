@@ -1,7 +1,7 @@
 import React from 'react'
 import { redirect } from 'next/navigation'
 import { PageBanner } from '@/components/shared/page-banner'
-import { Users2, PlusCircle, Users } from 'lucide-react'
+import { Users2, PlusCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { getMyProfileData } from '@/lib/profile/profileActions'
@@ -43,6 +43,7 @@ export default async function MyTeamPage() {
         currentManagerName={profile?.name || 'Manager'}
         reportees={reportees}
         allManagers={allEmployees}
+        managerProfile={profile}
       />
     </div>
   )
