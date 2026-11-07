@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.10.01",
+    "date": "2026-11-07",
+    "title": "Fix the check count in the role-dashboards workflow",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Fix the check count in the role-dashboards workflow"
+      }
+    ]
+  },
+  {
     "version": "2.10.00",
     "date": "2026-11-07",
     "title": "Privacy settings, rights requests, retention and compliance checker",
