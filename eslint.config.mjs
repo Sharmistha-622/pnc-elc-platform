@@ -41,6 +41,7 @@ export default [
       ".next/**",
       "node_modules/**",
       "graphify-out/**",
+      ".claude/**",
       "out/**",
       "build/**",
       "public/**",

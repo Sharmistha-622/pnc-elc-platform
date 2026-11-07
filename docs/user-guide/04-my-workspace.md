@@ -40,6 +40,23 @@ role sees different tiles:
 | Manager | Direct reports · On probation |
 | Employee, Platform Ops | *(no tiles)* |
 
+### Panels
+
+Lists, tables and charts showing the work in flight for your role. Anyone who manages direct reports also gets *My team*, showing their active reportees.
+
+| Role | Panels |
+|---|---|
+| Super Admin | Headcount by team · Documents to verify · Upcoming joiners · Open confirmations · Exits in progress · Settings activity · Email delivery · Accounts by role |
+| PnC Admin | Documents to verify · Upcoming joiners · Open confirmations · Exits in progress |
+| PnC Ops | Documents to verify · Upcoming joiners · Open confirmations (status only) · Exits in progress |
+| Fin Admin | Movements this month · Settlements due · Headcount movements (trend) |
+| Fin Ops | Movements this month |
+| Exec View | Headcount by team · Headcount movements (trend) · Open confirmations |
+| Platform Admin | Settings activity · Email delivery · Accounts by role |
+| Platform Ops | *(none, unless managing direct reports)* |
+| Manager | My team · My profile |
+| Employee | My profile |
+
 ## My Profile (`/profile`)
 
 Your employment record, **read-only**:

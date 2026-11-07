@@ -2,7 +2,7 @@
 // Dashboard loader.
 // ----------------------------------------------------------------------------
 // Runs a query only for the widgets `dashboardFor` hands this role, so a number
-// a role is not shown is never fetched for it. Two rules hold throughout:
+// or panel a role is not shown is never fetched for it. Two rules hold throughout:
 //
 //   The RLS-bound client wherever the table allows it. The one exception is
 //   `onboarding_records`, which is closed to user sessions at the database so
@@ -10,9 +10,9 @@
 //   Its counts use the service-role client, and are only ever run for roles
 //   `dashboardFor` has already given the widget to.
 //
-//   Counts, not rows. Every stat is a `head: true` count — no row leaves the
-//   database. The task lists return names and titles of things addressed to
-//   this person, and nothing else.
+//   Counts and minimal projection, not bulk rows. Every stat is a `head: true`
+//   count. Every panel uses an explicit column allowlist checked against our
+//   security deny-list.
 // ============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -20,16 +20,34 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getCurrentEmployee } from "@/lib/forms/currentEmployee";
 import { getMyForms } from "@/lib/forms/getMyForms";
-import { roleLabel, type UserRole } from "@/lib/role-constants";
-import { listUsersWithRoles } from "@/lib/rbac/listUsersWithRoles";
+import type { UserRole } from "@/lib/role-constants";
 import { addDays, istToday, monthWindow } from "./dates";
 import {
   dashboardFor,
   STAT_WIDGETS,
+  type PanelWidgetId,
+  type QuickLinkId,
   type StatWidget,
   type StatWidgetId,
   type TaskWidgetId,
 } from "./widgets";
+
+import type { PanelLoaderContext, PanelResult } from "./panels/types";
+import { loadMyProfile } from "./panels/myProfile";
+import { loadMyTeam } from "./panels/myTeam";
+import { loadDocumentsToVerify } from "./panels/documentsToVerify";
+import { loadUpcomingJoiners } from "./panels/upcomingJoiners";
+import { loadOpenConfirmations } from "./panels/openConfirmations";
+import { loadExitsInProgress } from "./panels/exitsInProgress";
+import { loadSettlementsDue } from "./panels/settlementsDue";
+import { loadMonthMovements } from "./panels/monthMovements";
+import { loadMovementTrend } from "./panels/movementTrend";
+import { loadHeadcountByTeam } from "./panels/headcountByTeam";
+import { loadConfigActivity } from "./panels/configActivity";
+import { loadEmailHealth } from "./panels/emailHealth";
+import { loadAccountsByRole } from "./panels/accountsByRole";
+
+export type { PanelResult } from "./panels/types";
 
 type Db = SupabaseClient;
 
@@ -55,115 +73,34 @@ export interface StatResult extends StatWidget {
   value: number | null;
 }
 
-export interface EmployeeProfileSnapshot {
-  id: string;
-  name: string;
-  email: string | null;
-  department: string | null;
-  employeeType: string | null;
-  status: string;
-  joiningDate: string | null;
-  confirmationDate: string | null;
-  manager: {
-    id?: string;
-    name: string;
-    email: string | null;
-    department: string | null;
-  } | null;
-}
-
-export interface TeamMemberSnapshot {
-  id: string;
-  name: string;
-  email: string | null;
-  department: string | null;
-  employeeType: string | null;
-  joiningDate: string | null;
-  confirmationDate: string | null;
-  status: string;
-}
-
-export interface CandidateSnapshot {
-  id: string;
-  name: string;
-  role: string | null;
-  department: string | null;
-  submittedAt: string | null;
-  status: string;
-}
-
-export interface UpcomingJoinerSnapshot {
-  id: string;
-  name: string;
-  role: string | null;
-  department: string | null;
-  joiningDate: string | null;
-  status: string;
-}
-
-export interface ConfirmationSnapshot {
-  id: string;
-  employeeName: string;
-  managerName?: string | null;
-  status: string;
-  createdAt: string;
-}
-
-export interface MovementSnapshot {
-  id: string;
-  name: string;
-  department: string | null;
-  date: string | null;
-  status?: string;
-}
-
-export interface SettlementSnapshot {
-  id: string;
-  employeeName: string;
-  department: string | null;
-  status: string;
-  lastWorkingDay?: string | null;
-}
-
-export interface DepartmentCount {
-  department: string;
-  count: number;
-}
-
-export interface UserRoleCount {
-  role: string;
-  label: string;
-  count: number;
-}
-
-export interface SettingsChangeSnapshot {
-  id: string;
-  section: string;
-  changedAt: string;
-  changedBy: string | null;
-}
-
-export interface RoleCustomData {
-  employeeProfile?: EmployeeProfileSnapshot | null;
-  teamMembers?: TeamMemberSnapshot[];
-  candidatesToReview?: CandidateSnapshot[];
-  upcomingJoiners?: UpcomingJoinerSnapshot[];
-  openConfirmationsList?: ConfirmationSnapshot[];
-  monthJoiners?: MovementSnapshot[];
-  monthExits?: MovementSnapshot[];
-  pendingSettlements?: SettlementSnapshot[];
-  departmentBreakdown?: DepartmentCount[];
-  recentJoiners?: MovementSnapshot[];
-  userRoleCounts?: UserRoleCount[];
-  recentSettingsChanges?: SettingsChangeSnapshot[];
+export interface PanelEntry {
+  id: PanelWidgetId;
+  result: PanelResult<unknown>;
 }
 
 export interface DashboardData {
   focus: string;
   tasks: TaskGroup[];
   stats: StatResult[];
-  roleCustomData: RoleCustomData;
+  panels: PanelEntry[];
+  quickLinks: QuickLinkId[];
 }
+
+const PANEL_LOADERS: Record<PanelWidgetId, (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>> = {
+  myProfile: loadMyProfile as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  myTeam: loadMyTeam as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  documentsToVerify: loadDocumentsToVerify as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  upcomingJoiners: loadUpcomingJoiners as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  openConfirmations: loadOpenConfirmations as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  exitsInProgress: loadExitsInProgress as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  settlementsDue: loadSettlementsDue as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  monthMovements: loadMonthMovements as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  movementTrend: loadMovementTrend as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  headcountByTeam: loadHeadcountByTeam as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  configActivity: loadConfigActivity as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  emailHealth: loadEmailHealth as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+  accountsByRole: loadAccountsByRole as (ctx: PanelLoaderContext) => Promise<PanelResult<unknown>>,
+};
 
 // Counted on `status`, the field every onboarding transition writes.
 // `joiner_status` was backfilled once and is otherwise only ever set to
@@ -313,16 +250,12 @@ async function loadMyPeerFeedback(
   const group: TaskGroup = {
     id: "myPeerFeedback",
     label: "Feedback you've been asked for",
-    // Each request is its own page; there is no list of them to link to.
     href: null,
     items: [],
     loaded: true,
   };
   if (!me && !email) return group;
 
-  // A peer is nominated either from the directory (employee id) or by typing
-  // their address (email only), so both are asked for and merged. Explicit
-  // filters, not RLS: for P&C roles RLS returns every request in the org.
   const open = () =>
     db
       .from("peer_feedback")
@@ -367,8 +300,6 @@ async function loadTeamDecisions(db: Db, me: { id: string } | null): Promise<Tas
   };
   if (!me) return group;
 
-  // Scoped to this person's own reportees here, explicitly — not left to RLS
-  // to narrow an org-wide query.
   const { data: reportees, error: teamError } = await db
     .from("employees")
     .select("id")
@@ -406,388 +337,6 @@ async function loadTeamDecisions(db: Db, me: { id: string } | null): Promise<Tas
   return group;
 }
 
-async function loadRoleCustomData(
-  db: Db,
-  role: UserRole,
-  me: { id: string } | null,
-  email: string | null,
-  today: string,
-  options: { hasReports?: boolean } = {}
-): Promise<RoleCustomData> {
-  const custom: RoleCustomData = {};
-  const month = monthWindow(today);
-
-  // If user is employee or manager or has direct reports, load their personal employment profile
-  if (role === "employee" || role === "manager" || options.hasReports) {
-    if (me) {
-      try {
-        const { data: emp } = await db
-          .from("employees")
-          .select("id, name, email, team, status, employee_type, joining_date, confirmation_date, manager:employees!manager_id(id, name, email, team)")
-          .eq("id", me.id)
-          .maybeSingle();
-
-        if (emp) {
-          const mgr = emp.manager as { id?: string; name?: string; email?: string | null; team?: string | null } | null;
-          custom.employeeProfile = {
-            id: emp.id,
-            name: emp.name,
-            email: emp.email,
-            department: emp.team,
-            employeeType: emp.employee_type,
-            status: emp.status,
-            joiningDate: emp.joining_date,
-            confirmationDate: emp.confirmation_date,
-            manager: mgr ? {
-              id: mgr.id,
-              name: mgr.name ?? "Manager",
-              email: mgr.email ?? null,
-              department: mgr.team ?? null,
-            } : null,
-          };
-        }
-      } catch (e) {
-        console.error("dashboard: failed to load employee profile", e);
-      }
-    }
-  }
-
-  // If role is manager or user has direct reports, load team members roster
-  if (role === "manager" || options.hasReports) {
-    if (me) {
-      try {
-        const { data: reportees } = await db
-          .from("employees")
-          .select("id, name, email, team, status, employee_type, joining_date, confirmation_date")
-          .eq("manager_id", me.id)
-          .eq("status", "active")
-          .order("name");
-
-        custom.teamMembers = (reportees ?? []).map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          email: r.email,
-          department: r.team,
-          employeeType: r.employee_type,
-          joiningDate: r.joining_date,
-          confirmationDate: r.confirmation_date,
-          status: r.status,
-        }));
-      } catch (e) {
-        console.error("dashboard: failed to load team members", e);
-      }
-    }
-  }
-
-  // PnC Ops: Operational candidates awaiting document verification and upcoming joiners (NO SALARY/CTC!)
-  if (role === "pnc_ops") {
-    try {
-      const admin = createAdminSupabaseClient();
-      if (admin) {
-        const [candRes, joinRes] = await Promise.all([
-          admin
-            .from("onboarding_records")
-            .select("id, first_name, last_name, position_title, status, submitted_at, team_name, teams(name)")
-            .in("status", AWAITING_REVIEW)
-            .or(NOT_WITHDRAWN)
-            .order("submitted_at", { ascending: false })
-            .limit(6),
-          admin
-            .from("onboarding_records")
-            .select("id, first_name, last_name, position_title, status, joining_date, team_name, teams(name)")
-            .in("status", ACCEPTED)
-            .or(NOT_WITHDRAWN)
-            .gte("joining_date", today)
-            .lte("joining_date", addDays(today, 30))
-            .order("joining_date", { ascending: true })
-            .limit(6),
-        ]);
-
-        custom.candidatesToReview = (candRes.data ?? []).map((c: any) => ({
-          id: c.id,
-          name: [c.first_name, c.last_name].filter(Boolean).join(" ") || "Candidate",
-          role: c.position_title || "New Hire",
-          department: c.teams?.name || c.team_name || "General",
-          submittedAt: c.submitted_at,
-          status: c.status,
-        }));
-
-        custom.upcomingJoiners = (joinRes.data ?? []).map((j: any) => ({
-          id: j.id,
-          name: [j.first_name, j.last_name].filter(Boolean).join(" ") || "Candidate",
-          role: j.position_title || "New Hire",
-          department: j.teams?.name || j.team_name || "General",
-          joiningDate: j.joining_date,
-          status: j.status,
-        }));
-      }
-    } catch (e) {
-      console.error("dashboard: failed to load pnc_ops data", e);
-    }
-  }
-
-  // PnC Admin: Full HR pipeline (Candidates to review, upcoming joiners, open confirmations in flight)
-  if (role === "pnc_admin") {
-    try {
-      const admin = createAdminSupabaseClient();
-      const [candRes, joinRes, confRes] = await Promise.all([
-        admin
-          ? admin
-              .from("onboarding_records")
-              .select("id, first_name, last_name, position_title, status, submitted_at, team_name, teams(name)")
-              .in("status", AWAITING_REVIEW)
-              .or(NOT_WITHDRAWN)
-              .order("submitted_at", { ascending: false })
-              .limit(5)
-          : Promise.resolve({ data: [] }),
-        admin
-          ? admin
-              .from("onboarding_records")
-              .select("id, first_name, last_name, position_title, status, joining_date, team_name, teams(name)")
-              .in("status", ACCEPTED)
-              .or(NOT_WITHDRAWN)
-              .gte("joining_date", today)
-              .lte("joining_date", addDays(today, 30))
-              .order("joining_date", { ascending: true })
-              .limit(5)
-          : Promise.resolve({ data: [] }),
-        db
-          .from("confirmations")
-          .select("id, status, created_at, employees(name, manager:employees!manager_id(name))")
-          .eq("status", "pending")
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
-
-      custom.candidatesToReview = (candRes.data ?? []).map((c: any) => ({
-        id: c.id,
-        name: [c.first_name, c.last_name].filter(Boolean).join(" ") || "Candidate",
-        role: c.position_title || "New Hire",
-        department: c.teams?.name || c.team_name || "General",
-        submittedAt: c.submitted_at,
-        status: c.status,
-      }));
-
-      custom.upcomingJoiners = (joinRes.data ?? []).map((j: any) => ({
-        id: j.id,
-        name: [j.first_name, j.last_name].filter(Boolean).join(" ") || "Candidate",
-        role: j.position_title || "New Hire",
-        department: j.teams?.name || j.team_name || "General",
-        joiningDate: j.joining_date,
-        status: j.status,
-      }));
-
-      custom.openConfirmationsList = (confRes.data ?? []).map((c: any) => ({
-        id: c.id,
-        employeeName: c.employees?.name || "Employee",
-        managerName: (c.employees?.manager as any)?.name ?? null,
-        status: c.status,
-        createdAt: c.created_at,
-      }));
-    } catch (e) {
-      console.error("dashboard: failed to load pnc_admin data", e);
-    }
-  }
-
-  // Finance: movements touching payroll (joiners, exits, settlements)
-  if (role === "fin_admin" || role === "fin_ops") {
-    try {
-      const [joinRes, exitRes, settleRes] = await Promise.all([
-        db
-          .from("employees")
-          .select("id, name, team, joining_date, status")
-          .gte("joining_date", month.from)
-          .lt("joining_date", month.to)
-          .order("joining_date", { ascending: false })
-          .limit(6),
-        db
-          .from("employees")
-          .select("id, name, team, exit_date, status")
-          .gte("exit_date", month.from)
-          .lt("exit_date", month.to)
-          .order("exit_date", { ascending: false })
-          .limit(6),
-        db
-          .from("offboarding_cases")
-          .select("id, status, last_working_day, employees(name, team)")
-          .eq("status", "settlement_pending")
-          .order("created_at", { ascending: false })
-          .limit(6),
-      ]);
-
-      custom.monthJoiners = (joinRes.data ?? []).map((j: any) => ({
-        id: j.id,
-        name: j.name,
-        department: j.team,
-        date: j.joining_date,
-        status: j.status,
-      }));
-
-      custom.monthExits = (exitRes.data ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        department: e.team,
-        date: e.exit_date,
-        status: e.status,
-      }));
-
-      custom.pendingSettlements = (settleRes.data ?? []).map((s: any) => ({
-        id: s.id,
-        employeeName: s.employees?.name || "Employee",
-        department: s.employees?.team || null,
-        status: s.status,
-        lastWorkingDay: s.last_working_day,
-      }));
-    } catch (e) {
-      console.error("dashboard: failed to load finance data", e);
-    }
-  }
-
-  // Exec View: Department distribution and growth
-  if (role === "exec_view") {
-    try {
-      const [deptRes, joinRes] = await Promise.all([
-        db.from("employees").select("team").eq("status", "active"),
-        db
-          .from("employees")
-          .select("id, name, team, joining_date")
-          .eq("status", "active")
-          .order("joining_date", { ascending: false })
-          .limit(5),
-      ]);
-
-      const counts: Record<string, number> = {};
-      for (const row of deptRes.data ?? []) {
-        const team = (row.team as string) || "General";
-        counts[team] = (counts[team] ?? 0) + 1;
-      }
-      custom.departmentBreakdown = Object.entries(counts)
-        .map(([department, count]) => ({ department, count }))
-        .sort((a, b) => b.count - a.count);
-
-      custom.recentJoiners = (joinRes.data ?? []).map((j: any) => ({
-        id: j.id,
-        name: j.name,
-        department: j.team,
-        date: j.joining_date,
-      }));
-    } catch (e) {
-      console.error("dashboard: failed to load exec data", e);
-    }
-  }
-
-  // Platform Admin & Ops: User role breakdown and settings audit
-  if (role === "platform_admin" || role === "platform_ops") {
-    try {
-      const [auditRes, users] = await Promise.all([
-        db
-          .from("settings_change_log")
-          .select("id, section, changed_at, changed_by")
-          .order("changed_at", { ascending: false })
-          .limit(6),
-        listUsersWithRoles().catch(() => []),
-      ]);
-
-      custom.recentSettingsChanges = (auditRes.data ?? []).map((a: any) => ({
-        id: a.id,
-        section: a.section,
-        changedAt: a.changed_at,
-        changedBy: a.changed_by,
-      }));
-
-      const roleCounts: Record<string, number> = {};
-      for (const u of users) {
-        const r = u.role || "employee";
-        roleCounts[r] = (roleCounts[r] ?? 0) + 1;
-      }
-      custom.userRoleCounts = Object.entries(roleCounts)
-        .map(([r, count]) => ({
-          role: r,
-          label: roleLabel(r as any),
-          count,
-        }))
-        .sort((a, b) => b.count - a.count);
-    } catch (e) {
-      console.error("dashboard: failed to load platform data", e);
-    }
-  }
-
-  // Super Admin: Comprehensive cross-functional snapshot
-  if (role === "super_admin") {
-    try {
-      const admin = createAdminSupabaseClient();
-      const [deptRes, candRes, joinRes, users] = await Promise.all([
-        db.from("employees").select("team").eq("status", "active"),
-        admin
-          ? admin
-              .from("onboarding_records")
-              .select("id, first_name, last_name, position_title, status, submitted_at, team_name, teams(name)")
-              .in("status", AWAITING_REVIEW)
-              .or(NOT_WITHDRAWN)
-              .order("submitted_at", { ascending: false })
-              .limit(5)
-          : Promise.resolve({ data: [] }),
-        admin
-          ? admin
-              .from("onboarding_records")
-              .select("id, first_name, last_name, position_title, status, joining_date, team_name, teams(name)")
-              .in("status", ACCEPTED)
-              .or(NOT_WITHDRAWN)
-              .gte("joining_date", today)
-              .lte("joining_date", addDays(today, 30))
-              .order("joining_date", { ascending: true })
-              .limit(5)
-          : Promise.resolve({ data: [] }),
-        listUsersWithRoles().catch(() => []),
-      ]);
-
-      const counts: Record<string, number> = {};
-      for (const row of deptRes.data ?? []) {
-        const team = (row.team as string) || "General";
-        counts[team] = (counts[team] ?? 0) + 1;
-      }
-      custom.departmentBreakdown = Object.entries(counts)
-        .map(([department, count]) => ({ department, count }))
-        .sort((a, b) => b.count - a.count);
-
-      custom.candidatesToReview = (candRes.data ?? []).map((c: any) => ({
-        id: c.id,
-        name: [c.first_name, c.last_name].filter(Boolean).join(" ") || "Candidate",
-        role: c.position_title || "New Hire",
-        department: c.teams?.name || c.team_name || "General",
-        submittedAt: c.submitted_at,
-        status: c.status,
-      }));
-
-      custom.upcomingJoiners = (joinRes.data ?? []).map((j: any) => ({
-        id: j.id,
-        name: [j.first_name, j.last_name].filter(Boolean).join(" ") || "Candidate",
-        role: j.position_title || "New Hire",
-        department: j.teams?.name || j.team_name || "General",
-        joiningDate: j.joining_date,
-        status: j.status,
-      }));
-
-      const roleCounts: Record<string, number> = {};
-      for (const u of users) {
-        const r = u.role || "employee";
-        roleCounts[r] = (roleCounts[r] ?? 0) + 1;
-      }
-      custom.userRoleCounts = Object.entries(roleCounts)
-        .map(([r, count]) => ({
-          role: r,
-          label: roleLabel(r as any),
-          count,
-        }))
-        .sort((a, b) => b.count - a.count);
-    } catch (e) {
-      console.error("dashboard: failed to load super_admin data", e);
-    }
-  }
-
-  return custom;
-}
-
 /**
  * Everything the dashboard shows this person, or null for a role that has no
  * dashboard (the portal-only roles, which middleware never lets this far).
@@ -802,6 +351,7 @@ export async function getDashboardData(
   const db = await createServerSupabaseClient();
   const { employee: me, email } = await getCurrentEmployee(db);
   const today = istToday();
+  const panelCtx: PanelLoaderContext = { db, me, today };
 
   const taskLoaders: Record<TaskWidgetId, () => Promise<TaskGroup>> = {
     myForms: loadMyForms,
@@ -809,16 +359,17 @@ export async function getDashboardData(
     teamDecisions: () => loadTeamDecisions(db, me),
   };
 
-  const [tasks, values, roleCustomData] = await Promise.all([
+  const [tasks, values, panelResults] = await Promise.all([
     Promise.all(dashboard.tasks.map((id) => taskLoaders[id]())),
     Promise.all(dashboard.stats.map((id) => loadStat(db, id, me, today))),
-    loadRoleCustomData(db, role, me, email, today, options),
+    Promise.all(dashboard.panels.map(async (id) => ({ id, result: await PANEL_LOADERS[id](panelCtx) }))),
   ]);
 
   return {
     focus: dashboard.focus,
     tasks: tasks.map((t) => ({ ...t, items: t.items.slice(0, TASK_LIMIT) })),
     stats: dashboard.stats.map((id, i) => ({ ...STAT_WIDGETS[id], value: values[i] })),
-    roleCustomData,
+    panels: panelResults,
+    quickLinks: dashboard.quickLinks,
   };
 }
