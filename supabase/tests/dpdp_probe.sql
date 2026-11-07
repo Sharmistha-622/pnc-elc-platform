@@ -372,7 +372,63 @@ exception when insufficient_privilege then null; end $$;
 reset role;
 
 -------------------------------------------------------------------------
--- 8. The data inventory covers the schema
+-- 8. The incident register: deadlines set by the database, privacy cases only
+-------------------------------------------------------------------------
+insert into public.privacy_incidents (title, detected_at, recorded_by, personal_data, certin_reportable)
+  values ('Probe breach', '2026-01-01T00:00:00Z', 'probe', true, true),
+         ('Probe outage', '2026-01-01T00:00:00Z', 'probe', false, true);
+
+do $$ begin
+  if not exists (select 1 from public.privacy_incidents where title = 'Probe breach'
+                 and certin_due_at = '2026-01-01T06:00:00Z' and board_report_due_at = '2026-01-04T00:00:00Z') then
+    insert into pg_temp.failures values ('incident deadlines are 6 hours and 72 hours from detection', 'breach deadlines wrong');
+  end if;
+  if not exists (select 1 from public.privacy_incidents where title = 'Probe outage' and board_report_due_at is null) then
+    insert into pg_temp.failures values ('incident deadlines are 6 hours and 72 hours from detection', 'non-personal incident has a Board deadline');
+  end if;
+end $$;
+
+do $$ begin
+  update public.privacy_incidents set certin_due_at = '2027-01-01' where title = 'Probe breach';
+  if exists (select 1 from public.privacy_incidents where title = 'Probe breach' and certin_due_at <> '2026-01-01T06:00:00Z') then
+    insert into pg_temp.failures values ('incident deadlines are 6 hours and 72 hours from detection', 'deadline overwritten');
+  end if;
+end $$;
+
+do $$ begin
+  update public.privacy_incidents set certin_reported_at = '2026-01-01T05:00:00Z' where title = 'Probe breach';
+  update public.privacy_incidents set detected_at = '2026-01-02T00:00:00Z' where title = 'Probe breach';
+  insert into pg_temp.failures values ('incident deadlines are 6 hours and 72 hours from detection', 'detection moved after a report');
+exception when check_violation then null; end $$;
+
+do $$ begin
+  update public.privacy_incidents set status = 'closed' where title = 'Probe outage';
+  insert into pg_temp.failures values ('an incident closes with a note', 'closed without a note');
+exception when check_violation then null; end $$;
+
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-plat@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$ begin
+  if exists (select 1 from public.privacy_incidents) then
+    insert into pg_temp.failures values ('incidents reach privacy case roles only', 'platform admin reads incidents');
+  end if;
+end $$;
+reset role;
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('dp-pa@navgurukul.org'), false); end $$;
+set role authenticated;
+do $$ begin
+  if not exists (select 1 from public.privacy_incidents) then
+    insert into pg_temp.failures values ('incidents reach privacy case roles only', 'PnC Admin cannot read incidents');
+  end if;
+end $$;
+do $$ begin
+  insert into public.privacy_incidents (title, detected_at, recorded_by) values ('Session incident', now(), 'x');
+  insert into pg_temp.failures values ('incidents reach privacy case roles only', 'session insert accepted');
+exception when insufficient_privilege then null; end $$;
+reset role;
+
+-------------------------------------------------------------------------
+-- 9. The data inventory covers the schema
 -------------------------------------------------------------------------
 \ir dpdp_inventory_compare.sql
 

@@ -467,7 +467,7 @@ export const DPDP_TABLES: InventoryTable[] = [
     general: 'requester_name, details, answer, assigned_to, answered_by, recorded_by',
     contact: 'requester_email',
   }),
-  personal('core', 'privacy_nominations', { principals: ['employee', 'candidate'], basis: 'legal_obligation', retention: 'dependant_nominee', processors: CORE, note: 'The person nominated to exercise rights (s. 14).' }, {
+  personal('core', 'privacy_nominations', { principals: ['employee', 'candidate'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE, note: 'The person nominated to exercise rights (s. 14).' }, {
     meta: 'id, principal_type, principal_ref, recorded_at, revoked_at',
     general: 'nominee_name, nominee_relation, recorded_by',
     contact: 'nominee_contact',
@@ -475,6 +475,10 @@ export const DPDP_TABLES: InventoryTable[] = [
   personal('core', 'dpdp_legal_holds', { principals: ['employee', 'candidate'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE, note: 'Which people or records are under a legal hold (s. 17(1)(a)).' }, {
     meta: 'id, subject_type, subject_ref, record_table, record_id, review_date, placed_at, released_at',
     general: 'reason, placed_by, released_by, release_reason',
+  }),
+  personal('core', 'privacy_incidents', { principals: ['candidate', 'employee'], basis: 'legal_obligation', retention: 'privacy_records', processors: CORE, note: 'Breach and incident register (s. 8(6); r. 7). Describes incidents; names no affected person.' }, {
+    meta: 'id, reference, detected_at, occurred_at, severity, status, personal_data, certin_reportable, categories, people_affected, certin_due_at, certin_reported_at, board_intimated_at, board_report_due_at, board_report_at, individuals_notified_at, closed_at, created_at, updated_at',
+    general: 'title, description, systems, location, consequences, mitigation, safety_steps, cause, recorded_by, closed_by, closure_note',
   }),
   nonPersonal('core', 'retention_runs', 'Retention job reports: mode and counts only.', 'id, started_at, finished_at, mode, status, counts, instructions, triggered_by'),
 ]

@@ -5,7 +5,7 @@ import { z } from 'zod'
 // ============================================================================
 
 /** Tables a record-level hold can name: the ones the retention job deletes from. */
-export const HOLDABLE_TABLES = ['onboarding_documents', 'privacy_requests', 'privacy_nominations'] as const
+export const HOLDABLE_TABLES = ['onboarding_documents', 'privacy_requests', 'privacy_nominations', 'privacy_incidents'] as const
 export const HOLD_SUBJECTS = ['employee', 'candidate', 'record'] as const
 
 export const placeHoldSchema = z

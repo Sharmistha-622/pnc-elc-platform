@@ -93,15 +93,17 @@ function subjectOf(principalType: string, ref: string | null): RetentionCandidat
   return STAFF_PRINCIPALS.has(principalType) ? { type: 'employee', ref } : undefined
 }
 
-/** Closed rights requests and revoked nominations, under the privacy-records rule. */
+/** Closed rights requests and incidents, and revoked nominations, under the privacy-records rule. */
 export async function closedPrivacyRecords(db: Db): Promise<RetentionCandidate[]> {
-  const [requests, nominations] = await Promise.all([
+  const [requests, nominations, incidents] = await Promise.all([
     db.from('privacy_requests').select('id, principal_type, principal_ref, closed_at, updated_at').eq('status', 'closed'),
     db.from('privacy_nominations').select('id, principal_type, principal_ref, revoked_at').not('revoked_at', 'is', null),
+    db.from('privacy_incidents').select('id, closed_at, updated_at').eq('status', 'closed'),
   ])
-  if (requests.error || nominations.error) throw new Error('Could not read the privacy records.')
+  if (requests.error || nominations.error || incidents.error) throw new Error('Could not read the privacy records.')
   type Req = { id: string; principal_type: string; principal_ref: string | null; closed_at: string | null; updated_at: string }
   type Nom = { id: string; principal_type: string; principal_ref: string; revoked_at: string }
+  type Inc = { id: string; closed_at: string | null; updated_at: string }
   return [
     ...((requests.data ?? []) as Req[]).map<RetentionCandidate>((r) => ({
       kind: 'privacy_request',
@@ -120,6 +122,14 @@ export async function closedPrivacyRecords(db: Db): Promise<RetentionCandidate[]
       processedAt: n.revoked_at,
       subject: subjectOf(n.principal_type, n.principal_ref),
       record: { table: 'privacy_nominations', id: n.id },
+    })),
+    ...((incidents.data ?? []) as Inc[]).map<RetentionCandidate>((i) => ({
+      kind: 'privacy_incident',
+      id: i.id,
+      ruleId: 'privacy_records',
+      clockStart: i.closed_at,
+      processedAt: i.updated_at,
+      record: { table: 'privacy_incidents', id: i.id },
     })),
   ]
 }

@@ -74,6 +74,9 @@ insert into public.privacy_nominations (principal_type, principal_ref, nominee_n
 insert into public.dpdp_legal_holds (subject_type, subject_ref, reason, review_date, placed_by)
   values ('employee', '00000000-0000-0000-0000-00000000000b', 'probe hold reason', current_date + 90, 'probe');
 insert into public.retention_runs (mode, status) values ('dry_run', 'ok');
+-- An incident under investigation.
+insert into public.privacy_incidents (title, detected_at, recorded_by)
+  values ('Probe incident', now() - interval '2 hours', 'probe');
 -- R acknowledged the employee notice.
 insert into public.consent_records (principal_type, principal_ref, record_type, notice_type, notice_language, notice_version, channel)
   values ('employee', '00000000-0000-0000-0000-00000000000b', 'acknowledgment', 'employee', 'en', 1, 'app');
@@ -203,6 +206,8 @@ insert into pg_temp.expectations values
   ('privacy_nominations',    '{"employee (R)",pnc_admin,super_admin}'),
   -- Legal holds name people: the privacy case roles only, never the subject.
   ('dpdp_legal_holds',       '{pnc_admin,super_admin}'),
+  -- Incidents: the privacy case roles only.
+  ('privacy_incidents',      '{pnc_admin,super_admin}'),
   ('retention_runs',         '{pnc_admin,platform_admin,exec_view,super_admin}');
 
 -------------------------------------------------------------------------

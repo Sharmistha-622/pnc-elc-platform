@@ -18,7 +18,7 @@ import {
 // Server-only, run by the daily job with the service role. It plans every
 // candidate (planner.ts) and then, in live mode only:
 //   - deletes withdrawn joiners' staged files (the rows stay, marked purged);
-//   - deletes closed rights requests and revoked nominations;
+//   - deletes closed rights requests and incidents, and revoked nominations;
 //   - purges log tables and spent consent records through dpdp_purge_rows(),
 //     which applies the 1-year floor and legal holds in the database.
 // Exited people's records, Drive folders and the vault are out of its reach:
@@ -70,6 +70,7 @@ export async function runRetention(db: Db, mode: RetentionMode, today: Date, dep
     await deleteWithdrawnDocuments(due, deps, at('withdrawn_joiner_documents'))
     await deleteRows(db, 'privacy_requests', due.filter((p) => p.candidate.kind === 'privacy_request'), at('privacy_records'))
     await deleteRows(db, 'privacy_nominations', due.filter((p) => p.candidate.kind === 'privacy_nomination'), at('privacy_records'))
+    await deleteRows(db, 'privacy_incidents', due.filter((p) => p.candidate.kind === 'privacy_incident'), at('privacy_records'))
   }
 
   const logRule = rules.find((r) => r.id === 'logs')

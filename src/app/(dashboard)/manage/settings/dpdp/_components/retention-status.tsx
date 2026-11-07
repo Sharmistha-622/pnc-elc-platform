@@ -46,7 +46,7 @@ export async function RetentionStatusPanel() {
             </thead>
             <tbody className="divide-y divide-border">
               {Object.entries(counts)
-                .filter(([, c]) => c !== null && typeof c === 'object')
+                .filter(([, c]) => c !== null && typeof c === 'object' && 'due' in c)
                 .map(([rule, c]) => {
                   const v = c as { due?: number; deleted?: number; held?: number; under_floor?: number }
                   return (

@@ -4,11 +4,13 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { purgeStagedDocuments } from '@/lib/vault/seal-service'
 import { runRetention } from '@/lib/dpdp/retention/executor'
 import { escalateDueRequests } from '@/lib/dpdp/requests/service'
+import { incidentDeadlineCounts } from '@/lib/dpdp/incidents/service'
 import type { RetentionMode } from '@/lib/dpdp/types'
 
 // The daily DPDP job. Applies the retention rules in the mode set in Settings
 // (dry-run reports, live deletes), escalates rights requests near their due
-// date, and writes a counts-only report to retention_runs.
+// date, counts incidents past a reporting deadline, and writes a counts-only
+// report to retention_runs.
 export async function GET(request: Request) {
   if (!carriesCronSecret(request.headers.get('authorization'))) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
@@ -37,12 +39,13 @@ export async function GET(request: Request) {
     })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const escalated = await escalateDueRequests(now, appUrl).catch(() => null)
+    const incidents = await incidentDeadlineCounts(db, now)
     await db
       .from('retention_runs')
       .update({
         finished_at: new Date().toISOString(),
         status: escalated === null ? 'partial' : report.status,
-        counts: { ...report.counts, requests_escalated: escalated },
+        counts: { ...report.counts, requests_escalated: escalated, incidents },
         instructions: report.instructions,
       })
       .eq('id', run.id)

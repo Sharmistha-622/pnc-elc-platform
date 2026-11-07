@@ -75,6 +75,7 @@ const base = {
   ],
   privacy_requests: [],
   privacy_nominations: [],
+  privacy_incidents: [],
   employees: [],
 }
 
