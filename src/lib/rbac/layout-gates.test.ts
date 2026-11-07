@@ -26,7 +26,7 @@ function pages(dir: string): string[] {
   })
 }
 
-/** `/onboarding/review/[token]/page.tsx` → `/onboarding/review/x`. */
+/** `/onboarding/review/[id]/page.tsx` → `/onboarding/review/x`. */
 function urlOf(page: string): string {
   const segments = path
     .relative(DASHBOARD, path.dirname(page))

@@ -5,9 +5,11 @@ import {
   updateConfirmationRule,
   updatePeerFeedbackSettings,
 } from '@/lib/settings/service'
-import type {
-  ConfirmationRule,
-  PeerFeedbackSettings,
+import {
+  DEFAULT_CONFIRMATION_RULES,
+  DEFAULT_PEER_FEEDBACK_SETTINGS,
+  type ConfirmationRule,
+  type PeerFeedbackSettings,
 } from '@/lib/settings/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +24,6 @@ import {
   Clock,
   Users,
   AlertCircle,
-  Sparkles,
 } from 'lucide-react'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 
@@ -39,12 +40,14 @@ export function ConfirmationSettingsForm({
   initialRules,
   initialPeerSettings,
 }: {
-  initialRules: ConfirmationRule[]
-  initialPeerSettings: PeerFeedbackSettings | null
+  initialRules?: ConfirmationRule[]
+  initialPeerSettings?: PeerFeedbackSettings | null
 }) {
-  const [rules, setRules] = useState(initialRules)
-  const [peerSettings, setPeerSettings] = useState(
-    initialPeerSettings || { id: '1', minimum_peers: 4, maximum_peers: 5, default_peers: 5, red_flag_response_threshold: 0.5, updated_at: '' }
+  const [rules, setRules] = useState<ConfirmationRule[]>(
+    initialRules && initialRules.length > 0 ? initialRules : DEFAULT_CONFIRMATION_RULES
+  )
+  const [peerSettings, setPeerSettings] = useState<PeerFeedbackSettings>(
+    initialPeerSettings || DEFAULT_PEER_FEEDBACK_SETTINGS
   )
   const [isPending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
@@ -101,9 +104,11 @@ export function ConfirmationSettingsForm({
         minimum_peers: peerSettings.minimum_peers,
         maximum_peers: peerSettings.maximum_peers,
         default_peers: peerSettings.default_peers,
+        red_flag_response_threshold: peerSettings.red_flag_response_threshold,
       })
+
       if (!peerResult.success) {
-        setError(`Failed to save peer settings: ${peerResult.error}`)
+        setError(`Failed to save reviewer nomination parameters: ${peerResult.error}`)
         return
       }
 
@@ -114,10 +119,10 @@ export function ConfirmationSettingsForm({
   return (
     <div className="space-y-6">
       {/* 1. Confirmation Timeline Rules Table */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-4 pb-3 border-b border-border/60 bg-muted/10">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               <Clock className="w-4 h-4" />
             </div>
             <div>
@@ -217,10 +222,10 @@ export function ConfirmationSettingsForm({
       </Card>
 
       {/* 2. Peer Reviewer Nomination Parameters */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-2">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
               <Users className="w-4 h-4" />
             </div>
             <div>
@@ -233,7 +238,7 @@ export function ConfirmationSettingsForm({
         </CardHeader>
         <CardContent className="p-5 pt-1">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Minimum Reviewers
               </Label>
@@ -246,14 +251,14 @@ export function ConfirmationSettingsForm({
                   setPeerSettings({ ...peerSettings, minimum_peers: parseInt(e.target.value) || 1 })
                   setSaved(false)
                 }}
-                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs"
+                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs rounded-lg"
               />
               <p className="text-[11px] text-muted-foreground">
                 Minimum reviewer feedback required to clear probation review.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Maximum Reviewers
               </Label>
@@ -266,14 +271,14 @@ export function ConfirmationSettingsForm({
                   setPeerSettings({ ...peerSettings, maximum_peers: parseInt(e.target.value) || 1 })
                   setSaved(false)
                 }}
-                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs"
+                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs rounded-lg"
               />
               <p className="text-[11px] text-muted-foreground">
                 Upper limit to maintain evaluation turnaround and avoid survey fatigue.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Default Reviewer Slots
               </Label>
@@ -286,7 +291,7 @@ export function ConfirmationSettingsForm({
                   setPeerSettings({ ...peerSettings, default_peers: parseInt(e.target.value) || 1 })
                   setSaved(false)
                 }}
-                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs"
+                className="w-20 text-center text-sm font-semibold h-9 shadow-2xs rounded-lg"
               />
               <p className="text-[11px] text-muted-foreground">
                 Initial empty reviewer fields prefilled on the nomination form.
@@ -296,8 +301,8 @@ export function ConfirmationSettingsForm({
         </CardContent>
       </Card>
 
-      {/* Save Action Bar matching application aesthetic */}
-      <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border/80 shadow-xs">
+      {/* Save Action Bar */}
+      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/80 shadow-xs">
         <div className="flex items-center gap-2">
           {saved && (
             <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
@@ -320,19 +325,10 @@ export function ConfirmationSettingsForm({
         <Button
           onClick={handleSave}
           disabled={isPending}
-          className="gap-2 px-5 h-9 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+          className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 h-9 shadow-xs flex items-center gap-1.5"
         >
-          {isPending ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Saving...</span>
-            </>
-          ) : (
-            <>
-              <Save className="w-3.5 h-3.5" />
-              <span>Save Changes</span>
-            </>
-          )}
+          {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          <span>Save Changes</span>
         </Button>
       </div>
     </div>

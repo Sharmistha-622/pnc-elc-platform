@@ -108,7 +108,13 @@ every NDC department is cleared. It:
 
 - sets the employee to **Exited**, with an exit date (they move to the
   directory's *Exited Employees* tab);
+- ends their platform access: any role they held is removed and their account
+  is closed, so they are signed out and cannot sign back in;
 - emails the relieving letter.
+
+Close the exit on or after the last working day. If a person comes back, a
+Super Admin re-opens their account from **Users & Roles** (**Restore access**)
+and assigns their role again.
 
 ## Settings
 

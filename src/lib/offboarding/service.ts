@@ -35,6 +35,7 @@ import { assetIntegrationService } from '@/lib/integrations/assets';
 import { attendanceIntegrationService } from '@/lib/integrations/attendance';
 import { leaveIntegrationService } from '@/lib/integrations/leave';
 import { getEmployees } from '@/lib/employees/getEmployees';
+import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess';
 
 
 // ============================================================================
@@ -133,6 +134,14 @@ async function currentEmployeeId(): Promise<string | null> {
  * ID links to their directory record, and the email keeps the trail resolvable
  * after that record is archived at exit.
  */
+/** The employee record's email, read past RLS: the closer may not hold `general: view`. */
+async function employeeEmail(employeeId: string): Promise<string | null> {
+  const admin = createAdminSupabaseClient();
+  if (!admin || !employeeId) return null;
+  const { data } = await admin.from('employees').select('email').eq('id', employeeId).maybeSingle();
+  return (data?.email as string | undefined) ?? null;
+}
+
 function auditSubject(c: { employee_id: string; employee_email: string; employee_name: string }) {
   return {
     employee_id: c.employee_id,
@@ -983,7 +992,8 @@ export async function closeOffboardingCase(
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
 
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
+  // A case started on another server instance is only in the database.
+  const existing = MEMORY_OFFBOARDING_STORE.get(caseId) ?? (await getOffboardingById(caseId));
   if (!existing) return { success: false, error: 'Case not found' };
 
   // Verification checks: ensure asset and NDC clearances are fulfilled
@@ -1040,13 +1050,16 @@ export async function closeOffboardingCase(
   // Update employee record in employees table: status = 'exited', exit_date = finalLwd
   try {
     const supabase = await createServerSupabaseClient();
-    await supabase
+    const { error: employeeError } = await supabase
       .from('employees')
       .update({
         status: 'exited',
         exit_date: finalLwd,
       })
       .eq('id', existing.caseRecord.employee_id);
+    if (employeeError) {
+      return { success: false, error: 'Could not mark the employee as exited. Try again.' };
+    }
 
     // Also update offboarding case table in DB
     await supabase
@@ -1079,12 +1092,23 @@ export async function closeOffboardingCase(
     metadata: { actual_lwd: finalLwd },
   });
 
-  // Exit closure revokes platform access as a matter of record.
+  // Exit ends the person's platform access: their stored role goes, the
+  // account is marked ended, and its sessions cannot be renewed. The
+  // revocation is recorded once that has succeeded.
+  const email = existing.caseRecord.employee_email || (await employeeEmail(existing.caseRecord.employee_id));
+  const ended = await endPlatformAccess(email, { endedBy: allowed.caller.email ?? closedBy, now: new Date(nowIso) });
+  if (!ended.ok) {
+    return {
+      success: false,
+      error: `The exit is recorded, but platform access could not be ended: ${ended.error} Close the exit again to retry.`,
+    };
+  }
   await auditAccess.revoked({
     subject: auditSubject(existing.caseRecord),
     actorName: closedBy,
     entityId: caseId,
-    system: 'All NavGurukul systems',
+    system: 'ELC platform',
+    metadata: { account_found: ended.userId !== null },
   });
 
   // Send formal relieving & experience letter email

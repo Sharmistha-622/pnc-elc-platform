@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { updateReviewCycleSettings } from '@/lib/reviews/actions'
-import type { ReviewCycleSettings } from '@/lib/reviews/types'
+import { DEFAULT_REVIEW_CYCLE_SETTINGS, type ReviewCycleSettings } from '@/lib/reviews/types'
 
 type NumKey = {
   [K in keyof ReviewCycleSettings]-?: ReviewCycleSettings[K] extends number ? K : never
@@ -51,8 +51,8 @@ const GROUPS: { title: string; description: string; fields: { key: NumKey; label
   },
 ]
 
-export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }) {
-  const [s, setS] = useState(initial)
+export function ReviewSettingsForm({ initial }: { initial?: ReviewCycleSettings }) {
+  const [s, setS] = useState<ReviewCycleSettings>(initial || DEFAULT_REVIEW_CYCLE_SETTINGS)
   const [pending, start] = useTransition()
 
   function save() {
@@ -63,26 +63,28 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
     })
   }
 
+  const peerRatioPercent = Math.round((s.meeting_ready_peer_ratio ?? 0.6) * 100)
+
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-xs overflow-hidden">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Automation</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-base font-bold text-foreground">Automation</CardTitle>
+          <CardDescription className="text-xs">
             Every morning the platform opens confirmations and appraisals that are due, emails the employee and their manager, reminds anyone who has not answered, and tells PnC about anyone still silent.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border/70 p-3 bg-background/50">
             <div>
-              <Label htmlFor="rc-automation" className="text-sm font-medium">Run the daily review job</Label>
+              <Label htmlFor="rc-automation" className="text-sm font-medium cursor-pointer">Run the daily review job</Label>
               <p className="text-xs text-muted-foreground">Off: nothing opens or reminds on its own. PnC can still start reviews and send reminders by hand.</p>
             </div>
             <Switch id="rc-automation" checked={s.automation_enabled} onCheckedChange={(v) => setS({ ...s, automation_enabled: v })} />
           </div>
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border/70 p-3 bg-background/50">
             <div>
-              <Label htmlFor="rc-auto-meeting" className="text-sm font-medium">Book the meeting automatically</Label>
+              <Label htmlFor="rc-auto-meeting" className="text-sm font-medium cursor-pointer">Book the meeting automatically</Label>
               <p className="text-xs text-muted-foreground">Picks the first free slot in the manager&apos;s calendar and sends one invitation to the manager, the employee and PnC.</p>
             </div>
             <Switch id="rc-auto-meeting" checked={s.auto_schedule_meeting} onCheckedChange={(v) => setS({ ...s, auto_schedule_meeting: v })} />
@@ -96,9 +98,9 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
                   type="number"
                   min={0}
                   max={100}
-                  value={Math.round(s.meeting_ready_peer_ratio * 100)}
+                  value={peerRatioPercent}
                   onChange={(e) => setS({ ...s, meeting_ready_peer_ratio: Number(e.target.value) / 100 })}
-                  className="h-8 w-24 text-sm"
+                  className="h-8 w-24 text-sm rounded-lg"
                 />
                 <span className="text-xs text-muted-foreground">% of the peers asked</span>
               </div>
@@ -108,10 +110,10 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
               <Input
                 id="rc-pnc"
                 type="text"
-                placeholder="Empty: every PnC Admin account"
                 value={s.pnc_notification_email ?? ''}
-                onChange={(e) => setS({ ...s, pnc_notification_email: e.target.value })}
-                className="h-8 text-sm"
+                onChange={(e) => setS({ ...s, pnc_notification_email: e.target.value || null })}
+                placeholder="pnc@example.com"
+                className="h-8 text-sm rounded-lg"
               />
             </div>
           </div>
@@ -119,10 +121,10 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
       </Card>
 
       {GROUPS.map((g) => (
-        <Card key={g.title}>
+        <Card key={g.title} className="rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-xs overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{g.title}</CardTitle>
-            <CardDescription>{g.description}</CardDescription>
+            <CardTitle className="text-base font-bold text-foreground">{g.title}</CardTitle>
+            <CardDescription className="text-xs">{g.description}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
             {g.fields.map((f) => (
@@ -132,9 +134,9 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
                   <Input
                     id={`rc-${f.key}`}
                     type="number"
-                    value={s[f.key]}
+                    value={s[f.key] ?? 0}
                     onChange={(e) => setS({ ...s, [f.key]: Number(e.target.value) })}
-                    className="h-8 w-24 text-sm"
+                    className="h-8 w-24 text-sm rounded-lg"
                   />
                   {f.unit && <span className="text-xs text-muted-foreground">{f.unit}</span>}
                 </div>
@@ -146,7 +148,7 @@ export function ReviewSettingsForm({ initial }: { initial: ReviewCycleSettings }
       ))}
 
       <div className="flex justify-end">
-        <Button onClick={save} disabled={pending} className="gap-1.5">
+        <Button onClick={save} disabled={pending} className="gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs">
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           Save review settings
         </Button>

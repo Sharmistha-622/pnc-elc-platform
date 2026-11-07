@@ -18,6 +18,7 @@ import { buildPersonalDetailsSchema } from '@/lib/onboarding/personal-details-sc
 import { fieldErrors } from '@/lib/dpdp/settings/schemas';
 import { guardianBlocks, guardianStatusFor } from '@/lib/dpdp/children';
 import { GUARDIAN_HOLD_MESSAGE, guardianStatusOf, setGuardianStatus } from '@/lib/dpdp/guardian';
+import { buildSignatureMetadata } from '@/lib/onboarding/signature-metadata';
 
 export async function GET(
   req: NextRequest,
@@ -140,7 +141,8 @@ export async function POST(
         body.document_type,
         body.signer_name,
         body.signature_data_url,
-        body.signature_metadata
+        // From the request itself, never from the body.
+        buildSignatureMetadata(req.headers, new Date())
       );
     } else if (action === 'submit_onboarding') {
       result = await submitCandidateOnboarding(id);

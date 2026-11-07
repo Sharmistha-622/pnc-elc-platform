@@ -24,7 +24,7 @@ import {
   Banknote,
   RotateCcw,
 } from 'lucide-react';
-import { OffboardingSettings } from '@/lib/offboarding/types';
+import { DEFAULT_OFFBOARDING_SETTINGS, type OffboardingSettings } from '@/lib/offboarding/types';
 import { updateOffboardingSettings } from '@/lib/offboarding/service';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ export function OffboardingSettingsForm({
 }: {
   initialSettings: OffboardingSettings;
 }) {
-  const [settings, setSettings] = useState<OffboardingSettings>(initialSettings);
+  const [settings, setSettings] = useState<OffboardingSettings>(initialSettings || DEFAULT_OFFBOARDING_SETTINGS);
   const [isPending, startTransition] = useTransition();
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -67,7 +67,7 @@ export function OffboardingSettingsForm({
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Timelines & Notice Periods */}
-      <Card className="rounded-xl border border-border bg-card shadow-xs">
+      <Card className="rounded-lg border border-border bg-card shadow-xs">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -203,7 +203,7 @@ export function OffboardingSettingsForm({
       </Card>
 
       {/* 2. Clearance Governance & Enforcement */}
-      <Card className="rounded-xl border border-border bg-card shadow-xs">
+      <Card className="rounded-lg border border-border bg-card shadow-xs">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -328,3 +328,4 @@ export function OffboardingSettingsForm({
     </div>
   );
 }
+

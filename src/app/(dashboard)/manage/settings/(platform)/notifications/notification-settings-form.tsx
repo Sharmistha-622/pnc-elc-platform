@@ -205,7 +205,7 @@ export function NotificationSettingsForm({
   return (
     <div className="space-y-6">
       {/* Sub-Navigation Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 bg-muted/50 rounded-xl border border-border/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 bg-muted/50 rounded-lg border border-border/80">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -249,7 +249,7 @@ export function NotificationSettingsForm({
       {activeTab === 'rules' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* 1. Onboarding Notifications */}
-          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
@@ -266,7 +266,7 @@ export function NotificationSettingsForm({
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Offer Letter Email */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -299,7 +299,7 @@ export function NotificationSettingsForm({
                 </div>
 
                 {/* Offer Acceptance Reminders */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -351,7 +351,7 @@ export function NotificationSettingsForm({
                 </div>
 
                 {/* Document Submission Reminders */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -387,7 +387,7 @@ export function NotificationSettingsForm({
                 </div>
 
                 {/* Welcome & IT Provisioning Alerts */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <Label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
                     Day 1 Welcome & Workspace Provisioning
                   </Label>
@@ -421,7 +421,7 @@ export function NotificationSettingsForm({
           </Card>
 
           {/* 2. Confirmation & Probation Cadence */}
-          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
@@ -438,7 +438,7 @@ export function NotificationSettingsForm({
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Peer Request Subject & Deadline */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
                     Peer Feedback Invitation
                   </Label>
@@ -470,7 +470,7 @@ export function NotificationSettingsForm({
                 </div>
 
                 {/* Peer Reviewer Reminders */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -522,7 +522,7 @@ export function NotificationSettingsForm({
                 </div>
 
                 {/* Manager Probation Notice & Confirmation Release */}
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3 md:col-span-2">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3 md:col-span-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -570,7 +570,7 @@ export function NotificationSettingsForm({
           </Card>
 
           {/* 3. Performance Appraisal Notifications */}
-          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
@@ -586,7 +586,7 @@ export function NotificationSettingsForm({
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
                       Cycle Launch Announcement Email
@@ -613,7 +613,7 @@ export function NotificationSettingsForm({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <Label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
                     Submission Deadlines & Result Letters
                   </Label>
@@ -650,7 +650,7 @@ export function NotificationSettingsForm({
           </Card>
 
           {/* 4. Offboarding & Separation Workflows */}
-          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+          <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -666,7 +666,7 @@ export function NotificationSettingsForm({
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
                       Resignation Formal Acknowledgment
@@ -693,7 +693,7 @@ export function NotificationSettingsForm({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-3">
+                <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-3">
                   <Label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
                     Clearance Reminders & Settlement
                   </Label>
@@ -733,7 +733,7 @@ export function NotificationSettingsForm({
           </Card>
 
           {/* Save Action Bar */}
-          <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border/80 shadow-xs">
+          <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/80 shadow-xs">
             <div className="flex items-center gap-2">
               {saved && (
                 <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
@@ -783,7 +783,7 @@ export function NotificationSettingsForm({
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
+            <div className="p-4 rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Total Emails Dispatched
               </p>
@@ -791,7 +791,7 @@ export function NotificationSettingsForm({
               <p className="text-[10px] text-muted-foreground">All lifecycle communication</p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
+            <div className="p-4 rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Delivered
               </p>
@@ -799,7 +799,7 @@ export function NotificationSettingsForm({
               <p className="text-[10px] text-muted-foreground">Verified recipient delivery</p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
+            <div className="p-4 rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Queued Reminders
               </p>
@@ -807,7 +807,7 @@ export function NotificationSettingsForm({
               <p className="text-[10px] text-muted-foreground">Scheduled for next cron window</p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
+            <div className="p-4 rounded-lg border border-border/80 bg-card/60 backdrop-blur-sm shadow-2xs space-y-1">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Delivery Bounces / Errors
               </p>
@@ -817,7 +817,7 @@ export function NotificationSettingsForm({
           </div>
 
           {/* Outbox Table Card */}
-          <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
+          <div className="rounded-lg border border-border/80 bg-card shadow-xs overflow-hidden">
             {/* Toolbar: Search + Category + Status filters */}
             <div className="p-4 border-b border-border/60 bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="relative w-full md:w-80">
@@ -974,7 +974,7 @@ export function NotificationSettingsForm({
 
       {/* EMAIL PREVIEW MODAL */}
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-        <DialogContent className="max-w-xl rounded-2xl p-0 overflow-hidden">
+        <DialogContent className="max-w-xl rounded-lg p-0 overflow-hidden">
           <DialogHeader className="p-5 border-b border-border/60 bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -996,7 +996,7 @@ export function NotificationSettingsForm({
 
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Headers Area */}
-            <div className="p-3.5 rounded-xl border border-border/80 bg-muted/30 space-y-2 text-xs">
+            <div className="p-3.5 rounded-lg border border-border/80 bg-muted/30 space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground font-semibold">Recipient:</span>
                 <span className="font-medium text-foreground">
@@ -1070,3 +1070,4 @@ export function NotificationSettingsForm({
     </div>
   )
 }
+

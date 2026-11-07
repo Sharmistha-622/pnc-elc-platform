@@ -19,6 +19,7 @@ create table auth.users (
   email text,
   raw_app_meta_data jsonb default '{}'::jsonb,
   raw_user_meta_data jsonb default '{}'::jsonb,
+  banned_until timestamptz,
   created_at timestamptz default now()
 );
 create function auth.jwt() returns jsonb language sql stable as $$

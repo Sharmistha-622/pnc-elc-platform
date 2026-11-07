@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { normalizeRole, type UserRole } from '@/lib/role-constants'
+import { accessEndedAt } from '@/lib/rbac/lifecycle'
 
 export type UserRow = {
   id: string
@@ -32,7 +33,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
             ? ('super_admin' as UserRole)
             : normalizeRole(u.app_metadata?.role),
           team: (u.user_metadata?.team as string) ?? null,
-          status: u.confirmed_at ? 'active' : 'invited',
+          status: accessEndedAt(u.app_metadata) ? 'access ended' : u.confirmed_at ? 'active' : 'invited',
           created_at: u.created_at,
           last_active_at: u.last_sign_in_at,
           avatar: (u.user_metadata?.avatar_url as string) ?? (u.user_metadata?.picture as string) ?? null,

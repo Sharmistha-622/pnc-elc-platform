@@ -28,7 +28,7 @@ export function DocumentSettingsForm({
 }: {
   initialDocumentTypes: DocumentType[]
 }) {
-  const [docTypes, setDocTypes] = useState<DocumentType[]>(initialDocumentTypes)
+  const [docTypes, setDocTypes] = useState<DocumentType[]>(initialDocumentTypes || [])
   const [pageIndex, setPageIndex] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [isPending, startTransition] = useTransition()
@@ -114,7 +114,7 @@ export function DocumentSettingsForm({
   return (
     <div className="space-y-6">
       {/* 1. Storage Boundary Information Notice */}
-      <Card className="border-border/80 bg-muted/20 rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-muted/20 rounded-lg overflow-hidden">
         <CardContent className="pt-5 pb-5">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
@@ -132,7 +132,7 @@ export function DocumentSettingsForm({
       </Card>
 
       {/* 2. Document Types Table */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ export function DocumentSettingsForm({
       </Card>
 
       {/* Save Action Bar matching application aesthetic */}
-      <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border/80 shadow-xs">
+      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/80 shadow-xs">
         <div className="flex items-center gap-2">
           {saved && (
             <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
@@ -340,3 +340,4 @@ export function DocumentSettingsForm({
     </div>
   )
 }
+

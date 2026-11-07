@@ -23,6 +23,7 @@ import {
   OnboardingStatus,
   GeneratedDocumentType,
   OnboardingSalaryStructure,
+  SignatureMetadata,
 } from './types';
 import { GENERATED_DOCUMENT_LABELS } from './types';
 import { onboardingDb, assertOk, isUuid, mapRecord, RECORD_SELECT } from './db';
@@ -746,13 +747,7 @@ export async function signGeneratedDocument(
   docType: GeneratedDocumentType,
   signerName: string,
   signatureDataUrl?: string,
-  signatureMetadata?: {
-    ip_address?: string;
-    user_agent?: string;
-    timestamp?: string;
-    method?: string;
-    auth_token?: string;
-  }
+  signatureMetadata?: SignatureMetadata
 ): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
@@ -789,7 +784,9 @@ export async function signGeneratedDocument(
     actorEmail: data.record.personal_email,
     entityId: doc.id,
     letterType: label,
-    metadata: signatureMetadata as Record<string, unknown> | undefined,
+    // How and when it was signed. The address and browser stay with the
+    // signature itself, not in the audit trail.
+    metadata: signatureMetadata ? { method: signatureMetadata.method, signed_at: signatureMetadata.timestamp } : undefined,
   });
 
   return refreshProgress(id);

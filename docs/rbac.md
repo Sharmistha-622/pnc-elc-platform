@@ -163,6 +163,13 @@ Status is the single field the automation reads; the role follows from it.
 | Active | `employee` | marked joined on Day 1 |
 | Confirmed | `employee` | probation confirmed |
 | **Withdrawn** | *none* | declined, offer pulled or no-show |
+| **Exited** | *none* | exit closed: any granted role ends too, the account is closed and its sessions cannot be renewed |
+
+Exited is terminal for access: closing an exit removes the stored role, marks
+the account ended (`app_metadata.access_ended_at`) and bans it, and the
+database gives an ended, banned or exited account no role at all. A Super Admin
+can re-open the account from Users & Roles ("Restore access"), for a re-hire or
+a mistake; the role is assigned again by hand.
 
 Withdrawn is terminal and reachable from any stage before confirmation. The
 record is **kept, never deleted**, so no confirmation trigger can fire for

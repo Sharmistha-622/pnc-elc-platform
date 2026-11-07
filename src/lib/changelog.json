@@ -1,5 +1,45 @@
 [
   {
+    "version": "2.09.08",
+    "date": "2026-11-07",
+    "title": "Add role-dashboards IDE workflow",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Add role-dashboards IDE workflow"
+      }
+    ]
+  },
+  {
+    "version": "2.09.07",
+    "date": "2026-11-07",
+    "title": "Keep the portal link with the candidate; record signatures on the server",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "onboarding portal links and signature records hardened"
+      },
+      {
+        "category": "Fixes",
+        "description": "a candidate's signature records their real network address"
+      }
+    ]
+  },
+  {
+    "version": "2.09.06",
+    "date": "2026-11-07",
+    "title": "End platform access when an exit closes",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "offboarding and account lifecycle hardened"
+      }
+    ]
+  },
+  {
     "version": "2.09.05",
     "date": "2026-11-04",
     "title": "Every function service-role only, including new ones",

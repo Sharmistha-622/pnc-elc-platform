@@ -56,7 +56,7 @@ export function PeerFeedbackSettingsForm({
       updated_at: '',
     }
   )
-  const [keywords, setKeywords] = useState<RedFlagKeyword[]>(initialKeywords)
+  const [keywords, setKeywords] = useState<RedFlagKeyword[]>(initialKeywords || [])
   const [newKeyword, setNewKeyword] = useState('')
   const [isPending, startTransition] = useTransition()
   const [isKeywordPending, setIsKeywordPending] = useState(false)
@@ -157,7 +157,7 @@ export function PeerFeedbackSettingsForm({
   return (
     <div className="space-y-6">
       {/* 1. Reviewer Limits */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
@@ -173,7 +173,7 @@ export function PeerFeedbackSettingsForm({
         </CardHeader>
         <CardContent className="p-5 pt-0">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Minimum Reviewers
               </Label>
@@ -193,7 +193,7 @@ export function PeerFeedbackSettingsForm({
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Maximum Reviewers
               </Label>
@@ -213,7 +213,7 @@ export function PeerFeedbackSettingsForm({
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/80 bg-background/60 space-y-2">
+            <div className="p-4 rounded-lg border border-border/80 bg-background/60 space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Default Slots
               </Label>
@@ -237,7 +237,7 @@ export function PeerFeedbackSettingsForm({
       </Card>
 
       {/* 2. Red-Flag Criteria & Keywords */}
-      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+      <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
         <CardHeader className="p-5 pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
@@ -253,7 +253,7 @@ export function PeerFeedbackSettingsForm({
         </CardHeader>
         <CardContent className="p-5 pt-0 space-y-6">
           {/* Response Rate Threshold */}
-          <div className="p-4 rounded-xl border border-border/80 bg-background/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 rounded-lg border border-border/80 bg-background/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
                 Response Rate Red Flag Threshold
@@ -403,7 +403,7 @@ export function PeerFeedbackSettingsForm({
               </div>
             ) : (
               /* View Mode: Table */
-              <div className="rounded-xl border border-border/80 overflow-hidden bg-background shadow-2xs">
+              <div className="rounded-lg border border-border/80 overflow-hidden bg-background shadow-2xs">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -478,7 +478,7 @@ export function PeerFeedbackSettingsForm({
       </Card>
 
       {/* Save Action Bar matching application aesthetic */}
-      <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border/80 shadow-xs">
+      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/80 shadow-xs">
         <div className="flex items-center gap-2">
           {saved && (
             <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
@@ -519,3 +519,5 @@ export function PeerFeedbackSettingsForm({
     </div>
   )
 }
+
+

@@ -305,14 +305,6 @@ export default function CandidateOnboardingPortalPage({
     const canvas = canvasRef.current;
     const signatureDataUrl = canvas ? canvas.toDataURL('image/png') : null;
 
-    const signatureMetadata = {
-      ip_address: '106.51.78.192',
-      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
-      timestamp: new Date().toISOString(),
-      method: 'canvas_digital_draw',
-      auth_token: token,
-    };
-
     try {
       setSaving(true);
       const res = await fetch(`/api/onboarding/token/${token}`, {
@@ -323,12 +315,11 @@ export default function CandidateOnboardingPortalPage({
           document_type: signingDoc.type,
           signer_name: signerFullName,
           signature_data_url: signatureDataUrl,
-          signature_metadata: signatureMetadata,
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(`${signingDoc.name} signed with verified signature metadata!`);
+        toast.success(`${signingDoc.name} signed.`);
         setData(json.data);
         setSigningDoc(null);
         setSignConsent(false);
@@ -1161,10 +1152,6 @@ export default function CandidateOnboardingPortalPage({
                   </div>
                   <div className="space-y-2 text-[11px] font-mono text-muted-foreground divide-y divide-border/40">
                     <div className="flex justify-between pt-1">
-                      <span>Auth Token:</span>
-                      <span className="text-foreground font-bold">{token.slice(0, 16)}...</span>
-                    </div>
-                    <div className="flex justify-between pt-1">
                       <span>Capture Method:</span>
                       <span className="text-foreground">HTML5 Canvas Direct Stroke</span>
                     </div>
@@ -1177,8 +1164,8 @@ export default function CandidateOnboardingPortalPage({
                       <span className="text-foreground">Candidate ({record.designation})</span>
                     </div>
                     <div className="flex justify-between pt-1">
-                      <span>IP Geolocation Ref:</span>
-                      <span className="text-foreground">106.51.78.192 (India)</span>
+                      <span>Network address:</span>
+                      <span className="text-foreground">Recorded when you sign</span>
                     </div>
                   </div>
                 </div>

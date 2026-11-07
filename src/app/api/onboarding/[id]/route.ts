@@ -14,7 +14,7 @@ import {
   purgeWithdrawnDocuments,
 } from '@/lib/onboarding/service';
 import { ACTION_ROLES, isOnboardingAction } from '@/lib/onboarding/access';
-import { redactSalary } from '@/lib/onboarding/redact';
+import { redactSalary, redactPortalToken } from '@/lib/onboarding/redact';
 import { guard, maySeeSalary, type Guarded } from '@/lib/rbac/guard';
 import type { FullOnboardingData } from '@/lib/onboarding/types';
 
@@ -24,8 +24,12 @@ import type { FullOnboardingData } from '@/lib/onboarding/types';
 // matrix denies one.
 
 function forCaller(data: FullOnboardingData, caller: Guarded): FullOnboardingData {
-  return maySeeSalary(caller) ? data : redactSalary(data);
+  const withoutToken = redactPortalToken(data);
+  return maySeeSalary(caller) ? withoutToken : redactSalary(withoutToken);
 }
+
+/** Staff address a record by its id; the portal token is the candidate's alone. */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Who did it, from the session. Never from the request body. */
 function actorOf(caller: Guarded): string {
@@ -41,6 +45,7 @@ export async function GET(
     if (!access.ok) return NextResponse.json({ success: false, error: access.error }, { status: 403 });
 
     const { id } = await params;
+    if (!RECORD_ID.test(id)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
     const data = await getOnboardingById(id);
     if (!data) {
       return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
@@ -57,6 +62,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
+    if (!RECORD_ID.test(id)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
     const body = await req.json();
     const { action } = body;
 

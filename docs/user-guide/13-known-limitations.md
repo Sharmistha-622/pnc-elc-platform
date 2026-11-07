@@ -53,8 +53,6 @@ real work.** Items are grouped by area.
   screen yet.
 - There's no button to **withdraw** a candidate, or to delete a withdrawn
   candidate's documents.
-- The IP address recorded with a candidate's signature is a fixed
-  placeholder, not their real IP.
 - Documents that were sealed into the vault on verification may not be
   copied into the employee's Drive folder when the account is created. Check
   the employee's **Documents** page.

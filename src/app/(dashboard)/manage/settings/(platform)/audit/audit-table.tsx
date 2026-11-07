@@ -31,10 +31,10 @@ export function AuditTable({ initialLogs }: { initialLogs: any[] }) {
   const [pageIndex, setPageIndex] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const paginatedLogs = initialLogs.slice((pageIndex - 1) * pageSize, pageIndex * pageSize)
+  const paginatedLogs = (initialLogs || []).slice((pageIndex - 1) * pageSize, pageIndex * pageSize)
 
   return (
-    <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-xl overflow-hidden">
+    <Card className="border-border/80 bg-card/60 backdrop-blur-sm shadow-xs rounded-lg overflow-hidden">
       <CardHeader className="p-5 pb-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
@@ -49,7 +49,7 @@ export function AuditTable({ initialLogs }: { initialLogs: any[] }) {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {initialLogs.length === 0 ? (
+        {(initialLogs || []).length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm border-t border-border/80">
             <History className="w-8 h-8 mx-auto mb-2 opacity-30 text-indigo-700 dark:text-indigo-300" />
             <p className="font-semibold text-foreground">No configuration changes logged yet</p>
@@ -109,7 +109,7 @@ export function AuditTable({ initialLogs }: { initialLogs: any[] }) {
             <DataTablePagination
               pageIndex={pageIndex}
               pageSize={pageSize}
-              totalItems={initialLogs.length}
+              totalItems={(initialLogs || []).length}
               pageSizeOptions={[10, 25, 50]}
               onPageChange={setPageIndex}
               onPageSizeChange={(newSize) => {
@@ -124,3 +124,4 @@ export function AuditTable({ initialLogs }: { initialLogs: any[] }) {
     </Card>
   )
 }
+

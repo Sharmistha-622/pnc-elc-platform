@@ -75,9 +75,9 @@ The list of every candidate.
   & team, joining date, **Dossier Progress %**, status.
 - Row actions:
   - **Review** opens the candidate's review page.
-  - **⋮ › Copy Candidate Portal Link** copies their personal link.
-  - **⋮ › Preview Candidate View** shows what the candidate sees.
-  - **⋮ › Send / Resend Invitation Email**.
+  - **⋮ › Send / Resend Invitation Email**. The portal link is the
+    candidate's own: it reaches them by email only, and staff screens don't
+    show it.
 
 ## Creating a candidate (`/onboarding/candidate/new`)
 
@@ -163,7 +163,6 @@ and last active.
 
 **Buttons** (they change with the status):
 
-- **Candidate Form** shows the portal as the candidate sees it.
 - **Send Invitation / Resend Link**.
 - **Request Changes** and **Approve Dossier**, when the dossier is submitted.
 - **Create Official Account**, when it's approved.

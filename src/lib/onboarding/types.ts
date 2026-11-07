@@ -200,13 +200,7 @@ export interface OnboardingGeneratedDocument {
   signed_at?: string | null;
   signed_by?: string | null;
   signature_data_url?: string | null;
-  signature_metadata?: {
-    ip_address?: string;
-    user_agent?: string;
-    timestamp?: string;
-    method?: string;
-    auth_token?: string;
-  } | null;
+  signature_metadata?: SignatureMetadata | null;
   created_at: string;
 }
 
@@ -301,4 +295,15 @@ export interface FullOnboardingData {
   activityLogs: OnboardingActivityLog[];
   provisioning?: EmployeeAccountProvisioning | null;
   salaryStructure?: OnboardingSalaryStructure | null;
+}
+
+/**
+ * What is recorded with a signature. Built on the server from the request
+ * that carried it (`buildSignatureMetadata`), never taken from the browser.
+ */
+export interface SignatureMetadata {
+  ip_address: string | null;
+  user_agent: string | null;
+  timestamp: string;
+  method: 'canvas_digital_draw';
 }

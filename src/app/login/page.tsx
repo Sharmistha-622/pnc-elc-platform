@@ -3,15 +3,16 @@ import { redirect } from "next/navigation"
 import { LoginForm } from "@/components/login-form"
 import { Toaster } from "@/components/ui/sonner"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isAllowedEmail } from "@/lib/auth/allowedEmail"
+import { resolveRole } from "@/lib/rbac/resolveRole"
 
 export default async function LoginPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
-  // Only an account that may use the app is sent on to it. An outside-domain
-  // session that survived sign-out would otherwise bounce /login → / →
-  // /auth/signout → /login; it stays here, with the refusal showing.
-  if (user && isAllowedEmail(user.email)) redirect("/")
+  // Only an account that may use the app is sent on to it. A refused session
+  // (outside the domains, or access ended) that survived sign-out would
+  // otherwise bounce /login → / → /auth/signout → /login; it stays here, with
+  // the refusal showing.
+  if (user && resolveRole(user).role) redirect("/")
 
   return (
     <div className="min-h-screen w-full bg-slate-50 dark:bg-zinc-950 flex flex-col items-center relative overflow-hidden font-sans selection:bg-primary/20 selection:text-primary">

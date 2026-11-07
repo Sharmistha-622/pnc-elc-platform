@@ -5,7 +5,7 @@ import {
   createOnboardingRecord,
 } from '@/lib/onboarding/service';
 import { OFFER_ROLES } from '@/lib/onboarding/access';
-import { redactRecordSalary, redactSalary } from '@/lib/onboarding/redact';
+import { redactRecordSalary, redactSalary, redactPortalToken, withoutPortalToken } from '@/lib/onboarding/redact';
 import { guard, maySeeSalary } from '@/lib/rbac/guard';
 
 export async function GET(req: NextRequest) {
@@ -19,10 +19,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const details = searchParams.get('details');
     if (details === 'full') {
-      const fullRecords = await getAllFullOnboardingData();
+      const fullRecords = (await getAllFullOnboardingData()).map(redactPortalToken);
       return NextResponse.json({ success: true, data: salary ? fullRecords : fullRecords.map(redactSalary) });
     }
-    const records = await getAllOnboardingRecords();
+    const records = (await getAllOnboardingRecords()).map(withoutPortalToken);
     return NextResponse.json({ success: true, data: salary ? records : records.map(redactRecordSalary) });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Enter the offered CTC.' }, { status: 400 });
     }
     const created = await createOnboardingRecord(payload, customLetters);
-    return NextResponse.json({ success: true, data: created });
+    return NextResponse.json({ success: true, data: created ? redactPortalToken(created) : created });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
