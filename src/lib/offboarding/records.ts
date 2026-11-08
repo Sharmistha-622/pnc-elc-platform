@@ -14,7 +14,6 @@ import type {
   OffboardingFnF,
   OffboardingNDCDepartment,
   OffboardingSettings,
-  OffboardingStatus,
   ResignationRequest,
   ResignationRequestStatus,
   ReviewDecision,
@@ -306,14 +305,6 @@ export function documentName(docType: ExitDocument['document_type'], employeeNam
     : `Relieving & Experience Certificate — ${employeeName}.pdf`
 }
 
-/** Exits still under way. */
-export const OPEN_CASE_STATUSES: readonly OffboardingStatus[] = [
-  'initiated',
-  'notice_period',
-  'clearance_in_progress',
-  'settlement_pending',
-]
-
 export function isClearedAsset(a: Pick<OffboardingAssetItem, 'return_status'>): boolean {
   return a.return_status === 'cleared' || a.return_status === 'returned' || a.return_status === 'waived'
 }
@@ -324,6 +315,57 @@ export function hasOutstandingAssets(assets: Pick<OffboardingAssetItem, 'return_
 
 export function ndcBlockers(ndc: Pick<OffboardingNDCDepartment, 'status' | 'department_label' | 'blocker_reason'>[]): string[] {
   return ndc.filter((n) => n.status !== 'cleared').map((n) => `${n.department_label}: ${n.blocker_reason || n.status}`)
+}
+
+/**
+ * How the IT No Dues sign-off follows the assets, in either direction:
+ * cleared once every asset is back or waived; blocked while one is under
+ * recovery; back to pending when an asset is outstanding again after IT had
+ * cleared. Null when it should stay as it is (including a block someone set
+ * by hand while nothing is under recovery).
+ */
+export function itSignOffChange(
+  current: Pick<OffboardingNDCDepartment, 'status' | 'blocker_reason'>,
+  assets: Pick<OffboardingAssetItem, 'return_status' | 'recovery_amount'>[],
+): Record<string, unknown> | null {
+  if (assets.every(isClearedAsset)) {
+    return current.status === 'cleared'
+      ? null
+      : { status: 'cleared', remarks: 'All assigned assets inspected and verified cleared.', blocker_reason: null }
+  }
+  const recovering = assets.filter((a) => a.return_status === 'under_recovery')
+  if (recovering.length > 0) {
+    const total = recovering.reduce((sum, a) => sum + (Number(a.recovery_amount) || 0), 0)
+    const reason = `Asset recovery pending: ₹${total}`
+    return current.status === 'blocked' && current.blocker_reason === reason
+      ? null
+      : { status: 'blocked', blocker_reason: reason, cleared_at: null, cleared_by: null }
+  }
+  return current.status === 'cleared'
+    ? { status: 'pending', remarks: 'An asset is outstanding again.', blocker_reason: null, cleared_at: null, cleared_by: null }
+    : null
+}
+
+/**
+ * How the F&F row follows the No Dues sign-offs, in either direction: ready
+ * for computation once every department has cleared, and back to awaiting
+ * clearance if one stops being cleared before the computation is under
+ * review. The blockers always list the departments still to clear.
+ */
+export function fnfFollowingClearances(
+  fnfStatus: string,
+  ndc: Pick<OffboardingNDCDepartment, 'status' | 'department_label' | 'blocker_reason'>[],
+): Record<string, unknown> {
+  const blockers = ndcBlockers(ndc)
+  const patch: Record<string, unknown> = { blocked_reasons: blockers }
+  if (ndc.length > 0 && blockers.length === 0 && (fnfStatus === 'awaiting_clearance' || fnfStatus === 'not_started')) {
+    patch.status = 'computation_pending'
+    patch.remarks = 'All departmental NDC sign-offs complete. Ready for F&F computation.'
+  } else if (blockers.length > 0 && fnfStatus === 'computation_pending') {
+    patch.status = 'awaiting_clearance'
+    patch.remarks = 'A departmental NDC sign-off is pending again.'
+  }
+  return patch
 }
 
 // ---------------------------------------------------------------------------

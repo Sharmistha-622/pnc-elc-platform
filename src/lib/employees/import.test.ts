@@ -5,6 +5,7 @@ import {
   parseYesNo,
   planEmployeeImport,
   leaversIn,
+  accessChangesFor,
   IMPORT_TEMPLATE_CSV,
   type ExistingEmployee,
   type ImportContext,
@@ -289,5 +290,17 @@ describe('leaversIn', () => {
     )
     expect(p.canImport).toBe(true)
     expect(leaversIn(p).map((r) => r.email)).toEqual(['gone@navgurukul.org', 'leaving@navgurukul.org'])
+  })
+})
+
+describe('accessChangesFor', () => {
+  it('ends access for leavers but leaves the owner alone, ignoring case', () => {
+    const p = plan(
+      'gone@navgurukul.org,,,,,,exited,,,\n' + 'Owner@NavGurukul.org,,,,,,exited,,,',
+      [person({ id: 'g', email: 'gone@navgurukul.org' }), person({ id: 'o', email: 'owner@navgurukul.org' })]
+    )
+    const { end, kept } = accessChangesFor(p, ['owner@navgurukul.org'])
+    expect(end.map((r) => r.email)).toEqual(['gone@navgurukul.org'])
+    expect(kept.map((r) => r.email.toLowerCase())).toEqual(['owner@navgurukul.org'])
   })
 })

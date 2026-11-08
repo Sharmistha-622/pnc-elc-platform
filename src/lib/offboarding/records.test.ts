@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   decideResignation,
   documentsFrom,
+  fnfFollowingClearances,
+  itSignOffChange,
   isIsoDate,
   isUuid,
   ndcBlockers,
@@ -135,5 +137,49 @@ describe('decideResignation', () => {
     expect(held.patch).toMatchObject({ status: 'on_hold', hold_until_date: '2026-11-11' })
     const byDefault = decideResignation({ manager_decision: 'pending', pnc_decision: 'pending' }, { ...base, reviewerRole: 'manager', decision: 'on_hold' })
     expect(byDefault.patch.hold_until_date).toBe('2026-11-15')
+  })
+})
+
+describe('itSignOffChange', () => {
+  const asset = (return_status: string, recovery_amount = 0) => ({ return_status, recovery_amount }) as never
+
+  it('clears IT once every asset is back or waived, and leaves a cleared IT alone', () => {
+    expect(itSignOffChange({ status: 'pending', blocker_reason: null }, [asset('returned'), asset('waived')])).toMatchObject({ status: 'cleared' })
+    expect(itSignOffChange({ status: 'cleared', blocker_reason: null }, [asset('returned')])).toBeNull()
+  })
+
+  it('blocks IT while an asset is under recovery, with the total', () => {
+    expect(itSignOffChange({ status: 'cleared', blocker_reason: null }, [asset('under_recovery', 300), asset('under_recovery', 200)])).toMatchObject({
+      status: 'blocked',
+      blocker_reason: 'Asset recovery pending: ₹500',
+    })
+    expect(itSignOffChange({ status: 'blocked', blocker_reason: 'Asset recovery pending: ₹500' }, [asset('under_recovery', 500)])).toBeNull()
+  })
+
+  it('moves a cleared IT back to pending when an asset is outstanding again, and leaves a hand-set block alone', () => {
+    expect(itSignOffChange({ status: 'cleared', blocker_reason: null }, [asset('lost')])).toMatchObject({ status: 'pending' })
+    expect(itSignOffChange({ status: 'blocked', blocker_reason: 'Badge not returned' }, [asset('pending_return')])).toBeNull()
+  })
+})
+
+describe('fnfFollowingClearances', () => {
+  const ndc = (status: string, department_label = 'Finance') => ({ status, department_label, blocker_reason: null }) as never
+
+  it('readies F&F once every department has cleared', () => {
+    expect(fnfFollowingClearances('awaiting_clearance', [ndc('cleared'), ndc('cleared')])).toMatchObject({
+      status: 'computation_pending',
+      blocked_reasons: [],
+    })
+  })
+
+  it('takes it back when a department stops being cleared before review', () => {
+    expect(fnfFollowingClearances('computation_pending', [ndc('cleared'), ndc('blocked', 'IT')])).toMatchObject({
+      status: 'awaiting_clearance',
+      blocked_reasons: ['IT: blocked'],
+    })
+  })
+
+  it('only updates the blockers once the computation is under review or later', () => {
+    expect(fnfFollowingClearances('processing', [ndc('blocked', 'IT')])).toEqual({ blocked_reasons: ['IT: blocked'] })
   })
 })

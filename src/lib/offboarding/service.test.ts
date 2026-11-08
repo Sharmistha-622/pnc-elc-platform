@@ -18,6 +18,9 @@ const db = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   writes: [] as Array<{ client: string; table: string; op: string }>,
   fail: {} as Record<string, { code: string; message: string }>,
+  // Fails only the nth call (counting from 1) to a table and operation.
+  failNth: {} as Record<string, { n: number; code: string; message: string }>,
+  calls: {} as Record<string, number>,
 }))
 
 const state = vi.hoisted(() => ({
@@ -43,7 +46,13 @@ function fake(client: Client) {
     let count = false
     let orderBy: { col: string; asc: boolean } | null = null
 
-    const failure = () => db.fail[`${table}:${op}`] ?? null
+    const failure = () => {
+      const key = `${table}:${op}`
+      db.calls[key] = (db.calls[key] ?? 0) + 1
+      const nth = db.failNth[key]
+      if (nth && nth.n === db.calls[key]) return { code: nth.code, message: nth.message }
+      return db.fail[key] ?? null
+    }
     const withJoins = (r: Row): Row => {
       if (!selectCols.includes('employees(')) return { ...r }
       const person = (db.tables.employees ?? []).find((e) => e.id === r.employee_id)
@@ -172,6 +181,7 @@ vi.mock('@/lib/offboarding/preExitRoles', async () => {
   const actual = await vi.importActual<typeof import('./preExitRoles')>('./preExitRoles')
   return {
     lastWorkingDayOf: actual.lastWorkingDayOf,
+    OPEN_EXIT_STATUSES: actual.OPEN_EXIT_STATUSES,
     applyPreExitRoleRule: async (exit: Record<string, unknown>) => {
       state.preExit.push(exit)
       return { due: false, ended: false, failed: false, activeReportees: 0 }
@@ -248,6 +258,8 @@ beforeEach(() => {
   }
   db.writes = []
   db.fail = {}
+  db.failNth = {}
+  db.calls = {}
   state.caller = PNC_ADMIN
   state.self = null
   state.ownEmployeeId = null
@@ -315,6 +327,34 @@ describe('opening an exit', () => {
     expect(res).toEqual({ success: false, error: 'The exit could not be saved. Try again.' })
     expect(rowsOf('offboarding_cases')).toHaveLength(0)
     expect(rowsOf('offboarding_checklists')).toHaveLength(0)
+  })
+
+  it('refuses a second open exit for the same person, and allows a new one once the first is closed', async () => {
+    const first = await openCase()
+    const second = await offboarding.initiateOffboardingCase(exitInput())
+    expect(second).toEqual({ success: false, error: 'An exit is already open for this person.' })
+    expect(rowsOf('offboarding_cases')).toHaveLength(1)
+
+    rowsOf('offboarding_cases').find((c) => c.id === first)!.status = 'completed'
+    expect((await offboarding.initiateOffboardingCase(exitInput())).success).toBe(true)
+    expect(rowsOf('offboarding_cases')).toHaveLength(2)
+  })
+
+  it('explains the database refusing a second open exit made at the same moment', async () => {
+    db.fail['offboarding_cases:insert'] = { code: '23505', message: 'duplicate key value violates unique constraint' }
+    expect(await offboarding.initiateOffboardingCase(exitInput())).toEqual({
+      success: false,
+      error: 'An exit is already open for this person.',
+    })
+  })
+
+  it('says so when an incomplete exit could not be removed', async () => {
+    db.fail['offboarding_ndc:insert'] = { code: '42501', message: 'denied' }
+    db.fail['offboarding_cases:delete'] = { code: '57014', message: 'timeout' }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await offboarding.initiateOffboardingCase(exitInput())
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/incomplete one may have been/)
   })
 
   it('refuses an exit without a person, a valid date or a reason', async () => {
@@ -403,6 +443,66 @@ describe('working the exit', () => {
     expect(rowsOf('offboarding_cases')[0].proposed_lwd).toBe('2026-11-20')
     expect(state.preExit[0]).toMatchObject({ lastWorkingDay: '2026-11-20' })
     expect((await offboarding.updateExitDates(caseId, 'soon')).success).toBe(false)
+  })
+
+  it('does not clear IT when the assets cannot be read, and says the follow-on failed', async () => {
+    const caseId = await openCase()
+    const asset = rowsOf('offboarding_asset_clearances', caseId)[0]
+    db.fail['offboarding_asset_clearances:select'] = { code: '57014', message: 'timeout' }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await offboarding.updateAssetClearance(caseId, asset.id as string, { return_status: 'returned' })
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/was saved, but the clearances/)
+    expect(asset.return_status).toBe('returned')
+    expect(rowsOf('offboarding_ndc', caseId).find((n) => n.department === 'it_admin')?.status).toBe('pending')
+  })
+
+  it('moves IT back when an asset is outstanding again, and blocks it while one is under recovery', async () => {
+    const caseId = await openCase()
+    const asset = rowsOf('offboarding_asset_clearances', caseId)[0]
+    const it = () => rowsOf('offboarding_ndc', caseId).find((n) => n.department === 'it_admin')!
+    await offboarding.updateAssetClearance(caseId, asset.id as string, { return_status: 'returned' })
+    expect(it().status).toBe('cleared')
+
+    await offboarding.updateAssetClearance(caseId, asset.id as string, { return_status: 'lost' })
+    expect(it()).toMatchObject({ status: 'pending', cleared_at: null, cleared_by: null })
+
+    await offboarding.updateAssetClearance(caseId, asset.id as string, { return_status: 'under_recovery', recovery_amount: 500 })
+    expect(it()).toMatchObject({ status: 'blocked', blocker_reason: 'Asset recovery pending: ₹500' })
+  })
+
+  it('takes F&F back to awaiting clearance when a department stops being cleared', async () => {
+    const caseId = await openCase()
+    for (const department of ['manager', 'it_admin', 'finance', 'pnc']) {
+      await offboarding.updateNDCDepartment(caseId, department, { status: 'cleared' })
+    }
+    expect(rowsOf('offboarding_fnf', caseId)[0].status).toBe('computation_pending')
+
+    await offboarding.updateNDCDepartment(caseId, 'finance', { status: 'blocked', blocker_reason: 'Advance not settled' })
+    expect(rowsOf('offboarding_fnf', caseId)[0]).toMatchObject({
+      status: 'awaiting_clearance',
+      blocked_reasons: ['Finance & Accounts: Advance not settled'],
+    })
+  })
+
+  it('reports a sign-off whose F&F follow-on could not be written', async () => {
+    const caseId = await openCase()
+    db.fail['offboarding_fnf:update'] = { code: '57014', message: 'timeout' }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await offboarding.updateNDCDepartment(caseId, 'manager', { status: 'cleared' })
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/was saved, but the clearances/)
+    expect(rowsOf('offboarding_ndc', caseId).find((n) => n.department === 'manager')?.status).toBe('cleared')
+  })
+
+  it('will not move the dates of a closed exit', async () => {
+    const caseId = await openCase()
+    rowsOf('offboarding_cases')[0].status = 'completed'
+    expect(await offboarding.updateExitDates(caseId, '2026-11-20')).toEqual({
+      success: false,
+      error: 'This exit is closed; its dates can no longer change.',
+    })
+    expect(rowsOf('offboarding_cases')[0].proposed_lwd).toBe('2026-12-15')
   })
 
   it('lists a generated document, read back from the activity log', async () => {
@@ -530,6 +630,41 @@ describe('resignations', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await offboarding.submitReviewDecision(req.id, 'manager', 'accepted')).success).toBe(false)
     expect((db.tables.resignation_requests ?? [])[0].status).toBe('manager_pending')
+  })
+
+  it('lets only one of two decisions made at once through, so only one exit opens', async () => {
+    const req = await submit('pnc')
+    const results = await Promise.all([
+      offboarding.submitReviewDecision(req.id, 'manager', 'accepted'),
+      offboarding.submitReviewDecision(req.id, 'manager', 'accepted'),
+    ])
+    expect(results.filter((r) => r.success)).toHaveLength(1)
+    expect(results.find((r) => !r.success)?.error).toBe('This resignation changed. Reload and try again.')
+    expect(rowsOf('offboarding_cases')).toHaveLength(1)
+  })
+
+  it('opens no second exit when linking the first one failed', async () => {
+    const req = await submit('pnc')
+    // The first update claims the decision; the second links the exit.
+    db.failNth['resignation_requests:update'] = { n: 2, code: '57014', message: 'timeout' }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const first = await offboarding.submitReviewDecision(req.id, 'manager', 'accepted')
+    expect(first.success).toBe(false)
+    expect(first.error).toMatch(/exit is open, but could not be linked/)
+    expect((db.tables.resignation_requests ?? [])[0].status).toBe('resignation_accepted')
+
+    const retry = await offboarding.submitReviewDecision(req.id, 'manager', 'accepted')
+    expect(retry.success).toBe(false)
+    expect(rowsOf('offboarding_cases')).toHaveLength(1)
+  })
+
+  it('leaves the resignation undecided when its person already has an open exit', async () => {
+    await openCase()
+    const req = await submit('pnc')
+    const res = await offboarding.submitReviewDecision(req.id, 'manager', 'accepted')
+    expect(res).toMatchObject({ success: false, error: 'An exit is already open for this person.' })
+    expect((db.tables.resignation_requests ?? [])[0]).toMatchObject({ status: 'manager_pending', manager_decision: 'pending' })
+    expect(rowsOf('offboarding_cases')).toHaveLength(1)
   })
 
   it("takes the employee's own answer to a retention offer, and only theirs, only while it is open", async () => {

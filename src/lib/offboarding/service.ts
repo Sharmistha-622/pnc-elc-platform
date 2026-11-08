@@ -36,13 +36,13 @@ import {
   documentName,
   documentsFrom,
   hasOutstandingAssets,
-  isClearedAsset,
+  fnfFollowingClearances,
+  itSignOffChange,
   isIsoDate,
   isNdcDepartment,
   isReviewDecision,
   isUuid,
   managerIdsOf,
-  ndcBlockers,
   pickAssetChanges,
   pickChecklistChanges,
   pickFnfChanges,
@@ -57,7 +57,7 @@ import { assetIntegrationService } from '@/lib/integrations/assets';
 import { attendanceIntegrationService } from '@/lib/integrations/attendance';
 import { leaveIntegrationService } from '@/lib/integrations/leave';
 import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess';
-import { applyPreExitRoleRule, lastWorkingDayOf } from '@/lib/offboarding/preExitRoles';
+import { applyPreExitRoleRule, lastWorkingDayOf, OPEN_EXIT_STATUSES } from '@/lib/offboarding/preExitRoles';
 
 // ============================================================================
 // OFFBOARDING
@@ -83,6 +83,14 @@ type Db = SupabaseClient;
 const NOT_FOUND = 'Case not found';
 const SAVE_FAILED = 'The change could not be saved. Try again.';
 const REQUEST_NOT_FOUND = 'Resignation request not found';
+const ALREADY_OPEN = 'An exit is already open for this person.';
+const REQUEST_CHANGED = 'This resignation changed. Reload and try again.';
+const SYNC_FAILED =
+  'The change was saved, but the clearances that follow from it could not be updated. Save it again to retry.';
+
+function isOpenStatus(status: string | null | undefined): boolean {
+  return (OPEN_EXIT_STATUSES as readonly string[]).includes(status ?? '');
+}
 
 /** The F&F columns a caller without salary access may see: status and blockers, no amount. */
 const FNF_STATUS_COLUMNS =
@@ -352,6 +360,20 @@ async function openOffboardingCase(
   if (!(EXIT_TYPES as readonly string[]).includes(input.exit_type)) return { success: false, error: 'Choose an exit type.' };
   if (typeof input.reason !== 'string' || input.reason.trim() === '') return { success: false, error: 'Enter a reason.' };
 
+  // One open exit per person. The partial unique index in
+  // 202611081100_one_open_exit.sql holds the same rule when two arrive at once.
+  const { data: openCases, error: openError } = await db
+    .from('offboarding_cases')
+    .select('id')
+    .eq('employee_id', input.employee_id)
+    .in('status', [...OPEN_EXIT_STATUSES])
+    .limit(1);
+  if (openError) {
+    logDbError('open exit check failed', openError);
+    return { success: false, error: 'The exit could not be saved. Try again.' };
+  }
+  if ((openCases ?? []).length > 0) return { success: false, error: ALREADY_OPEN };
+
   const caseId = randomUUID();
   const now = new Date();
   const nowIso = now.toISOString();
@@ -474,6 +496,7 @@ async function openOffboardingCase(
 
   const { error: caseError } = await db.from('offboarding_cases').insert(caseRow);
   if (caseError) {
+    if (caseError.code === '23505') return { success: false, error: ALREADY_OPEN };
     logDbError('case insert failed', caseError);
     return { success: false, error: 'The exit could not be saved. Try again.' };
   }
@@ -491,7 +514,14 @@ async function openOffboardingCase(
   if (childError) {
     logDbError('case children insert failed', childError);
     // All or nothing: the children cascade with the case.
-    await (serviceDb() ?? db).from('offboarding_cases').delete().eq('id', caseId);
+    const { error: rollbackError } = await (serviceDb() ?? db).from('offboarding_cases').delete().eq('id', caseId);
+    if (rollbackError) {
+      logDbError('case rollback failed', rollbackError);
+      return {
+        success: false,
+        error: 'The exit could not be saved, and an incomplete one may have been. Check Offboarding before trying again.',
+      };
+    }
     return { success: false, error: 'The exit could not be saved. Try again.' };
   }
 
@@ -655,34 +685,40 @@ export async function updateAssetClearance(
   }
   if (!asset) return { success: false, error: 'Asset record not found' };
 
-  // The IT No Dues sign-off follows the assets: cleared once every asset is
-  // back or waived, blocked while one is under recovery.
-  const [{ data: allAssets }, { data: itNdc }] = await Promise.all([
-    db.from('offboarding_asset_clearances').select('return_status').eq('offboarding_id', caseId),
-    db.from('offboarding_ndc').select('status').eq('offboarding_id', caseId).eq('department', 'it_admin').maybeSingle(),
+  // The IT No Dues sign-off follows the assets, in either direction
+  // (`itSignOffChange`), and F&F follows the sign-offs. The asset change is
+  // saved either way; a failure here is reported once it is recorded.
+  let synced = true;
+  const [{ data: allAssets, error: assetsError }, { data: itNdc, error: itNdcError }] = await Promise.all([
+    db.from('offboarding_asset_clearances').select('return_status, recovery_amount').eq('offboarding_id', caseId),
+    db
+      .from('offboarding_ndc')
+      .select('status, blocker_reason')
+      .eq('offboarding_id', caseId)
+      .eq('department', 'it_admin')
+      .maybeSingle(),
   ]);
-  const allCleared = ((allAssets ?? []) as Pick<OffboardingAssetItem, 'return_status'>[]).every(isClearedAsset);
-  if (itNdc) {
-    let ndcPatch: Record<string, unknown> | null = null;
-    if (allCleared && itNdc.status !== 'cleared') {
-      ndcPatch = {
-        status: 'cleared',
-        cleared_at: nowIso,
-        cleared_by: actor,
-        remarks: 'All assigned assets inspected and verified cleared.',
-        blocker_reason: null,
-      };
-    } else if (!allCleared && asset.return_status === 'under_recovery') {
-      ndcPatch = { status: 'blocked', blocker_reason: `Asset recovery pending: ₹${asset.recovery_amount || 0}` };
-    }
-    if (ndcPatch) {
+  if (assetsError || itNdcError) {
+    logDbError('IT sign-off read failed', assetsError ?? itNdcError);
+    synced = false;
+  } else if (itNdc) {
+    const change = itSignOffChange(
+      itNdc as Pick<OffboardingNDCDepartment, 'status' | 'blocker_reason'>,
+      (allAssets ?? []) as Pick<OffboardingAssetItem, 'return_status' | 'recovery_amount'>[]
+    );
+    if (change) {
+      if (change.status === 'cleared') Object.assign(change, { cleared_at: nowIso, cleared_by: actor });
       const { error: ndcError } = await db
         .from('offboarding_ndc')
-        .update({ ...ndcPatch, updated_at: nowIso })
+        .update({ ...change, updated_at: nowIso })
         .eq('offboarding_id', caseId)
         .eq('department', 'it_admin');
-      if (ndcError) logDbError('IT sign-off update failed', ndcError);
-      else await refreshFnfBlockers(caseId);
+      if (ndcError) {
+        logDbError('IT sign-off update failed', ndcError);
+        synced = false;
+      } else {
+        synced = (await refreshFnfBlockers(caseId)).ok;
+      }
     }
   }
 
@@ -717,34 +753,43 @@ export async function updateAssetClearance(
   }
 
   revalidatePath(`/offboarding/${caseId}`);
-  return { success: true };
+  return synced ? { success: true } : { success: false, error: SYNC_FAILED };
 }
 
 /**
- * Brings the F&F row's status and blockers in line with the No Dues sign-offs:
- * once every department has cleared, F&F is ready for computation.
+ * Brings the F&F row's status and blockers in line with the No Dues sign-offs,
+ * in either direction (`fnfFollowingClearances`). Not ok when a read or the
+ * write fails, which the calling action reports.
  *
  * With the service-role client: `offboarding_fnf` is closed to PnC Ops, who
  * clear departments, and this writes only what follows from the clearances.
  * Called only from actions that have passed the offboarding guard.
  */
-async function refreshFnfBlockers(caseId: string): Promise<void> {
+async function refreshFnfBlockers(caseId: string): Promise<{ ok: boolean }> {
   const db = serviceDb();
-  if (!db) return;
-  const [{ data: ndc }, { data: fnf }] = await Promise.all([
+  if (!db) return { ok: false };
+  const [{ data: ndc, error: ndcError }, { data: fnf, error: fnfError }] = await Promise.all([
     db.from('offboarding_ndc').select('department_label, status, blocker_reason').eq('offboarding_id', caseId),
     db.from('offboarding_fnf').select('status').eq('offboarding_id', caseId).maybeSingle(),
   ]);
-  if (!fnf) return;
-  const rows = (ndc ?? []) as Pick<OffboardingNDCDepartment, 'department_label' | 'status' | 'blocker_reason'>[];
-  const blockers = ndcBlockers(rows);
-  const patch: Record<string, unknown> = { blocked_reasons: blockers, updated_at: new Date().toISOString() };
-  if (rows.length > 0 && blockers.length === 0 && (fnf.status === 'awaiting_clearance' || fnf.status === 'not_started')) {
-    patch.status = 'computation_pending';
-    patch.remarks = 'All departmental NDC sign-offs complete. Ready for F&F computation.';
+  if (ndcError || fnfError) {
+    logDbError('F&F blockers read failed', ndcError ?? fnfError);
+    return { ok: false };
   }
-  const { error } = await db.from('offboarding_fnf').update(patch).eq('offboarding_id', caseId);
-  if (error) logDbError('F&F blockers update failed', error);
+  if (!fnf) return { ok: true };
+  const patch = fnfFollowingClearances(
+    String(fnf.status),
+    (ndc ?? []) as Pick<OffboardingNDCDepartment, 'department_label' | 'status' | 'blocker_reason'>[]
+  );
+  const { error } = await db
+    .from('offboarding_fnf')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('offboarding_id', caseId);
+  if (error) {
+    logDbError('F&F blockers update failed', error);
+    return { ok: false };
+  }
+  return { ok: true };
 }
 
 export async function updateNDCDepartment(
@@ -781,7 +826,8 @@ export async function updateNDCDepartment(
   }
   if (!ndc) return { success: false, error: 'Department NDC record not found' };
 
-  await refreshFnfBlockers(caseId);
+  // The sign-off is saved either way; a failure here is reported once it is recorded.
+  const synced = await refreshFnfBlockers(caseId);
 
   await appendActivity([
     {
@@ -808,7 +854,7 @@ export async function updateNDCDepartment(
   }
 
   revalidatePath(`/offboarding/${caseId}`);
-  return { success: true };
+  return synced.ok ? { success: true } : { success: false, error: SYNC_FAILED };
 }
 
 export async function updateFnFDetails(
@@ -891,6 +937,9 @@ export async function updateExitDates(
   const db = await createServerSupabaseClient();
   const existing = await readCase(db, caseId);
   if (!existing) return { success: false, error: NOT_FOUND };
+  if (!isOpenStatus(existing.status)) {
+    return { success: false, error: 'This exit is closed; its dates can no longer change.' };
+  }
 
   const actor = actorOf(allowed.caller);
   const nowIso = new Date().toISOString();
@@ -1260,6 +1309,68 @@ function exitInputFor(req: ResignationRequest): InitiateOffboardingInput {
   };
 }
 
+/**
+ * Moves a resignation on from the status it was read in, and opens its exit
+ * when the move accepts it.
+ *
+ * The move is claimed first: the update matches only the status that was
+ * read, so of two decisions made at once only one goes through, and only that
+ * one can open an exit. The exit is opened after the claim and then linked.
+ * If it cannot be opened, the resignation is put back as it was, so the
+ * decision can be made again.
+ */
+async function moveResignation(
+  db: Db,
+  req: ResignationRequest,
+  patch: Partial<ResignationRequest>,
+  exit: { salary: boolean; initiatedBy: string } | null
+): Promise<{ ok: true; request: ResignationRequest } | { ok: false; error: string }> {
+  const { data: claimed, error: claimError } = await db
+    .from('resignation_requests')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', req.id)
+    .eq('status', req.status)
+    .select('id')
+    .maybeSingle();
+  if (claimError) {
+    logDbError('resignation update failed', claimError);
+    return { ok: false, error: SAVE_FAILED };
+  }
+  if (!claimed) return { ok: false, error: REQUEST_CHANGED };
+
+  let offboardingCaseId: string | null = req.offboarding_case_id ?? null;
+  if (exit) {
+    const opened = await openOffboardingCase(exitInputFor(req), db, exit);
+    if (!opened.success || !opened.caseId) {
+      const before = req as unknown as Record<string, unknown>;
+      const restore = Object.fromEntries(Object.keys(patch).map((key) => [key, before[key] ?? null]));
+      const { error: restoreError } = await db
+        .from('resignation_requests')
+        .update({ ...restore, updated_at: new Date().toISOString() })
+        .eq('id', req.id)
+        .eq('status', patch.status ?? req.status);
+      if (restoreError) {
+        logDbError('resignation restore failed', restoreError);
+        return {
+          ok: false,
+          error: `${opened.error ?? 'The exit could not be opened.'} The resignation may show as accepted; reload before trying again.`,
+        };
+      }
+      return { ok: false, error: opened.error ?? 'The exit could not be opened. Try again.' };
+    }
+    offboardingCaseId = opened.caseId;
+    const { error: linkError } = await db
+      .from('resignation_requests')
+      .update({ offboarding_case_id: offboardingCaseId, updated_at: new Date().toISOString() })
+      .eq('id', req.id);
+    if (linkError) {
+      logDbError('resignation link failed', linkError);
+      return { ok: false, error: 'The exit is open, but could not be linked to this resignation. Find it under Offboarding.' };
+    }
+  }
+  return { ok: true, request: { ...req, ...patch, offboarding_case_id: offboardingCaseId } };
+}
+
 export async function getAllResignationRequests(): Promise<ResignationRequest[]> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return [];
@@ -1392,8 +1503,8 @@ export async function submitResignationRequest(
 /**
  * Records the manager's or PnC's decision on a resignation. PnC records the
  * manager's too: managers do not use this screen. Both accepting opens the
- * exit; if it cannot be opened, the decision is not saved, so it can be
- * made again.
+ * exit (`moveResignation`); if it cannot be opened, the decision is not
+ * saved, so it can be made again.
  */
 export async function submitReviewDecision(
   requestId: string,
@@ -1427,27 +1538,14 @@ export async function submitReviewDecision(
     now: new Date(),
   });
 
-  let offboardingCaseId: string | null = req.offboarding_case_id ?? null;
-  if (opensExit) {
-    const opened = await openOffboardingCase(exitInputFor(req), db, {
-      salary: maySeeSalary(allowed.caller),
-      initiatedBy: `Approved by Manager & P&C (${actor})`,
-    });
-    if (!opened.success || !opened.caseId) {
-      return { success: false, error: opened.error ?? 'The exit could not be opened. Try again.' };
-    }
-    offboardingCaseId = opened.caseId;
-  }
-
-  const { error } = await db
-    .from('resignation_requests')
-    .update({ ...patch, offboarding_case_id: offboardingCaseId, updated_at: new Date().toISOString() })
-    .eq('id', req.id);
-  if (error) {
-    logDbError('resignation decision update failed', error);
-    return { success: false, error: SAVE_FAILED };
-  }
-  const updated: ResignationRequest = { ...req, ...patch, offboarding_case_id: offboardingCaseId };
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    opensExit ? { salary: maySeeSalary(allowed.caller), initiatedBy: `Approved by Manager & P&C (${actor})` } : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
 
   await recordAuditLog(
     'resignation_requests',
@@ -1512,41 +1610,32 @@ export async function respondToRetention(
   if (!db) return { success: false, error: 'Responses are unavailable: no service-role key.' };
   const actor = allowed.ok ? actorOf(allowed.caller) : req.employee_name;
 
-  const nowIso = new Date().toISOString();
   const safeNotes = typeof notes === 'string' ? notes.slice(0, 4000) : null;
+  const declined = response === 'declined_withdrawal';
   const patch: Partial<ResignationRequest> = {
     employee_retention_response: response,
-    employee_response_at: nowIso,
+    employee_response_at: new Date().toISOString(),
     employee_response_notes: safeNotes,
+    status: declined ? 'resignation_accepted' : 'withdrawn_by_employee',
+    ...(declined
+      ? {}
+      : {
+          retention_notes: safeNotes
+            ? `Withdrawal Accepted: ${safeNotes}`
+            : 'Employee agreed to retention proposal and withdrew resignation.',
+        }),
   };
 
-  let offboardingCaseId: string | null = req.offboarding_case_id ?? null;
-  if (response === 'accepted_withdrawal') {
-    patch.status = 'withdrawn_by_employee';
-    patch.retention_notes = safeNotes
-      ? `Withdrawal Accepted: ${safeNotes}`
-      : 'Employee agreed to retention proposal and withdrew resignation.';
-  } else {
-    patch.status = 'resignation_accepted';
-    const opened = await openOffboardingCase(exitInputFor(req), db, {
-      salary: allowed.ok ? maySeeSalary(allowed.caller) : true,
-      initiatedBy: `Employee declined retention (${actor})`,
-    });
-    if (!opened.success || !opened.caseId) {
-      return { success: false, error: opened.error ?? 'The exit could not be opened. Try again.' };
-    }
-    offboardingCaseId = opened.caseId;
-  }
-
-  const { error } = await db
-    .from('resignation_requests')
-    .update({ ...patch, offboarding_case_id: offboardingCaseId, updated_at: nowIso })
-    .eq('id', req.id);
-  if (error) {
-    logDbError('retention response update failed', error);
-    return { success: false, error: SAVE_FAILED };
-  }
-  const updated: ResignationRequest = { ...req, ...patch, offboarding_case_id: offboardingCaseId };
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    declined
+      ? { salary: allowed.ok ? maySeeSalary(allowed.caller) : true, initiatedBy: `Employee declined retention (${actor})` }
+      : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
 
   await recordAuditLog(
     'resignation_requests',
@@ -1583,32 +1672,23 @@ export async function resolveDisagreement(
     retention_notes: safeNotes || `Disagreement formally resolved by P&C Authority to: ${resolvedDecision.toUpperCase()}`,
   };
 
-  let offboardingCaseId: string | null = req.offboarding_case_id ?? null;
-  if (resolvedDecision === 'accepted') {
+  const accepted = resolvedDecision === 'accepted';
+  if (accepted) {
     patch.manager_decision = 'accepted';
     patch.pnc_decision = 'accepted';
     patch.status = 'resignation_accepted';
-    const opened = await openOffboardingCase(exitInputFor(req), db, {
-      salary: maySeeSalary(allowed.caller),
-      initiatedBy: `P&C disagreement resolution (${actor})`,
-    });
-    if (!opened.success || !opened.caseId) {
-      return { success: false, error: opened.error ?? 'The exit could not be opened. Try again.' };
-    }
-    offboardingCaseId = opened.caseId;
   } else {
     patch.status = 'withdrawal_proposed';
   }
 
-  const { error } = await db
-    .from('resignation_requests')
-    .update({ ...patch, offboarding_case_id: offboardingCaseId, updated_at: new Date().toISOString() })
-    .eq('id', req.id);
-  if (error) {
-    logDbError('disagreement resolution update failed', error);
-    return { success: false, error: SAVE_FAILED };
-  }
-  const updated: ResignationRequest = { ...req, ...patch, offboarding_case_id: offboardingCaseId };
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    accepted ? { salary: maySeeSalary(allowed.caller), initiatedBy: `P&C disagreement resolution (${actor})` } : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
 
   await recordAuditLog(
     'resignation_requests',

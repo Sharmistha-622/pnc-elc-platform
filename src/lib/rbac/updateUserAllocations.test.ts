@@ -42,7 +42,7 @@ function table(name: string) {
     select: () => q,
     ilike: () => q,
     eq: () => q,
-    or: () => q,
+    in: () => q,
     limit: async () => ({ data: [] }),
     maybeSingle: async () => ({ data: null }),
     update: (payload: any) => {

@@ -8,8 +8,9 @@ import { allowedEmailDomains } from '@/lib/auth/allowedEmail'
 import { recordAuditEvents } from '@/lib/audit/service'
 import type { AuditEventInput } from '@/lib/audit/types'
 import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess'
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
 import {
-  leaversIn,
+  accessChangesFor,
   planEmployeeImport,
   type ExistingEmployee,
   type ImportContext,
@@ -216,7 +217,8 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
   //    pre-exit job (`/api/cron/pre-exit-roles`) closes any it could not.
   let accessNotEnded = 0
   const revoked: AuditEventInput[] = []
-  for (const r of leaversIn(plan)) {
+  const { end: leavers, kept: ownerRows } = accessChangesFor(plan, IMMUTABLE_SUPER_ADMIN_EMAILS)
+  for (const r of leavers) {
     const ended = await endPlatformAccess(r.email, { endedBy: caller.email ?? 'Employee import', now: new Date(now) })
     if (!ended.ok) {
       accessNotEnded++
@@ -238,15 +240,20 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
   revalidatePath('/manage/users')
   revalidatePath('/reviews')
 
+  const warnings = [
+    ...(accessNotEnded
+      ? [
+          `${accessNotEnded} ${accessNotEnded === 1 ? 'person is' : 'people are'} marked exited, but their platform access could not be ended yet. It will be retried tonight; Users & Roles shows who still has access.`,
+        ]
+      : []),
+    ...(ownerRows.length ? ["The owner's platform access is not changed by an import."] : []),
+  ]
+
   return {
     ok: true,
     created,
     updated,
     unchanged: plan.counts.unchanged,
-    ...(accessNotEnded
-      ? {
-          warning: `${accessNotEnded} ${accessNotEnded === 1 ? 'person is' : 'people are'} marked exited, but their platform access could not be ended yet. It will be retried tonight; Users & Roles shows who still has access.`,
-        }
-      : {}),
+    ...(warnings.length ? { warning: warnings.join(' ') } : {}),
   }
 }
