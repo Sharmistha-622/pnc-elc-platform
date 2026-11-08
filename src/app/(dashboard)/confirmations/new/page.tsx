@@ -8,6 +8,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { guard } from '@/lib/rbac/guard'
 import { isTeamScoped, myReporteeIds } from '@/lib/confirmations/access'
 import { NewConfirmationClient } from './new-confirmation-client'
+import { departmentOf } from '@/lib/employees/department'
 
 export default async function NewConfirmationPage() {
   const allowed = await guard('confirmationsInitiate')
@@ -24,7 +25,7 @@ export default async function NewConfirmationPage() {
   // Fetch active employees awaiting probation confirmation (confirmation_date IS NULL)
   let query = supabase
     .from('employees')
-    .select('id, name, email, employee_type, joining_date, conversion_date, confirmation_date, manager_id, employee_types(code, name), teams(name)')
+    .select('id, name, email, employee_type, joining_date, conversion_date, confirmation_date, manager_id, team, employee_types(code, name), teams(name)')
     .eq('status', 'active')
     .is('confirmation_date', null)
     .order('name', { ascending: true })
@@ -60,7 +61,7 @@ export default async function NewConfirmationPage() {
       email: r.email || null,
       employeeType: r.employee_types?.name || r.employee_type || 'Full-Time Employee (FTE)',
       employeeTypeCode: (r.employee_types?.code || r.employee_type || 'fte').toLowerCase(),
-      team: r.teams?.name || null,
+      team: departmentOf(r),
       joiningDate: r.joining_date || null,
       conversionDate: r.conversion_date || null,
     }))
@@ -68,7 +69,7 @@ export default async function NewConfirmationPage() {
   // Directory of active employees for peer suggestions
   const { data: allActiveRows } = await supabase
     .from('employees')
-    .select('id, name, email, employee_types(name), teams(name)')
+    .select('id, name, email, team, employee_types(name), teams(name)')
     .eq('status', 'active')
     .order('name', { ascending: true })
 
@@ -77,7 +78,7 @@ export default async function NewConfirmationPage() {
     name: r.name,
     email: r.email || null,
     employeeType: r.employee_types?.name || 'Employee',
-    team: r.teams?.name || null,
+    team: departmentOf(r),
   }))
 
   return (

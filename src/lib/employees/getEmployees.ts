@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { departmentOf } from '@/lib/employees/department'
 
 export type Employee = {
   id: string
@@ -28,6 +29,7 @@ export async function getEmployees(): Promise<Employee[]> {
       is_alumni,
       confirmation_date,
       status,
+      team,
 
       employee_types ( name ),
       teams ( name )
@@ -47,6 +49,7 @@ export async function getEmployees(): Promise<Employee[]> {
         joining_date,
         confirmation_date,
         status,
+        team,
 
         employee_types ( name ),
         teams ( name )
@@ -67,7 +70,7 @@ export async function getEmployees(): Promise<Employee[]> {
     name: row.name,
     email: row.email || null,
     employee_type: row.employee_types?.name || 'Full-Time',
-    team: row.teams?.name || null,
+    team: departmentOf(row),
     joining_date: row.joining_date,
     exit_date: row.exit_date || null,
     confirmation_date: row.confirmation_date,

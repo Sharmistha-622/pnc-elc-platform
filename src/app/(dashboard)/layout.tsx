@@ -16,6 +16,7 @@ import { breakGlassCaller } from "@/lib/rbac/breakGlassAccess"
 import { PrivacyContact } from "@/components/shared/privacy/privacy-contact"
 import { NoticeBanner } from "@/components/shared/privacy/notice-banner"
 import { staffPrivacyShell } from "@/lib/dpdp/staff-notice"
+import { departmentOf } from "@/lib/employees/department"
 
 export default async function DashboardLayout({
     children,
@@ -56,13 +57,13 @@ export default async function DashboardLayout({
         try {
             const { data: employee } = await supabase
                 .from('employees')
-                .select('name, email, teams(name), employee_types(name)')
+                .select('name, email, team, teams(name), employee_types(name)')
                 .eq('email', profileEmail)
                 .maybeSingle()
 
             if (employee) {
                 if (employee.name) profileName = employee.name
-                team = (employee.teams as any)?.name || null
+                team = departmentOf(employee as { team?: string | null; teams?: { name?: string | null } | null })
                 employeeType = (employee.employee_types as any)?.name || null
             }
         } catch {

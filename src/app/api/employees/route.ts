@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { departmentOf } from '@/lib/employees/department'
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
       id: e.id,
       name: e.name,
       email: e.email ?? null,
-      team: e.teams?.name || e.team || null,
+      team: departmentOf(e),
       status: e.status || 'active',
       employeeType: e.employee_types?.name || e.employee_type || 'FTE',
       managerId: e.manager_id ?? null,

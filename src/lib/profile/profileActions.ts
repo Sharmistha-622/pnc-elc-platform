@@ -6,6 +6,7 @@ import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { guardResource } from '@/lib/rbac/guard'
 import { accessFor } from '@/lib/rbac/roles'
+import { departmentOf } from '@/lib/employees/department'
 
 export interface EmployeeProfileData {
   id: string
@@ -61,7 +62,7 @@ export async function getMyProfileData(): Promise<{
     id: e.id,
     name: e.name,
     email: e.email ?? null,
-    team: (e as any).teams?.name || (e as any).team || null,
+    team: departmentOf(e as { team?: string | null }),
   }))
 
   if (!matchedEmployee) {
@@ -115,7 +116,7 @@ export async function getMyProfileData(): Promise<{
         id: mgr.id,
         name: mgr.name,
         email: mgr.email ?? null,
-        team: (mgr as any).teams?.name || (mgr as any).team || null,
+        team: departmentOf(mgr as { team?: string | null }),
       }
     }
   }
@@ -141,7 +142,7 @@ export async function getMyProfileData(): Promise<{
     id: r.id,
     name: r.name,
     email: r.email ?? null,
-    team: (r as any).teams?.name || (r as any).team || null,
+    team: departmentOf(r as { team?: string | null }),
     employeeType: (r as any).employee_types?.name || (r as any).employee_type || 'FTE',
     status: r.status || 'active',
     joiningDate: r.joining_date ?? null,
@@ -151,7 +152,7 @@ export async function getMyProfileData(): Promise<{
     id: empRecord.id,
     name: empRecord.name,
     email: empRecord.email ?? user.email,
-    team: (empRecord as any).teams?.name || (empRecord as any).team || 'None',
+    team: departmentOf(empRecord as { team?: string | null }) || 'None',
     employeeType: (empRecord as any).employee_types?.name || (empRecord as any).employee_type || 'FTE',
     status: empRecord.status || 'active',
     joiningDate: empRecord.joining_date ?? null,
