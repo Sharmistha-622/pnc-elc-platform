@@ -36,6 +36,7 @@ import { attendanceIntegrationService } from '@/lib/integrations/attendance';
 import { leaveIntegrationService } from '@/lib/integrations/leave';
 import { getEmployees } from '@/lib/employees/getEmployees';
 import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess';
+import { applyPreExitRoleRule, lastWorkingDayOf } from '@/lib/offboarding/preExitRoles';
 
 
 // ============================================================================
@@ -584,6 +585,22 @@ async function openOffboardingCase(
       // Table missing - memory store handles it
     }
 
+    // The stored role ends 72 hours before the last working day. The daily
+    // job applies that to every open exit; applying it here too covers an
+    // exit opened inside the window (an immediate relieving), which would
+    // otherwise keep its role until the job next runs.
+    await applyPreExitRoleRule(
+      {
+        caseId,
+        employeeId: newCase.employee_id,
+        employeeEmail: newCase.employee_email || (await employeeEmail(newCase.employee_id)),
+        employeeName: newCase.employee_name,
+        lastWorkingDay: lastWorkingDayOf(newCase),
+        status: newCase.status,
+      },
+      { now: new Date(), trigger: 'exit opened' }
+    );
+
     // Record in global audit log
     await recordAuditLog('offboarding_cases', caseId, 'insert', {
       employee_id: input.employee_id,
@@ -958,6 +975,21 @@ export async function updateExitDates(
   } catch {
     // fallback
   }
+
+  // A last working day brought forward into the 72-hour window ends the
+  // stored role now. One pushed back out does not give it back: whoever can
+  // grant the role restores it on the users screen.
+  await applyPreExitRoleRule(
+    {
+      caseId,
+      employeeId: existing.caseRecord.employee_id,
+      employeeEmail: existing.caseRecord.employee_email || (await employeeEmail(existing.caseRecord.employee_id)),
+      employeeName: existing.caseRecord.employee_name,
+      lastWorkingDay: lastWorkingDayOf(existing.caseRecord),
+      status: existing.caseRecord.status,
+    },
+    { now: new Date(), trigger: 'exit dates changed' }
+  );
 
   await recordAuditLog('offboarding_cases', caseId, 'update', {
     oldProposed,

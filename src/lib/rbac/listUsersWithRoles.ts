@@ -1,7 +1,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { normalizeRole, type UserRole } from '@/lib/role-constants'
-import { accessEndedAt } from '@/lib/rbac/lifecycle'
+import { accessEndedAt, roleBeforeExit } from '@/lib/rbac/lifecycle'
 
 export type UserRow = {
   id: string
@@ -13,6 +13,8 @@ export type UserRow = {
   created_at?: string | null
   last_active_at?: string | null
   avatar?: string | null
+  /** The stored role removed ahead of an exit, while no role has been set by hand since. */
+  roleBeforeExit?: UserRole | null
 }
 
 export async function listUsersWithRoles(): Promise<UserRow[]> {
@@ -37,6 +39,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
           created_at: u.created_at,
           last_active_at: u.last_sign_in_at,
           avatar: (u.user_metadata?.avatar_url as string) ?? (u.user_metadata?.picture as string) ?? null,
+          roleBeforeExit: accessEndedAt(u.app_metadata) ? null : normalizeRole(roleBeforeExit(u.app_metadata)),
         }))
       }
     } catch (err) {

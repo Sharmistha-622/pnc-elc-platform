@@ -101,6 +101,27 @@ Admin**. PnC Ops sees the status but no amounts.
 With the default settings, **F&F can't be marked processed until all four
 No Dues departments have cleared.**
 
+### 72 hours before the last working day
+
+From 72 hours before the last working day begins (00:00 IST, three days
+before), the leaver's role is removed: PnC Admin, Fin Ops, Platform Admin and
+so on all drop to **Employee**. They can still sign in and finish their
+handover. If anything stops working because it depended on their access, it
+shows up while they are still there to hand it over.
+
+- A daily job does this for every open exit. Opening an exit, or moving the
+  last working day, inside the 72 hours does it straight away.
+- The audit trail records each removal, with the old role and how many people
+  still report to the leaver. Reassign those reportees before the last day.
+- **Users & Roles** shows *Was PnC Admin: removed before exit* (or whichever
+  role it was). If the exit is cancelled or the last day moves out, the role
+  is **not** given back automatically: whoever can grant it sets it again
+  from **Users & Roles**.
+- A role given back while the exit is still open and inside the 72 hours
+  lasts until the next daily run, which removes it again. That's enough to
+  sort out something urgent; for anything longer, give the work to someone
+  staying.
+
 ### Closing the exit
 
 **Confirm & Execute Final Exit Closure** works only once every asset and

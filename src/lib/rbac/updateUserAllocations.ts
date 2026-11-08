@@ -12,6 +12,7 @@ import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
 import { breakGlassCaller } from '@/lib/rbac/breakGlassAccess'
 import { BREAK_GLASS_REFUSALS, canBreakGlassChange } from '@/lib/rbac/breakGlass'
+import { CLEARED_PRE_EXIT_MARKERS } from '@/lib/rbac/lifecycle'
 
 const GRANT_REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -242,7 +243,13 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   if (authUserRecord) {
     try {
       await admin.auth.admin.updateUserById(authUserRecord.id, {
-        app_metadata: { ...authUserRecord.app_metadata, role: newRole },
+        // A role set by hand replaces one removed ahead of an exit, and clears
+        // that record of it (src/lib/rbac/lifecycle.ts, "Before exit").
+        app_metadata: {
+          ...authUserRecord.app_metadata,
+          role: newRole,
+          ...(roleChanged ? CLEARED_PRE_EXIT_MARKERS : {}),
+        },
         user_metadata: { ...authUserRecord.user_metadata, team: normalizedNewTeam },
       })
     } catch (err) {

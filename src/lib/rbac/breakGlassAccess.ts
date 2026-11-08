@@ -46,13 +46,15 @@ export async function readBreakGlassEnabled(): Promise<boolean> {
  * otherwise null.
  *
  * Identity comes from the session only. An emulating caller is refused:
- * emulation exists to see less, never more.
+ * emulation exists to see less, never more. So is a leaver whose stored role
+ * was removed ahead of their exit: break-glass would let them put it back.
  */
 export async function breakGlassCaller(
   resolved?: ResolvedRole
 ): Promise<Guarded | null> {
   const caller = resolved ?? (await getCurrentUserRole())
   if (!caller.userId || !caller.role || !caller.originalRole || caller.isEmulating) return null
+  if (caller.roleEndedBeforeExit) return null
   if (!isBreakGlassEmail(caller.email)) return null
   if (!(await readBreakGlassEnabled())) return null
   return caller as Guarded

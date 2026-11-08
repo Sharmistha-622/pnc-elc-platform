@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   caller: null as any,
   users: {} as Record<string, { id: string; email: string; app_metadata: any; user_metadata: any }>,
   updatedAuth: [] as string[],
+  authAttrs: [] as any[],
   audit: [] as any[],
   trail: [] as any[],
   employeeUpdates: [] as any[],
@@ -67,8 +68,9 @@ vi.mock('@/lib/supabase/admin', () => ({
       admin: {
         getUserById: async (id: string) => ({ data: { user: state.users[id] ?? null } }),
         listUsers: async () => ({ data: { users: Object.values(state.users) } }),
-        updateUserById: async (id: string) => {
+        updateUserById: async (id: string, attrs?: any) => {
           state.updatedAuth.push(id)
+          state.authAttrs.push(attrs)
           return { data: null, error: null }
         },
       },
@@ -97,6 +99,7 @@ function as(id: string, role: string) {
 beforeEach(() => {
   state.users = {}
   state.updatedAuth = []
+  state.authAttrs = []
   state.audit = []
   state.trail = []
   state.employeeUpdates = []
@@ -114,6 +117,31 @@ const move = (targetUserId: string, newRole: any, newTeam: string) =>
   updateUserAllocations({ targetUserId, targetEmail: '', newRole, newTeam })
 
 describe('updateUserAllocations', () => {
+  it('clears the record of a role removed before exit when a role is set by hand', async () => {
+    state.users[ids.emp].app_metadata = {
+      role_before_exit: 'pnc_ops',
+      role_ended_before_exit_at: '2026-11-16T19:00:00Z',
+    }
+    as(ids.root, 'super_admin')
+    expect((await move(ids.emp, 'pnc_ops', 'None')).success).toBe(true)
+    expect(state.authAttrs[0].app_metadata).toEqual({
+      role: 'pnc_ops',
+      role_before_exit: null,
+      role_ended_before_exit_at: null,
+    })
+  })
+
+  it('keeps that record on a department-only change', async () => {
+    state.users[ids.emp].app_metadata = {
+      role: 'employee',
+      role_before_exit: 'pnc_ops',
+      role_ended_before_exit_at: '2026-11-16T19:00:00Z',
+    }
+    as(ids.root, 'super_admin')
+    expect((await move(ids.emp, 'employee', 'CEO Office')).success).toBe(true)
+    expect(state.authAttrs[0].app_metadata).toMatchObject({ role_before_exit: 'pnc_ops' })
+  })
+
   it('lets the root Super Admin move their own department', async () => {
     as(ids.root, 'super_admin')
     const res = await move(ids.root, 'super_admin', 'CEO Office')

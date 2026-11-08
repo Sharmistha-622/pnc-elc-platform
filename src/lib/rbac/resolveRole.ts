@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js'
 import { DEFAULT_ROLE, normalizeRole, type UserRole } from '@/lib/role-constants'
 import { canImpersonate } from '@/lib/rbac/roles'
 import { isAllowedEmail } from '@/lib/auth/allowedEmail'
-import { accessEndedAt } from '@/lib/rbac/lifecycle'
+import { accessEndedAt, roleEndedBeforeExitAt } from '@/lib/rbac/lifecycle'
 
 export const IMMUTABLE_SUPER_ADMIN_EMAILS = ['nitin@navgurukul.org']
 
@@ -12,6 +12,12 @@ export interface ResolvedRole {
   role: UserRole | null
   originalRole: UserRole | null
   isEmulating: boolean
+  /**
+   * The stored role was removed ahead of an exit (`endRoleBeforeExit`), and no
+   * role has been set by hand since. Break-glass access does not apply.
+   * Always set by `resolveRole`; optional only so other callers may omit it.
+   */
+  roleEndedBeforeExit?: boolean
 }
 
 /**
@@ -61,5 +67,6 @@ export function resolveRole(
     role: effectiveRole,
     originalRole,
     isEmulating: mayEmulate,
+    roleEndedBeforeExit: !isImmutableSuperAdmin && roleEndedBeforeExitAt(user.app_metadata) !== null,
   }
 }

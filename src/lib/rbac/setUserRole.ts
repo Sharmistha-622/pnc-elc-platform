@@ -6,6 +6,7 @@ import { guard } from '@/lib/rbac/guard'
 import { normalizeRole, type UserRole } from '@/lib/role-constants'
 import { canGrantRole, isRoleCode } from '@/lib/rbac/roles'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
+import { CLEARED_PRE_EXIT_MARKERS } from '@/lib/rbac/lifecycle'
 
 const REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -60,7 +61,9 @@ export async function setUserRole(targetUserId: string, role: UserRole) {
   }
 
   const { error } = await admin.auth.admin.updateUserById(targetUserId, {
-    app_metadata: { ...target.user.app_metadata, role },
+    // A role set by hand replaces one removed ahead of an exit, and clears
+    // that record of it (src/lib/rbac/lifecycle.ts, "Before exit").
+    app_metadata: { ...target.user.app_metadata, role, ...CLEARED_PRE_EXIT_MARKERS },
   })
   if (error) return { success: false, error: error.message }
 

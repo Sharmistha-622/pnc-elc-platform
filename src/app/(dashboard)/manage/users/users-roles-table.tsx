@@ -489,6 +489,11 @@ export function UsersRolesTable({
                     {/* System Role Badge */}
                     <TableCell className="py-2.5">
                       <RoleBadge role={user.role} />
+                      {user.roleBeforeExit && (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          Was {roleLabel(user.roleBeforeExit)}: removed before exit
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Status */}
