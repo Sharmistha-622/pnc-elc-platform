@@ -186,7 +186,10 @@ which is why the count is recorded.
 
 Exited is terminal for access: closing an exit removes the stored role, marks
 the account ended (`app_metadata.access_ended_at`) and bans it, and the
-database gives an ended, banned or exited account no role at all. A Super Admin
+database gives an ended, banned or exited account no role at all. An import
+that sets someone to `exited` does the same, and the daily pre-exit job closes
+the account of anyone whose only employee record is `exited`, however it was
+set. A Super Admin
 can re-open the account from Users & Roles ("Restore access"), for a re-hire or
 a mistake; the role is assigned again by hand.
 

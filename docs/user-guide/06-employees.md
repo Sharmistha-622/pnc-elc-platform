@@ -59,7 +59,10 @@ See [Onboarding › Employee documents](05-onboarding-and-letters.md#employee-do
 - **Confirmation date:** set automatically when PnC accepts a *Confirm*
   decision (see [Reviews](07-reviews.md)).
 - **Exited:** set automatically when an offboarding case is closed (see
-  [Offboarding](08-offboarding.md)).
+  [Offboarding](08-offboarding.md)), or by an import with `status` set to
+  `exited`. Either way the person's platform access ends: their role is
+  removed and their account closed. Only a Super Admin can re-open it, from
+  **Users & Roles** (**Restore access**).
 
 ## Keeping the directory accurate
 

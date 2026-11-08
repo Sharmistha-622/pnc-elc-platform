@@ -69,8 +69,20 @@ export async function endPlatformAccess(
     return { ok: false, error: 'Could not look up the account.' }
   }
   if (!user) return { ok: true, userId: null }
-  if (accessEndedAt(user.app_metadata)) return { ok: true, userId: user.id }
+  return closeAccount(admin, user, options)
+}
 
+/**
+ * The write itself, for an account already in hand: role removed, marked
+ * ended, banned. An account already ended is left as it is. Callers have
+ * already ruled out the owner.
+ */
+export async function closeAccount(
+  admin: SupabaseClient,
+  user: User,
+  options: { endedBy: string; now: Date },
+): Promise<AccessChangeResult> {
+  if (accessEndedAt(user.app_metadata)) return { ok: true, userId: user.id }
   const { error } = await admin.auth.admin.updateUserById(user.id, {
     app_metadata: {
       ...user.app_metadata,

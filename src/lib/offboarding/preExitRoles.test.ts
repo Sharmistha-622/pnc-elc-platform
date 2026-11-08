@@ -12,10 +12,17 @@ const state = vi.hoisted(() => ({
   ended: [] as string[],
   audits: [] as Array<{ action: string; opts: { metadata?: Record<string, unknown> } & Record<string, unknown> }>,
   statusFilter: [] as string[],
+  closed: [] as string[],
+  closeFails: new Set<string>(),
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({ createAdminSupabaseClient: () => null }))
 vi.mock('@/lib/rbac/endPlatformAccess', () => ({
+  closeAccount: vi.fn(async (_admin: unknown, user: { id: string }) => {
+    if (state.closeFails.has(user.id)) return { ok: false, error: 'x' }
+    state.closed.push(user.id)
+    return { ok: true, userId: user.id }
+  }),
   endRoleBeforeExit: vi.fn(async (email: string | null) => {
     state.ended.push(String(email))
     return (
@@ -29,7 +36,13 @@ vi.mock('@/lib/audit/events', () => ({
   }),
 }))
 
-import { runPreExitRoleEnding, applyPreExitRoleRule, lastWorkingDayOf, OPEN_EXIT_STATUSES } from './preExitRoles'
+import {
+  runPreExitRoleEnding,
+  applyPreExitRoleRule,
+  endAccessOfExitedRecords,
+  lastWorkingDayOf,
+  OPEN_EXIT_STATUSES,
+} from './preExitRoles'
 
 function fakeDb() {
   return {
@@ -187,5 +200,68 @@ describe('applyPreExitRoleRule', () => {
     )
     expect(result.due).toBe(false)
     expect(state.ended).toEqual([])
+  })
+})
+
+describe('endAccessOfExitedRecords', () => {
+  const directory = [
+    { id: 'e-gone', name: 'Gone', email: 'Gone@Example.com', status: 'exited' },
+    { id: 'e-rehire-old', name: 'Back', email: 'back@example.com', status: 'exited' },
+    { id: 'e-rehire-new', name: 'Back', email: 'back@example.com', status: 'active' },
+    { id: 'e-closed', name: 'Closed', email: 'closed@example.com', status: 'exited' },
+    { id: 'e-owner', name: 'Owner', email: 'nitin@navgurukul.org', status: 'exited' },
+    { id: 'e-stays', name: 'Stays', email: 'stays@example.com', status: 'active' },
+    { id: 'e-noacct', name: 'Never signed in', email: 'never@example.com', status: 'exited' },
+  ]
+  const accounts = [
+    { id: 'u-gone', email: 'gone@example.com', app_metadata: { role: 'pnc_admin' } },
+    { id: 'u-back', email: 'back@example.com', app_metadata: { role: 'employee' } },
+    { id: 'u-closed', email: 'closed@example.com', app_metadata: { access_ended_at: '2026-10-01T00:00:00Z' } },
+    { id: 'u-owner', email: 'nitin@navgurukul.org', app_metadata: {} },
+    { id: 'u-stays', email: 'stays@example.com', app_metadata: { role: 'fin_ops' } },
+  ]
+  const adminDb = () =>
+    ({
+      from: () => ({
+        select: () => ({
+          in: () => ({ order: () => ({ range: async () => ({ data: directory, error: null }) }) }),
+        }),
+      }),
+      auth: { admin: { listUsers: async () => ({ data: { users: accounts }, error: null }) } },
+    }) as unknown as SupabaseClient
+
+  beforeEach(() => {
+    state.closed = []
+    state.closeFails = new Set()
+    state.audits = []
+  })
+
+  it('closes the account of anyone whose only record is exited, and records it', async () => {
+    const report = await endAccessOfExitedRecords(adminDb(), new Date('2026-11-09T19:00:00Z'))
+    expect(state.closed).toEqual(['u-gone'])
+    expect(report).toEqual({ exitedPeople: 3, ended: 1, failed: 0 })
+    expect(state.audits).toEqual([
+      expect.objectContaining({
+        action: 'access.revoked',
+        opts: expect.objectContaining({
+          subject: { employee_id: 'e-gone', employee_email: 'gone@example.com', employee_name: 'Gone' },
+          actorType: 'system',
+        }),
+      }),
+    ])
+  })
+
+  it('leaves a re-hire, an account already closed, the owner and current staff alone', async () => {
+    await endAccessOfExitedRecords(adminDb(), new Date())
+    for (const id of ['u-back', 'u-closed', 'u-owner', 'u-stays']) expect(state.closed).not.toContain(id)
+  })
+
+  it('counts an account it could not close, without naming the person in the log', async () => {
+    state.closeFails.add('u-gone')
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const report = await endAccessOfExitedRecords(adminDb(), new Date())
+    expect(report).toMatchObject({ ended: 0, failed: 1 })
+    expect(JSON.stringify(errors.mock.calls)).not.toContain('gone@example.com')
+    errors.mockRestore()
   })
 })

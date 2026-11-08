@@ -4,6 +4,7 @@ import {
   parseImportDate,
   parseYesNo,
   planEmployeeImport,
+  leaversIn,
   IMPORT_TEMPLATE_CSV,
   type ExistingEmployee,
   type ImportContext,
@@ -270,5 +271,23 @@ describe('parseYesNo', () => {
     expect(['yes', 'Y', 'TRUE', '1'].map(parseYesNo)).toEqual([true, true, true, true])
     expect(['no', 'N', 'false', '0', ' No '].map(parseYesNo)).toEqual([false, false, false, false, false])
     expect(['', 'maybe', 'alumni'].map(parseYesNo)).toEqual([null, null, null])
+  })
+})
+
+describe('leaversIn', () => {
+  it('names the people the file adds as exited or changes to exited, and no one else', () => {
+    const p = plan(
+      'gone@navgurukul.org,Gone,FTE,2024-01-01,,,exited,,,no\n' +
+        'leaving@navgurukul.org,,,,,,exited,,,\n' +
+        'staying@navgurukul.org,,,,,Finance,,,,\n' +
+        'already@navgurukul.org,,,,,,exited,,,',
+      [
+        person({ id: 'l', email: 'leaving@navgurukul.org' }),
+        person({ id: 's', email: 'staying@navgurukul.org' }),
+        person({ id: 'a', email: 'already@navgurukul.org', status: 'exited' }),
+      ]
+    )
+    expect(p.canImport).toBe(true)
+    expect(leaversIn(p).map((r) => r.email)).toEqual(['gone@navgurukul.org', 'leaving@navgurukul.org'])
   })
 })

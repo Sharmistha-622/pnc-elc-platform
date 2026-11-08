@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
-import { endRoleBeforeExit } from '@/lib/rbac/endPlatformAccess'
-import { isPreExitRoleDue, PRE_EXIT_ROLE_LEAD_HOURS } from '@/lib/rbac/lifecycle'
+import type { User } from '@supabase/supabase-js'
+import { closeAccount, endRoleBeforeExit } from '@/lib/rbac/endPlatformAccess'
+import { accessEndedAt, isPreExitRoleDue, PRE_EXIT_ROLE_LEAD_HOURS } from '@/lib/rbac/lifecycle'
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
 import { normalizeRole } from '@/lib/role-constants'
 import { auditEvent } from '@/lib/audit/events'
 
@@ -182,6 +184,88 @@ export async function runPreExitRoleEnding(db: SupabaseClient, now: Date): Promi
     if (result.ended) report.ended += 1
     if (result.failed) report.failed += 1
     report.reporteesToReassign += result.activeReportees
+  }
+  return report
+}
+
+// ============================================================================
+// Exited records end access
+// ----------------------------------------------------------------------------
+// An employee record marked `exited` ends the account's platform access,
+// however it came to be marked: closing an exit, an import, or an edit. The
+// paths that mark it end the access themselves; this runs every night after
+// them and closes any account still open, so the rule holds whichever way the
+// record was changed. A person with an active record too (a re-hire) keeps
+// their account, as `current_app_role()` does.
+// ============================================================================
+
+export interface ExitedAccessReport {
+  exitedPeople: number
+  ended: number
+  failed: number
+}
+
+async function exitedOnlyEmails(db: SupabaseClient): Promise<Map<string, { id: string; name: string | null }>> {
+  const exited = new Map<string, { id: string; name: string | null }>()
+  const active = new Set<string>()
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from('employees')
+      .select('id, name, email, status')
+      .in('status', ['exited', 'active'])
+      .order('id')
+      .range(from, from + PAGE - 1)
+    if (error) throw new Error('Could not read the directory')
+    for (const row of (data ?? []) as { id: string; name: string | null; email: string | null; status: string }[]) {
+      const email = row.email?.trim().toLowerCase()
+      if (!email) continue
+      if (row.status === 'active') active.add(email)
+      else exited.set(email, { id: row.id, name: row.name })
+    }
+    if (!data || data.length < PAGE) break
+  }
+  for (const email of active) exited.delete(email)
+  for (const email of IMMUTABLE_SUPER_ADMIN_EMAILS) exited.delete(email)
+  return exited
+}
+
+/**
+ * Closes every account whose only employee record is `exited` and whose
+ * access has not ended. Reads the directory and the accounts once each.
+ * `db` is the service-role client; the caller has checked the cron secret.
+ */
+export async function endAccessOfExitedRecords(db: SupabaseClient, now: Date): Promise<ExitedAccessReport> {
+  const exited = await exitedOnlyEmails(db)
+  const report: ExitedAccessReport = { exitedPeople: exited.size, ended: 0, failed: 0 }
+  if (exited.size === 0) return report
+
+  const perPage = 200
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage })
+    if (error) throw new Error('Could not list accounts')
+    const users: User[] = data?.users ?? []
+    for (const user of users) {
+      const email = user.email?.trim().toLowerCase()
+      const person = email ? exited.get(email) : undefined
+      if (!email || !person || accessEndedAt(user.app_metadata)) continue
+      const result = await closeAccount(db, user, { endedBy: ACTOR_NAME, now })
+      if (!result.ok) {
+        report.failed += 1
+        console.error('Exited record: could not close the account', { userId: user.id })
+        continue
+      }
+      report.ended += 1
+      await auditEvent('access', 'access.revoked', 'ELC platform access revoked.', {
+        subject: { employee_id: person.id, employee_email: email, employee_name: person.name },
+        actorName: ACTOR_NAME,
+        actorType: 'system',
+        entityType: 'user',
+        entityId: user.id,
+        severity: 'warning',
+        metadata: { source: 'exited record', trigger: 'daily job' },
+      })
+    }
+    if (users.length < perPage) break
   }
   return report
 }

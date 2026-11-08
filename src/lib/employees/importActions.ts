@@ -7,7 +7,9 @@ import { guardResource } from '@/lib/rbac/guard'
 import { allowedEmailDomains } from '@/lib/auth/allowedEmail'
 import { recordAuditEvents } from '@/lib/audit/service'
 import type { AuditEventInput } from '@/lib/audit/types'
+import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess'
 import {
+  leaversIn,
   planEmployeeImport,
   type ExistingEmployee,
   type ImportContext,
@@ -76,7 +78,7 @@ export async function previewEmployeeImport(csvText: string): Promise<PreviewRes
 }
 
 export type RunResult =
-  | { ok: true; created: number; updated: number; unchanged: number }
+  | { ok: true; created: number; updated: number; unchanged: number; warning?: string }
   | { ok: false; error: string; plan?: ImportPlan; created?: number; updated?: number }
 
 /**
@@ -209,9 +211,42 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
     }))
   await recordAuditEvents(events)
 
+  // 5. Someone the file marks exited leaves the platform as closing an exit
+  //    does: their stored role goes and their account is closed. The daily
+  //    pre-exit job (`/api/cron/pre-exit-roles`) closes any it could not.
+  let accessNotEnded = 0
+  const revoked: AuditEventInput[] = []
+  for (const r of leaversIn(plan)) {
+    const ended = await endPlatformAccess(r.email, { endedBy: caller.email ?? 'Employee import', now: new Date(now) })
+    if (!ended.ok) {
+      accessNotEnded++
+      continue
+    }
+    revoked.push({
+      subject: { employee_id: idByEmail.get(r.email) ?? null, employee_email: r.email, employee_name: r.name },
+      actor,
+      module: 'access',
+      action: 'access.revoked',
+      description: 'ELC platform access revoked.',
+      severity: 'warning',
+      metadata: { source: 'employee_import', line: r.line, account_found: ended.userId !== null },
+    })
+  }
+  if (revoked.length) await recordAuditEvents(revoked)
+
   revalidatePath('/employees')
   revalidatePath('/manage/users')
   revalidatePath('/reviews')
 
-  return { ok: true, created, updated, unchanged: plan.counts.unchanged }
+  return {
+    ok: true,
+    created,
+    updated,
+    unchanged: plan.counts.unchanged,
+    ...(accessNotEnded
+      ? {
+          warning: `${accessNotEnded} ${accessNotEnded === 1 ? 'person is' : 'people are'} marked exited, but their platform access could not be ended yet. It will be retried tonight; Users & Roles shows who still has access.`,
+        }
+      : {}),
+  }
 }

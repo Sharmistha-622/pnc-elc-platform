@@ -217,6 +217,19 @@ function emptyPlan(fileErrors: string[]): ImportPlan {
   }
 }
 
+/**
+ * The rows that leave the organisation: added as `exited`, or changed to it.
+ * Each of them ends the person's platform access when the import runs, the
+ * same as closing an exit does.
+ */
+export function leaversIn(plan: Pick<ImportPlan, 'rows'>): RowPlan[] {
+  return plan.rows.filter(
+    (r) =>
+      (r.action === 'create' && r.write.status === 'exited') ||
+      (r.action === 'update' && r.changes.some((c) => c.field === 'status' && c.to === 'exited'))
+  )
+}
+
 export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportPlan {
   const table = parseCsv(csvText)
   if (table.length < 2) return emptyPlan(['The file needs a header row and at least one person.'])
