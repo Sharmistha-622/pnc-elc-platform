@@ -86,6 +86,12 @@ Sign-Off → 5. F&F Settlement**.
 | **F&F Settlement** | The full-and-final, edited by **Finance**. See below. |
 | **Documents & Closure** | **Generate / Preview** the No Dues Certificate and the Relieving & Experience Certificate, **Print / Save as PDF**, then **Confirm & Execute Final Exit Closure**. |
 
+Every change is saved as you make it and records who made it: the account
+you're signed in with (for example, who ticked a checklist item or cleared a
+department). Once a resignation is accepted or withdrawn, its decision can't
+be changed. An employee's answer to a retention offer is taken only while an
+offer is open.
+
 ### Full-and-final (F&F) settlement
 
 **Update Settlement** records:
@@ -147,8 +153,7 @@ returned before closure*, *allow immediate relieving / notice waiver*.
 
 > ⚠️ **Before relying on this module, read
 > [Known limitations › Offboarding](13-known-limitations.md#offboarding).**
-> Parts of it can show sample cases, and the asset, attendance and leave
-> panels use placeholder data.
+> The asset, attendance and leave panels use placeholder data.
 
 ## Worked example: a resignation with a 30-day notice
 

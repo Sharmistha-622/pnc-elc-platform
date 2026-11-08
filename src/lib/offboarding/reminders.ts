@@ -9,13 +9,13 @@
 // It lives apart from `service.ts` for that reason. Everything exported there
 // is browser-callable, and the scheduler has no session a guard could check.
 //
-// It reads the cases from the database rather than from the in-process store
-// in `service.ts`. That store is per process and starts from seed scenarios,
-// so a scheduled run reading it reminded the seeded people, not the ones
-// actually leaving.
+// It reads the cases from the database. The button on the offboarding screen
+// runs the same `remindOpenExits` through the caller's own session.
 // ============================================================================
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
+import { logWriter } from '@/lib/logs/writer';
 import { sendEmail } from '@/lib/email/sendEmail';
 
 type CaseRow = {
@@ -24,12 +24,14 @@ type CaseRow = {
   employees: { name: string | null; email: string | null } | null;
 };
 
-export async function sendScheduledOffboardingReminders(): Promise<{
+type ReminderResult = {
   success: boolean;
   remindersSent: number;
   details: string[];
   error?: string;
-}> {
+};
+
+export async function sendScheduledOffboardingReminders(): Promise<ReminderResult> {
   // The scheduler has no user session, so the ordinary server client would
   // act as `anon`, which holds no table privileges.
   const db = createAdminSupabaseClient();
@@ -41,15 +43,25 @@ export async function sendScheduledOffboardingReminders(): Promise<{
       error: 'Offboarding reminders are unavailable: SUPABASE_SERVICE_ROLE_KEY is not configured.',
     };
   }
+  return remindOpenExits(db);
+}
 
+/**
+ * Reminds everyone with an exit in its notice or clearance stage of what is
+ * still pending. Reads through `db`: the service-role client for the
+ * scheduled run, the caller's own session for the button on the offboarding
+ * screen (`sendOffboardingReminders`, behind its guard). The activity log is
+ * written by the service role either way, as every log table is.
+ */
+export async function remindOpenExits(db: SupabaseClient): Promise<ReminderResult> {
   const { data: caseRows, error } = await db
     .from('offboarding_cases')
     .select('id, proposed_lwd, employees(name, email)')
     .in('status', ['notice_period', 'clearance_in_progress']);
 
   if (error) {
-    console.error('Error fetching offboarding cases for reminders:', error.message);
-    return { success: false, remindersSent: 0, details: [], error: error.message };
+    console.error('Error fetching offboarding cases for reminders', { code: error.code ?? null });
+    return { success: false, remindersSent: 0, details: [], error: 'Could not read open exits.' };
   }
 
   const cases = (caseRows ?? []) as unknown as CaseRow[];
@@ -97,7 +109,7 @@ export async function sendScheduledOffboardingReminders(): Promise<{
         remindersSent++;
         details.push(`Reminder sent to ${employeeName} for ${pendingNdcDepts.length} pending clearances.`);
 
-        await db.from('offboarding_activity_log').insert({
+        await logWriter()?.from('offboarding_activity_log').insert({
           offboarding_id: c.id,
           actor_name: 'Automated Reminder Engine',
           actor_role: 'system',
@@ -105,8 +117,8 @@ export async function sendScheduledOffboardingReminders(): Promise<{
           description: `Sent reminder for pending departments: ${pendingNdcDepts.join(', ')}.`,
         });
       }
-    } catch (err: any) {
-      console.error('Failed to send reminder for case:', c.id, err?.message ?? 'Unknown error');
+    } catch {
+      console.error('Failed to send reminder for case', { caseId: c.id });
     }
   }
 
