@@ -78,7 +78,7 @@ export const driveCopyExcludesIdentity: StaticCheck = (repo) => {
 export const portalNoticeFirst: StaticCheck = (repo) => {
   const page = repo.read(`${PORTAL_DIR}/page.tsx`) ?? ''
   const route = repo.read('src/app/api/onboarding/token/[token]/route.ts') ?? ''
-  const steps = page.match(/const STEPS[^=]*=\s*\[([\s\S]*?)\];?\n/)
+  const steps = page.match(/const STEPS[^=]*=\s*\[([\s\S]*?)\];?\r?\n/)
   const first = steps?.[1].match(/\{[^}]*\}/)?.[0] ?? ''
   if (!/notice/i.test(first)) return fail('The portal\'s first step is not the privacy notice.')
   if (!route.includes("'acknowledge_notice'") || !/notice_version/.test(route + (repo.read('src/lib/dpdp/consent/service.ts') ?? ''))) {

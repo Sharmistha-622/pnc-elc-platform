@@ -185,10 +185,7 @@ export const NAV_SECTIONS: NavSection[] = [
         title: "Settings",
         url: "/manage/settings",
         icon: SlidersHorizontal,
-        // DPDP & Privacy has its own entry, for the roles that reach only it.
-        notActiveFor: ["/manage/settings/dpdp"],
       },
-      { title: "DPDP & Privacy", url: "/manage/settings/dpdp", icon: Lock },
       { title: "Privacy Cases", url: "/manage/privacy", icon: Scale },
       { title: "Email Center", url: "/manage/emails", icon: Mail },
       {
