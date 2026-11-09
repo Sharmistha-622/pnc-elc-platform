@@ -9,6 +9,7 @@ import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
 import { isAllowedEmail } from '@/lib/auth/allowedEmail'
 import type { UserRow } from '@/lib/rbac/listUsersWithRoles'
+import { syncEmployeeDepartment } from '@/lib/employees/syncDepartment'
 
 const GRANT_REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -29,7 +30,9 @@ export interface CreateUserInput {
   team?: string
 }
 
-export type CreateUserResult = { success: true; user: UserRow } | { success: false; error: string }
+export type CreateUserResult =
+  | { success: true; user: UserRow; warning?: string }
+  | { success: false; error: string }
 
 /**
  * Creates an account ahead of the person's first sign-in, holding the role
@@ -94,6 +97,18 @@ export async function createUserWithRole(input: CreateUserInput): Promise<Create
     }
   }
 
+  // The department belongs to the person, not only the account: write it onto
+  // their employee record too, which is what the directory and every other
+  // screen read (`departmentOf`). Someone with no record yet gets it when
+  // their record is created.
+  let warning: string | undefined
+  if (team !== 'None') {
+    const synced = await syncEmployeeDepartment(admin, { email, department: team })
+    if (!synced.ok) {
+      warning = "The account was created, but the employee record's department was not set. Set it again from the list."
+    }
+  }
+
   try {
     await recordAuditEvent({
       subject: { employee_id: data.user.id, employee_email: email, employee_name: fullName },
@@ -131,5 +146,6 @@ export async function createUserWithRole(input: CreateUserInput): Promise<Create
       last_active_at: null,
       avatar: null,
     },
+    ...(warning ? { warning } : {}),
   }
 }

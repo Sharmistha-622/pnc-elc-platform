@@ -12,6 +12,8 @@ import { canGrantRole, canSetDepartment, isRoleCode } from '@/lib/rbac/roles'
 import { guard } from '@/lib/rbac/guard'
 import { breakGlassCaller } from '@/lib/rbac/breakGlassAccess'
 import { BREAK_GLASS_REFUSALS, canBreakGlassChange } from '@/lib/rbac/breakGlass'
+import { CLEARED_PRE_EXIT_MARKERS } from '@/lib/rbac/lifecycle'
+import { syncEmployeeDepartment } from '@/lib/employees/syncDepartment'
 
 const GRANT_REFUSALS: Record<string, string> = {
   role_is_automatic:
@@ -242,7 +244,13 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   if (authUserRecord) {
     try {
       await admin.auth.admin.updateUserById(authUserRecord.id, {
-        app_metadata: { ...authUserRecord.app_metadata, role: newRole },
+        // A role set by hand replaces one removed ahead of an exit, and clears
+        // that record of it (src/lib/rbac/lifecycle.ts, "Before exit").
+        app_metadata: {
+          ...authUserRecord.app_metadata,
+          role: newRole,
+          ...(roleChanged ? CLEARED_PRE_EXIT_MARKERS : {}),
+        },
         user_metadata: { ...authUserRecord.user_metadata, team: normalizedNewTeam },
       })
     } catch (err) {
@@ -250,43 +258,15 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
     }
   }
 
-  // 2. Update employee record in public.employees (if present)
-  //
-  // With the service-role client, already in hand. The directory is
-  // `general: edit` for P&C only, so a Platform Admin's session is refused the
-  // write by the database — and an update refused by RLS changes zero rows
-  // without an error, which reported success while the team never moved. The
-  // `manageUsers` guard and `canGrantRole` above decide who gets this far.
-  let employeeSyncError: string | null = null
-  try {
-    const supabase = admin
-
-    // `employees` has `team` (the department's name) and `team_id`; it has no
-    // `department` or `department_id`. Writing those made PostgREST refuse the
-    // whole update, unchecked, so the directory never saw a department change.
-    let teamId: string | null = null
-    if (normalizedNewTeam !== 'None') {
-      const { data: teamRecord } = await supabase
-        .from('teams')
-        .select('id')
-        .ilike('name', normalizedNewTeam.trim())
-        .maybeSingle()
-      teamId = teamRecord?.id ?? null
-    }
-
-    const { error: employeeError } = await supabase
-      .from('employees')
-      .update({
-        team: normalizedNewTeam === 'None' ? null : normalizedNewTeam,
-        team_id: teamId,
-        updated_at: new Date().toISOString(),
-      })
-      .or(`email.ilike.${cleanTargetEmail}${isValidUuid(targetUserId) ? `,id.eq.${targetUserId}` : ''}`)
-    if (employeeError) employeeSyncError = employeeError.message
-  } catch (err) {
-    employeeSyncError = err instanceof Error ? err.message : String(err)
-  }
-  if (employeeSyncError) console.error('Employees table sync failed:', employeeSyncError)
+  // 2. Update employee record in public.employees (if present), with the
+  //    service-role client already in hand. The `manageUsers` guard and
+  //    `canGrantRole` above decide who gets this far.
+  const synced = await syncEmployeeDepartment(admin, {
+    email: cleanTargetEmail,
+    employeeId: targetUserId,
+    department: normalizedNewTeam,
+  })
+  const employeeSyncFailed = !synced.ok
 
   // 3. Write Audit Log to public.audit_log
   try {
@@ -353,10 +333,10 @@ export async function updateUserAllocations(input: UpdateAllocationsInput) {
   revalidatePath('/manage/roles')
   revalidatePath('/employees')
 
-  if (employeeSyncError && teamChanged) {
+  if (employeeSyncFailed && teamChanged) {
     return {
       success: false,
-      error: `The role and account were updated, but the employee record's department was not (${employeeSyncError}). Try again.`,
+      error: "The role and account were updated, but the employee record's department was not. Try again.",
     }
   }
 

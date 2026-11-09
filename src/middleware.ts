@@ -71,7 +71,7 @@ export async function middleware(request: NextRequest) {
     // Authenticated, but not necessarily entitled to this route. `canAccessRoute`
     // is the same map the sidebar hides links with, applied here so hiding a link
     // is not the only thing standing between a Viewer and /manage.
-    const { role, email, isEmulating } = resolveRole(
+    const { role, email, isEmulating, roleEndedBeforeExit } = resolveRole(
       user,
       request.cookies.get('dev-role-override')?.value
     )
@@ -94,10 +94,12 @@ export async function middleware(request: NextRequest) {
     if (pathname === '/portal-notice') return response
 
     // Break-glass accounts reach the users screen whatever role they hold
-    // (src/lib/rbac/breakGlass.ts). Only that screen, and never while
-    // emulating. The Super Admin switch is not read here: the screen's layout
-    // and `updateUserAllocations` check it on every request.
-    const breakGlassScreen = !isEmulating && isBreakGlassEmail(email) && isBreakGlassRoute(pathname)
+    // (src/lib/rbac/breakGlass.ts). Only that screen, never while emulating,
+    // and never once their stored role has been removed ahead of an exit. The
+    // Super Admin switch is not read here: the screen's layout and
+    // `updateUserAllocations` check it on every request.
+    const breakGlassScreen =
+      !isEmulating && !roleEndedBeforeExit && isBreakGlassEmail(email) && isBreakGlassRoute(pathname)
 
     if (!canAccessRoute(role, pathname) && !breakGlassScreen) {
       if (pathname.startsWith('/api/')) {

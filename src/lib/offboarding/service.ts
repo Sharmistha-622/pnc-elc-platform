@@ -1,18 +1,18 @@
 'use server';
 
+import { randomUUID } from 'crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { logWriter } from '@/lib/logs/writer';
-import { auditOffboarding, auditAccess, auditLetters } from '@/lib/audit/events';
+import { auditOffboarding, auditAccess } from '@/lib/audit/events';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { platformConfigRefusal } from '@/lib/settings/access';
-import { guard, guardResource, maySeeSalary } from '@/lib/rbac/guard';
+import { guard, guardResource, maySeeSalary, type Guarded } from '@/lib/rbac/guard';
 import { FEATURE_ACCESS } from '@/lib/role-constants';
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee';
 import {
-  ExitType,
-  OffboardingStatus,
   OffboardingCase,
   OffboardingChecklistItem,
   OffboardingAssetItem,
@@ -25,71 +25,92 @@ import {
   FullOffboardingData,
   InitiateOffboardingInput,
   ResignationRequest,
-  ResignationSource,
   ReviewDecision,
-  EmployeeRetentionResponse,
-  ResignationRequestStatus,
   SubmitResignationInput,
 } from './types';
+import {
+  DOCUMENT_GENERATED,
+  EXIT_TYPES,
+  PERSON_SELECT,
+  decideResignation,
+  documentName,
+  documentsFrom,
+  hasOutstandingAssets,
+  fnfFollowingClearances,
+  itSignOffChange,
+  isIsoDate,
+  isNdcDepartment,
+  isReviewDecision,
+  isUuid,
+  managerIdsOf,
+  pickAssetChanges,
+  pickChecklistChanges,
+  pickFnfChanges,
+  pickNdcChanges,
+  pickSettingsChanges,
+  sortNdc,
+  toCase,
+  toRequest,
+} from './records';
+import { remindOpenExits } from './reminders';
 import { assetIntegrationService } from '@/lib/integrations/assets';
 import { attendanceIntegrationService } from '@/lib/integrations/attendance';
 import { leaveIntegrationService } from '@/lib/integrations/leave';
-import { getEmployees } from '@/lib/employees/getEmployees';
 import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess';
-
-
-// ============================================================================
-// DEFAULT CONFIGURATION & RECOVERY SETTINGS
-// ============================================================================
-
-let MEMORY_SETTINGS = { ...DEFAULT_OFFBOARDING_SETTINGS };
+import { applyPreExitRoleRule, lastWorkingDayOf, OPEN_EXIT_STATUSES } from '@/lib/offboarding/preExitRoles';
 
 // ============================================================================
-// REALISTIC SEED DATA COVERING ALL 7 REQUIRED SCENARIOS
+// OFFBOARDING
+// ----------------------------------------------------------------------------
+// Every export below is a server action: the browser can call it directly,
+// with any arguments, whichever page imported it. The `/offboarding` route
+// gate does not reach them, so each one checks its caller first.
+//
+// Everything lives in the database. Reads and writes go through the caller's
+// own session, so the "offboarding roles" policies answer a second time. The
+// service-role client is used only where a session is refused by design and
+// the action has already decided the caller may proceed:
+//   - the activity log, which only the service role writes (`logWriter`);
+//   - the F&F row's status and blockers, which follow from the clearances,
+//     for callers without salary access (PnC Ops), and its non-salary columns
+//     when they read the case;
+//   - an employee's own answer to a retention offer, which may open their
+//     exit (the resignation policies let them insert, not update).
 // ============================================================================
 
-const MEMORY_OFFBOARDING_STORE: Map<string, FullOffboardingData> = new Map();
+type Db = SupabaseClient;
 
-function initSeedScenarios() {
-  // In-memory store starts empty in production.
+const NOT_FOUND = 'Case not found';
+const SAVE_FAILED = 'The change could not be saved. Try again.';
+const REQUEST_NOT_FOUND = 'Resignation request not found';
+const ALREADY_OPEN = 'An exit is already open for this person.';
+const REQUEST_CHANGED = 'This resignation changed. Reload and try again.';
+const SYNC_FAILED =
+  'The change was saved, but the clearances that follow from it could not be updated. Save it again to retry.';
+
+function isOpenStatus(status: string | null | undefined): boolean {
+  return (OPEN_EXIT_STATUSES as readonly string[]).includes(status ?? '');
 }
 
-// ============================================================================
-// AUDIT LOG HELPER
-// ============================================================================
+/** The F&F columns a caller without salary access may see: status and blockers, no amount. */
+const FNF_STATUS_COLUMNS =
+  'id, offboarding_id, status, blocked_reasons, payable_days, leave_encashment_days, gratuity_eligible, processed_at, created_at, updated_at';
 
-async function recordAuditLog(
-  tableName: string,
-  recordId: string,
-  action: 'insert' | 'update' | 'delete',
-  changedData: Record<string, any>,
-  changedBy: string = 'pnc-user'
-) {
-  try {
-    const supabase = logWriter();
-    if (!supabase) return;
-    await supabase.from('audit_log').insert({
-      table_name: tableName,
-      record_id: recordId,
-      action,
-      changed_by: null, // nullable in audit_log schema
-      changed_data: {
-        ...changedData,
-        actor: changedBy,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch {
-    // Audit table may not exist in local mode
-  }
+function logDbError(context: string, error: { code?: string } | null | undefined): void {
+  console.error(`Offboarding: ${context}`, { code: error?.code ?? null });
+}
+
+function serviceDb(): Db | null {
+  return createAdminSupabaseClient();
+}
+
+/** Who did it, from the session. Never from what the browser sends. */
+function actorOf(caller: Pick<Guarded, 'email'>): string {
+  return caller.email ?? 'P&C Operations';
 }
 
 // ============================================================================
 // ACCESS
-// ----------------------------------------------------------------------------
-// Every export below is a server action: the browser can call it directly,
-// with any arguments, whichever page imported it. The `/offboarding` route
-// gate does not reach them, so each one checks its caller here.
 // ============================================================================
 
 /**
@@ -122,18 +143,6 @@ async function currentEmployeeId(): Promise<string | null> {
   return employee?.id ?? null;
 }
 
-// ============================================================================
-// CORE SERVICE LAYER METHODS
-// ============================================================================
-
-/**
- * Fetch all offboarding cases.
- */
-/**
- * Audit subject for an offboarding case. Both keys are carried: the employee
- * ID links to their directory record, and the email keeps the trail resolvable
- * after that record is archived at exit.
- */
 /** The employee record's email, read past RLS: the closer may not hold `general: view`. */
 async function employeeEmail(employeeId: string): Promise<string | null> {
   const admin = createAdminSupabaseClient();
@@ -142,6 +151,11 @@ async function employeeEmail(employeeId: string): Promise<string | null> {
   return (data?.email as string | undefined) ?? null;
 }
 
+/**
+ * Audit subject for a case or request. Both keys are carried: the employee ID
+ * links to their directory record, and the email keeps the trail resolvable
+ * after that record is archived at exit.
+ */
 function auditSubject(c: { employee_id: string; employee_email: string; employee_name: string }) {
   return {
     employee_id: c.employee_id,
@@ -150,491 +164,443 @@ function auditSubject(c: { employee_id: string; employee_email: string; employee
   };
 }
 
+// ============================================================================
+// LOGS
+// ============================================================================
+
+async function recordAuditLog(
+  tableName: string,
+  recordId: string,
+  action: 'insert' | 'update' | 'delete',
+  changedData: Record<string, unknown>,
+  changedBy: string
+): Promise<void> {
+  const writer = logWriter();
+  if (!writer) return;
+  const { error } = await writer.from('audit_log').insert({
+    table_name: tableName,
+    record_id: recordId,
+    action,
+    changed_by: null,
+    changed_data: { ...changedData, actor: changedBy, timestamp: new Date().toISOString() },
+  });
+  if (error) logDbError('audit_log write failed', error);
+}
+
+type ActivityEntry = Omit<OffboardingActivityLog, 'id' | 'created_at'> & { id?: string };
+
+async function appendActivity(entries: ActivityEntry[]): Promise<void> {
+  const writer = logWriter();
+  if (!writer || entries.length === 0) return;
+  const { error } = await writer.from('offboarding_activity_log').insert(entries);
+  if (error) logDbError('activity log write failed', error);
+}
+
+// ============================================================================
+// READING
+// ============================================================================
+
+async function managerNames(db: Db, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { data } = await db.from('employees').select('id, name').in('id', ids);
+  return new Map(((data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
+}
+
+async function readSettings(db: Db): Promise<OffboardingSettings> {
+  const { data, error } = await db
+    .from('offboarding_settings')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return !error && data ? { ...DEFAULT_OFFBOARDING_SETTINGS, ...data } : { ...DEFAULT_OFFBOARDING_SETTINGS };
+}
+
+/** The case row with the person's fields, without the rest of the case. */
+async function readCase(db: Db, caseId: string): Promise<OffboardingCase | null> {
+  if (!isUuid(caseId)) return null;
+  const { data, error } = await db
+    .from('offboarding_cases')
+    .select(`*, employees(${PERSON_SELECT})`)
+    .eq('id', caseId)
+    .maybeSingle();
+  if (error) {
+    logDbError('case read failed', error);
+    return null;
+  }
+  if (!data) return null;
+  const managers = await managerNames(db, managerIdsOf([data]));
+  return toCase(data, managers);
+}
+
+function emptyFnf(caseId: string, at: string): OffboardingFnF {
+  return {
+    id: `fnf-${caseId}`,
+    offboarding_id: caseId,
+    status: 'not_started',
+    payable_days: 0,
+    leave_encashment_days: 0,
+    gratuity_eligible: false,
+    asset_recovery_amount: 0,
+    other_deductions: 0,
+    blocked_reasons: [],
+    created_at: at,
+    updated_at: at,
+  };
+}
+
+/** The whole case. F&F figures only for a caller who may see salary. */
+async function loadCase(db: Db, caseId: string, caller: Guarded): Promise<FullOffboardingData | null> {
+  const caseRecord = await readCase(db, caseId);
+  if (!caseRecord) return null;
+
+  // PnC Ops runs the exit but holds `salary: none`, and the database closes
+  // `offboarding_fnf` to them. They still need to see where the settlement
+  // stands and what is blocking it, so for them those columns, and no
+  // amount, are read with the service-role client, past the guard.
+  const fnfQuery = maySeeSalary(caller)
+    ? db.from('offboarding_fnf').select('*')
+    : (serviceDb() ?? db).from('offboarding_fnf').select(FNF_STATUS_COLUMNS);
+
+  const [chkRes, assetRes, ndcRes, fnfRes, logsRes] = await Promise.all([
+    db.from('offboarding_checklists').select('*').eq('offboarding_id', caseId).order('created_at'),
+    db.from('offboarding_asset_clearances').select('*').eq('offboarding_id', caseId).order('created_at'),
+    db.from('offboarding_ndc').select('*').eq('offboarding_id', caseId),
+    fnfQuery.eq('offboarding_id', caseId).maybeSingle(),
+    db.from('offboarding_activity_log').select('*').eq('offboarding_id', caseId).order('created_at', { ascending: false }),
+  ]);
+
+  const activityLogs = (logsRes.data ?? []) as OffboardingActivityLog[];
+  const fnf: OffboardingFnF = {
+    ...emptyFnf(caseId, caseRecord.created_at),
+    ...((fnfRes.data as Partial<OffboardingFnF> | null) ?? {}),
+  };
+  return {
+    caseRecord,
+    checklist: (chkRes.data ?? []) as OffboardingChecklistItem[],
+    assets: (assetRes.data ?? []) as OffboardingAssetItem[],
+    ndc: sortNdc((ndcRes.data ?? []) as OffboardingNDCDepartment[]),
+    fnf: maySeeSalary(caller) ? fnf : withoutSettlementFigures(fnf),
+    activityLogs,
+    documents: documentsFrom(activityLogs),
+  };
+}
+
 export async function getAllOffboardingCases(): Promise<OffboardingCase[]> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return [];
 
-  try {
-    const supabase = await createServerSupabaseClient();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const { data, error } = await supabase
-      .from('offboarding_cases')
-      .select('*, employees(name, email, team)')
-      .order('created_at', { ascending: false })
-      .abortSignal(controller.signal);
-
-    clearTimeout(timeout);
-
-    if (!error && data) {
-      return data.map((row: any) => ({
-        ...row,
-        employee_name: row.employees?.name || row.employee_name,
-        employee_email: row.employees?.email || row.employee_email,
-      }));
-    }
-  } catch (err) {
-    // Fallback to memory (timeout, missing table, or network error)
+  const db = await createServerSupabaseClient();
+  const { data, error } = await db
+    .from('offboarding_cases')
+    .select(`*, employees(${PERSON_SELECT})`)
+    .order('created_at', { ascending: false });
+  if (error) {
+    logDbError('case list read failed', error);
+    return [];
   }
-
-  return Array.from(MEMORY_OFFBOARDING_STORE.values())
-    .map((item) => item.caseRecord)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const managers = await managerNames(db, managerIdsOf(data ?? []));
+  return (data ?? []).map((row) => toCase(row, managers));
 }
 
-/**
- * Fetch a single offboarding case by ID with all related records.
- */
 export async function getOffboardingById(id: string): Promise<FullOffboardingData | null> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return null;
 
-  let fullData: FullOffboardingData | null = null;
+  const db = await createServerSupabaseClient();
+  const fullData = await loadCase(db, id, allowed.caller);
+  if (!fullData) return null;
+
   try {
-    const supabase = await createServerSupabaseClient();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const { data: caseRow, error: caseErr } = await supabase
-      .from('offboarding_cases')
-      .select('*, employees(*)')
-      .eq('id', id)
-      .abortSignal(controller.signal)
-      .single();
-
-    clearTimeout(timeout);
-
-    if (!caseErr && caseRow) {
-      // PnC Ops runs the exit but holds `salary: none`, and the database
-      // closes `offboarding_fnf` to them. They still need to see where the
-      // settlement stands and what is blocking it, so for them those columns
-      // — and no amount — are read with the service-role client, past the
-      // `offboarding` guard above.
-      const salary = maySeeSalary(allowed.caller);
-      const fnfQuery = salary
-        ? supabase.from('offboarding_fnf').select('*')
-        : (createAdminSupabaseClient() ?? supabase)
-            .from('offboarding_fnf')
-            .select(
-              'id, offboarding_id, status, blocked_reasons, payable_days, leave_encashment_days, gratuity_eligible, processed_at, created_at, updated_at'
-            );
-      const [chkRes, assetRes, ndcRes, fnfRes, logsRes] = await Promise.all([
-        supabase.from('offboarding_checklists').select('*').eq('offboarding_id', id),
-        supabase.from('offboarding_asset_clearances').select('*').eq('offboarding_id', id),
-        supabase.from('offboarding_ndc').select('*').eq('offboarding_id', id),
-        fnfQuery.eq('offboarding_id', id).maybeSingle(),
-        supabase.from('offboarding_activity_log').select('*').eq('offboarding_id', id).order('created_at', { ascending: false }),
-      ]);
-
-      const caseRecord: OffboardingCase = {
-        ...caseRow,
-        employee_name: caseRow.employees?.name || caseRow.employee_name,
-        employee_email: caseRow.employees?.email || caseRow.employee_email,
-      };
-
-      fullData = {
-        caseRecord,
-        checklist: chkRes.data || [],
-        assets: assetRes.data || [],
-        ndc: ndcRes.data || [],
-        fnf: {
-          id: `fnf-${id}`,
-          offboarding_id: id,
-          status: 'not_started',
-          payable_days: 0,
-          leave_encashment_days: 0,
-          gratuity_eligible: false,
-          asset_recovery_amount: 0,
-          other_deductions: 0,
-          blocked_reasons: [],
-          created_at: caseRow.created_at,
-          updated_at: caseRow.updated_at,
-          ...((fnfRes.data as Partial<OffboardingFnF> | null) ?? {}),
-        },
-        activityLogs: logsRes.data || [],
-        documents: [],
-      };
-    }
+    const [extAssets, extAtt, extLeave] = await Promise.all([
+      assetIntegrationService.getEmployeeAssignedAssets(fullData.caseRecord.employee_id),
+      attendanceIntegrationService.getEmployeeAttendanceSummary(fullData.caseRecord.employee_id),
+      leaveIntegrationService.getEmployeeLeaveSummary(fullData.caseRecord.employee_id),
+    ]);
+    fullData.externalAssetsSummary = extAssets;
+    fullData.externalAttendanceSummary = extAtt;
+    fullData.externalLeaveSummary = extLeave;
   } catch {
-    // Fallback to memory (timeout, missing table, or network error)
+    console.warn('Offboarding: could not fetch the external integration summary');
   }
-
-  if (!fullData) {
-    fullData = MEMORY_OFFBOARDING_STORE.get(id) || null;
-  }
-
-  if (fullData) {
-    try {
-      const [extAssets, extAtt, extLeave] = await Promise.all([
-        assetIntegrationService.getEmployeeAssignedAssets(fullData.caseRecord.employee_id),
-        attendanceIntegrationService.getEmployeeAttendanceSummary(fullData.caseRecord.employee_id),
-        leaveIntegrationService.getEmployeeLeaveSummary(fullData.caseRecord.employee_id),
-      ]);
-      fullData.externalAssetsSummary = extAssets;
-      fullData.externalAttendanceSummary = extAtt;
-      fullData.externalLeaveSummary = extLeave;
-    } catch (err) {
-      console.warn('Could not fetch external integration summary:', err);
-    }
-  }
-
-  // A copy, not the stored record: the memory store hands back the live
-  // object, and redacting that in place would erase the figures for everyone.
-  if (fullData && !maySeeSalary(allowed.caller)) {
-    return { ...fullData, fnf: withoutSettlementFigures(fullData.fnf) };
-  }
-
   return fullData;
 }
 
+// ============================================================================
+// OPENING AN EXIT
+// ============================================================================
 
-/**
- * Initiate an employee exit.
- */
 export async function initiateOffboardingCase(
   input: InitiateOffboardingInput
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
-  return openOffboardingCase(input);
+  const db = await createServerSupabaseClient();
+  return openOffboardingCase(input, db, {
+    salary: maySeeSalary(allowed.caller),
+    initiatedBy: actorOf(allowed.caller),
+  });
 }
 
 /**
- * Opens the case. Not exported: the resignation flow calls this once a
- * resignation is accepted, which can follow an employee's own response to a
- * retention offer (`respondToRetention`), and that caller has already been
- * checked by the action that got here.
+ * Opens the case: the case row, its checklist, assets, the four No Dues
+ * departments and the F&F row, all saved or none.
+ *
+ * Not exported. Its callers have checked who is asking and pass the client to
+ * write with: the caller's session, or the service-role client for an
+ * employee's own answer to a retention offer.
  */
 async function openOffboardingCase(
-  input: InitiateOffboardingInput
+  input: InitiateOffboardingInput,
+  db: Db,
+  opts: { salary: boolean; initiatedBy: string }
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
-  try {
-    const caseId = `off-case-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
-    const nowIso = new Date().toISOString();
+  if (!isUuid(input?.employee_id)) return { success: false, error: 'Choose an employee.' };
+  if (!isIsoDate(input.proposed_lwd)) return { success: false, error: 'Enter the last working day.' };
+  if (!(EXIT_TYPES as readonly string[]).includes(input.exit_type)) return { success: false, error: 'Choose an exit type.' };
+  if (typeof input.reason !== 'string' || input.reason.trim() === '') return { success: false, error: 'Enter a reason.' };
 
-    const initialStatus: OffboardingStatus = input.immediate_relieving ? 'settlement_pending' : 'notice_period';
-    const noticeDays = input.notice_period_days ?? 30;
-
-    const newCase: OffboardingCase = {
-      id: caseId,
-      employee_id: input.employee_id,
-      employee_name: input.employee_name,
-      employee_email: input.employee_email,
-      employee_designation: input.employee_designation,
-      employee_department: input.employee_department,
-      employee_type: input.employee_type,
-      manager_name: input.manager_name || 'Assigned Manager',
-      exit_type: input.exit_type,
-      initiated_date: input.initiated_date || new Date().toISOString().split('T')[0],
-      initiated_by: input.initiated_by || 'P&C Operations',
-      proposed_lwd: input.proposed_lwd,
-      actual_lwd: input.immediate_relieving ? input.proposed_lwd : null,
-      notice_period_days: noticeDays,
-      notice_period_waived: Boolean(input.notice_period_waived),
-      reason: input.reason,
-      reason_details: input.reason_details,
-      status: initialStatus,
-      immediate_relieving: Boolean(input.immediate_relieving),
-      exception_notes: input.exception_notes,
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    // Standard initial checklist
-    const defaultChecklist: OffboardingChecklistItem[] = [
-      {
-        id: `chk-${Date.now()}-1`,
-        offboarding_id: caseId,
-        title: 'Knowledge Handover Documentation & Repository Transfer',
-        description: 'Document active project tasks, repositories, drive assets, and runbooks.',
-        category: 'knowledge_transfer',
-        owner_role: 'employee',
-        assigned_to_name: input.employee_name,
-        status: 'pending',
-        is_mandatory: true,
-        due_date: input.proposed_lwd,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `chk-${Date.now()}-2`,
-        offboarding_id: caseId,
-        title: 'Manager Handover Acceptance & Peer Handover',
-        description: 'Validate knowledge transfer completion and team reassignments.',
-        category: 'knowledge_transfer',
-        owner_role: 'manager',
-        assigned_to_name: input.manager_name || 'Reporting Manager',
-        status: 'pending',
-        is_mandatory: true,
-        due_date: input.proposed_lwd,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `chk-${Date.now()}-3`,
-        offboarding_id: caseId,
-        title: 'IT Asset & Hardware Return Inspection',
-        description: 'Verify and return issued laptop, monitor, chargers, and hardware peripherals.',
-        category: 'asset_return',
-        owner_role: 'it_admin',
-        assigned_to_name: 'IT Operations Desk',
-        status: 'pending',
-        is_mandatory: true,
-        due_date: input.proposed_lwd,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `chk-${Date.now()}-4`,
-        offboarding_id: caseId,
-        title: 'Confidential Exit Interview & Feedback Form',
-        description: 'Submit confidential reflections, handover feedback, and survey responses.',
-        category: 'exit_interview',
-        owner_role: 'employee',
-        assigned_to_name: input.employee_name,
-        status: 'pending',
-        is_mandatory: true,
-        due_date: input.proposed_lwd,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `chk-${Date.now()}-5`,
-        offboarding_id: caseId,
-        title: 'Expense Claims & Financial Dues Verification',
-        description: 'Verify travel advances, reimbursements, or pending claims.',
-        category: 'finance',
-        owner_role: 'finance',
-        assigned_to_name: 'Finance Desk',
-        status: 'pending',
-        is_mandatory: true,
-        due_date: input.proposed_lwd,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    ];
-
-    // Standard initial departmental NDC
-    const defaultNdc: OffboardingNDCDepartment[] = [
-      {
-        id: `ndc-${Date.now()}-1`,
-        offboarding_id: caseId,
-        department: 'manager',
-        department_label: 'Reporting Manager',
-        status: 'pending',
-        remarks: 'Handover underway.',
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `ndc-${Date.now()}-2`,
-        offboarding_id: caseId,
-        department: 'it_admin',
-        department_label: 'IT & Asset Operations',
-        status: 'pending',
-        remarks: 'Awaiting hardware return.',
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `ndc-${Date.now()}-3`,
-        offboarding_id: caseId,
-        department: 'finance',
-        department_label: 'Finance & Accounts',
-        status: 'pending',
-        remarks: 'Expense claims check in progress.',
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      {
-        id: `ndc-${Date.now()}-4`,
-        offboarding_id: caseId,
-        department: 'pnc',
-        department_label: 'People & Culture',
-        status: 'pending',
-        remarks: 'Awaiting departmental sign-offs.',
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    ];
-
-    // Initial F&F Record
-    const defaultFnf: OffboardingFnF = {
-      id: `fnf-${caseId}`,
-      offboarding_id: caseId,
-      status: 'awaiting_clearance',
-      payable_days: 0,
-      leave_encashment_days: 0,
-      gratuity_eligible: false,
-      asset_recovery_amount: 0,
-      other_deductions: 0,
-      remarks: 'Computation scheduled upon clearance completion.',
-      blocked_reasons: ['Department NDC clearances pending', 'Asset verification pending'],
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    const initialActivity: OffboardingActivityLog[] = [
-      {
-        id: `log-${Date.now()}-init`,
-        offboarding_id: caseId,
-        actor_name: input.initiated_by || 'P&C Operations',
-        actor_role: 'pnc',
-        action: 'Exit Formally Initiated',
-        description: `Exit initiated for ${input.employee_name} (${input.exit_type.replace(/_/g, ' ')}). Proposed LWD: ${input.proposed_lwd}. Notice: ${noticeDays} days.`,
-        created_at: nowIso,
-      },
-    ];
-
-    // Query External Integration APIs to prime clearances and F&F
-    let initialAssets: OffboardingAssetItem[] = [
-      {
-        id: `asset-${Date.now()}-lap`,
-        offboarding_id: caseId,
-        asset_name: 'Company Assigned Laptop & Charger',
-        asset_type: 'laptop',
-        return_status: 'pending_return',
-        condition: 'good',
-        clearance_notes: 'Physical check at campus reception on LWD.',
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    ];
-
-    let extAttSummary: any = null;
-    let extLeaveSummary: any = null;
-    let extAssetsSummary: any = null;
-
-    try {
-      const [extAssets, extAtt, extLeave] = await Promise.all([
-        assetIntegrationService.getEmployeeAssignedAssets(input.employee_id),
-        attendanceIntegrationService.getEmployeeAttendanceSummary(input.employee_id),
-        leaveIntegrationService.getEmployeeLeaveSummary(input.employee_id),
-      ]);
-      extAssetsSummary = extAssets;
-      extAttSummary = extAtt;
-      extLeaveSummary = extLeave;
-
-      if (extAssets.assets.length > 0) {
-        initialAssets = extAssets.assets.map((a) => ({
-          id: `ast-${caseId}-${a.asset_id}`,
-          offboarding_id: caseId,
-          asset_name: a.asset_name,
-          asset_tag: a.asset_tag,
-          asset_type: a.asset_type,
-          assigned_date: a.assigned_date,
-          return_status: a.external_return_status === 'returned' ? 'returned' : 'pending_return',
-          condition: a.external_return_status === 'damaged' ? 'damaged' : 'good',
-          recovery_amount: a.estimated_recovery_amount,
-          clearance_notes: `Synced from ${extAssets.source_system}. S/N: ${a.serial_number}`,
-          created_at: nowIso,
-          updated_at: nowIso,
-        }));
-      }
-
-      defaultFnf.payable_days = extAtt.calculated_payable_days;
-      defaultFnf.leave_encashment_days = extLeave.total_encashable_days;
-      defaultFnf.asset_recovery_amount = extAssets.total_recovery_required;
-      defaultFnf.remarks = `External systems synced: Attendance (${extAtt.calculated_payable_days} payable days), Leave (${extLeave.total_encashable_days} encashable days), Asset recovery (₹${extAssets.total_recovery_required.toLocaleString('en-IN')}).`;
-    } catch {
-      // Fallback
-    }
-
-    // Save to memory store
-    MEMORY_OFFBOARDING_STORE.set(caseId, {
-      caseRecord: newCase,
-      checklist: defaultChecklist,
-      assets: initialAssets,
-      ndc: defaultNdc,
-      fnf: defaultFnf,
-      activityLogs: initialActivity,
-      documents: [],
-      externalAssetsSummary: extAssetsSummary,
-      externalAttendanceSummary: extAttSummary,
-      externalLeaveSummary: extLeaveSummary,
-    });
-
-
-    // Attempt persist to Supabase if tables exist
-    try {
-      const supabase = await createServerSupabaseClient();
-      await supabase.from('offboarding_cases').insert({
-        id: newCase.id,
-        employee_id: newCase.employee_id,
-        exit_type: newCase.exit_type,
-        initiated_date: newCase.initiated_date,
-        initiated_by: newCase.initiated_by,
-        proposed_lwd: newCase.proposed_lwd,
-        actual_lwd: newCase.actual_lwd,
-        notice_period_days: newCase.notice_period_days,
-        notice_period_waived: newCase.notice_period_waived,
-        reason: newCase.reason,
-        reason_details: newCase.reason_details,
-        status: newCase.status,
-        immediate_relieving: newCase.immediate_relieving,
-        exception_notes: newCase.exception_notes,
-      });
-
-      await supabase.from('offboarding_checklists').insert(defaultChecklist);
-      await supabase.from('offboarding_ndc').insert(defaultNdc);
-      await supabase.from('offboarding_fnf').insert(defaultFnf);
-      await logWriter()?.from('offboarding_activity_log').insert(initialActivity);
-    } catch {
-      // Table missing - memory store handles it
-    }
-
-    // Record in global audit log
-    await recordAuditLog('offboarding_cases', caseId, 'insert', {
-      employee_id: input.employee_id,
-      employee_name: input.employee_name,
-      exit_type: input.exit_type,
-      proposed_lwd: input.proposed_lwd,
-    });
-
-    // Send resignation formal acknowledgment email
-    try {
-      await sendEmail(
-        'offboarding_resignation_ack',
-        {
-          subject: 'Acknowledgment of Resignation — NavGurukul Foundation',
-          employee_name: input.employee_name,
-          resignation_date: input.initiated_date,
-          notice_period_duration: `${noticeDays} Days`,
-          last_working_day: input.proposed_lwd,
-          offboarding_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${caseId}`,
-          hr_poc_name: 'People & Culture Operations',
-        },
-        input.employee_email
-      );
-    } catch (mailErr) {
-      console.warn('Could not dispatch initial resignation email:', mailErr);
-    }
-
-    revalidatePath('/offboarding');
-    revalidatePath('/employees');
-    await auditOffboarding.caseOpened({
-      subject: auditSubject(newCase),
-      actorName: newCase.initiated_by,
-      entityId: caseId,
-      exitType: newCase.exit_type,
-      metadata: {
-        proposed_lwd: newCase.proposed_lwd,
-        notice_period_days: noticeDays,
-        reason: newCase.reason,
-      },
-    });
-
-    return { success: true, caseId };
-  } catch (err: any) {
-    console.error('Error initiating offboarding:', err);
-    return { success: false, error: err?.message || 'Failed to initiate offboarding case' };
+  // One open exit per person. The partial unique index in
+  // 202611081100_one_open_exit.sql holds the same rule when two arrive at once.
+  const { data: openCases, error: openError } = await db
+    .from('offboarding_cases')
+    .select('id')
+    .eq('employee_id', input.employee_id)
+    .in('status', [...OPEN_EXIT_STATUSES])
+    .limit(1);
+  if (openError) {
+    logDbError('open exit check failed', openError);
+    return { success: false, error: 'The exit could not be saved. Try again.' };
   }
+  if ((openCases ?? []).length > 0) return { success: false, error: ALREADY_OPEN };
+
+  const caseId = randomUUID();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  // Rows written in one statement share `now()`; distinct timestamps keep the
+  // checklist and assets in the order they were written.
+  const at = (i: number) => new Date(now.getTime() + i).toISOString();
+  const immediate = Boolean(input.immediate_relieving);
+  const noticeDays =
+    typeof input.notice_period_days === 'number' && input.notice_period_days >= 0 ? Math.round(input.notice_period_days) : 30;
+  const initiatedDate = isIsoDate(input.initiated_date) ? input.initiated_date : nowIso.slice(0, 10);
+
+  const caseRow = {
+    id: caseId,
+    employee_id: input.employee_id,
+    exit_type: input.exit_type,
+    initiated_date: initiatedDate,
+    initiated_by: opts.initiatedBy,
+    proposed_lwd: input.proposed_lwd,
+    actual_lwd: immediate ? input.proposed_lwd : null,
+    notice_period_days: noticeDays,
+    notice_period_waived: Boolean(input.notice_period_waived),
+    reason: input.reason.slice(0, 500),
+    reason_details: typeof input.reason_details === 'string' ? input.reason_details.slice(0, 4000) : null,
+    status: immediate ? 'settlement_pending' : 'notice_period',
+    immediate_relieving: immediate,
+    exception_notes: typeof input.exception_notes === 'string' ? input.exception_notes.slice(0, 4000) : null,
+  };
+
+  const person = await readPerson(db, input.employee_id);
+  const employeeName = person?.name || input.employee_name || 'Employee';
+
+  const checklist = [
+    ['Knowledge Handover Documentation & Repository Transfer', 'Document active project tasks, repositories, drive assets, and runbooks.', 'knowledge_transfer', 'employee', employeeName],
+    ['Manager Handover Acceptance & Peer Handover', 'Validate knowledge transfer completion and team reassignments.', 'knowledge_transfer', 'manager', 'Reporting Manager'],
+    ['IT Asset & Hardware Return Inspection', 'Verify and return issued laptop, monitor, chargers, and hardware peripherals.', 'asset_return', 'it_admin', 'IT Operations Desk'],
+    ['Confidential Exit Interview & Feedback Form', 'Submit confidential reflections, handover feedback, and survey responses.', 'exit_interview', 'employee', employeeName],
+    ['Expense Claims & Financial Dues Verification', 'Verify travel advances, reimbursements, or pending claims.', 'finance', 'finance', 'Finance Desk'],
+  ].map(([title, description, category, owner_role, assigned_to_name], i) => ({
+    offboarding_id: caseId,
+    title,
+    description,
+    category,
+    owner_role,
+    assigned_to_name,
+    status: 'pending',
+    is_mandatory: true,
+    due_date: input.proposed_lwd,
+    created_at: at(i),
+    updated_at: at(i),
+  }));
+
+  const ndc = [
+    ['manager', 'Reporting Manager', 'Handover underway.'],
+    ['it_admin', 'IT & Asset Operations', 'Awaiting hardware return.'],
+    ['finance', 'Finance & Accounts', 'Expense claims check in progress.'],
+    ['pnc', 'People & Culture', 'Awaiting departmental sign-offs.'],
+  ].map(([department, department_label, remarks]) => ({
+    offboarding_id: caseId,
+    department,
+    department_label,
+    status: 'pending',
+    remarks,
+  }));
+
+  let assets: Record<string, unknown>[] = [
+    {
+      offboarding_id: caseId,
+      asset_name: 'Company Assigned Laptop & Charger',
+      asset_type: 'laptop',
+      return_status: 'pending_return',
+      condition: 'good',
+      clearance_notes: 'Physical check at campus reception on LWD.',
+      created_at: at(0),
+      updated_at: at(0),
+    },
+  ];
+  const fnf: Record<string, unknown> = {
+    offboarding_id: caseId,
+    status: 'awaiting_clearance',
+    payable_days: 0,
+    leave_encashment_days: 0,
+    gratuity_eligible: false,
+    asset_recovery_amount: 0,
+    other_deductions: 0,
+    remarks: 'Computation scheduled upon clearance completion.',
+    blocked_reasons: ['Department NDC clearances pending', 'Asset verification pending'],
+  };
+
+  // Prime the clearances and F&F from the connected systems, where they answer.
+  try {
+    const [extAssets, extAtt, extLeave] = await Promise.all([
+      assetIntegrationService.getEmployeeAssignedAssets(input.employee_id),
+      attendanceIntegrationService.getEmployeeAttendanceSummary(input.employee_id),
+      leaveIntegrationService.getEmployeeLeaveSummary(input.employee_id),
+    ]);
+    if (extAssets?.assets?.length) {
+      assets = extAssets.assets.map((a, i) => ({
+        offboarding_id: caseId,
+        asset_name: a.asset_name,
+        asset_tag: a.asset_tag,
+        asset_type: a.asset_type,
+        assigned_date: a.assigned_date,
+        return_status: a.external_return_status === 'returned' ? 'returned' : 'pending_return',
+        condition: a.external_return_status === 'damaged' ? 'damaged' : 'good',
+        recovery_amount: a.estimated_recovery_amount,
+        clearance_notes: `Synced from ${extAssets.source_system}. S/N: ${a.serial_number}`,
+        created_at: at(i),
+        updated_at: at(i),
+      }));
+    }
+    if (extAtt && extLeave && extAssets) {
+      fnf.payable_days = extAtt.calculated_payable_days;
+      fnf.leave_encashment_days = extLeave.total_encashable_days;
+      fnf.asset_recovery_amount = extAssets.total_recovery_required;
+      fnf.remarks = `External systems synced: Attendance (${extAtt.calculated_payable_days} payable days), Leave (${extLeave.total_encashable_days} encashable days), Asset recovery (₹${extAssets.total_recovery_required.toLocaleString('en-IN')}).`;
+    }
+  } catch {
+    // The defaults above stand.
+  }
+
+  const { error: caseError } = await db.from('offboarding_cases').insert(caseRow);
+  if (caseError) {
+    if (caseError.code === '23505') return { success: false, error: ALREADY_OPEN };
+    logDbError('case insert failed', caseError);
+    return { success: false, error: 'The exit could not be saved. Try again.' };
+  }
+
+  // The F&F row is salary data: a caller without salary access has it
+  // written for them, as part of opening the exit they may open.
+  const fnfDb = opts.salary ? db : serviceDb() ?? db;
+  const children = await Promise.all([
+    db.from('offboarding_checklists').insert(checklist),
+    db.from('offboarding_ndc').insert(ndc),
+    db.from('offboarding_asset_clearances').insert(assets),
+    fnfDb.from('offboarding_fnf').insert(fnf),
+  ]);
+  const childError = children.find((r) => r.error)?.error;
+  if (childError) {
+    logDbError('case children insert failed', childError);
+    // All or nothing: the children cascade with the case.
+    const { error: rollbackError } = await (serviceDb() ?? db).from('offboarding_cases').delete().eq('id', caseId);
+    if (rollbackError) {
+      logDbError('case rollback failed', rollbackError);
+      return {
+        success: false,
+        error: 'The exit could not be saved, and an incomplete one may have been. Check Offboarding before trying again.',
+      };
+    }
+    return { success: false, error: 'The exit could not be saved. Try again.' };
+  }
+
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: opts.initiatedBy,
+      actor_role: 'pnc',
+      action: 'Exit Formally Initiated',
+      description: `Exit initiated for ${employeeName} (${input.exit_type.replace(/_/g, ' ')}). Proposed LWD: ${input.proposed_lwd}. Notice: ${noticeDays} days.`,
+    },
+  ]);
+
+  const email = person?.email || (await employeeEmail(input.employee_id));
+
+  // The stored role ends 72 hours before the last working day. The daily
+  // job applies that to every open exit; applying it here too covers an
+  // exit opened inside the window (an immediate relieving), which would
+  // otherwise keep its role until the job next runs.
+  await applyPreExitRoleRule(
+    {
+      caseId,
+      employeeId: input.employee_id,
+      employeeEmail: email,
+      employeeName,
+      lastWorkingDay: lastWorkingDayOf(caseRow),
+      status: caseRow.status,
+    },
+    { now: new Date(), trigger: 'exit opened' }
+  );
+
+  await recordAuditLog(
+    'offboarding_cases',
+    caseId,
+    'insert',
+    { employee_id: input.employee_id, exit_type: input.exit_type, proposed_lwd: input.proposed_lwd },
+    opts.initiatedBy
+  );
+
+  try {
+    if (email) await sendEmail(
+      'offboarding_resignation_ack',
+      {
+        subject: 'Acknowledgment of Resignation — NavGurukul Foundation',
+        employee_name: employeeName,
+        resignation_date: initiatedDate,
+        notice_period_duration: `${noticeDays} Days`,
+        last_working_day: input.proposed_lwd,
+        offboarding_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${caseId}`,
+        hr_poc_name: 'People & Culture Operations',
+      },
+      email
+    );
+  } catch {
+    console.warn('Offboarding: could not send the resignation acknowledgement');
+  }
+
+  await auditOffboarding.caseOpened({
+    subject: { employee_id: input.employee_id, employee_email: email, employee_name: employeeName },
+    actorName: opts.initiatedBy,
+    entityId: caseId,
+    exitType: input.exit_type,
+    metadata: { proposed_lwd: input.proposed_lwd, notice_period_days: noticeDays, reason: caseRow.reason },
+  });
+
+  revalidatePath('/offboarding');
+  revalidatePath('/employees');
+  return { success: true, caseId };
 }
 
-/**
- * Update a checklist item status or details.
- */
+async function readPerson(db: Db, employeeId: string): Promise<{ name: string | null; email: string | null } | null> {
+  const { data } = await db.from('employees').select('name, email').eq('id', employeeId).maybeSingle();
+  return (data as { name: string | null; email: string | null } | null) ?? null;
+}
+
+// ============================================================================
+// WORKING THE EXIT
+// ============================================================================
+
 export async function updateChecklistItem(
   caseId: string,
   itemId: string,
@@ -642,56 +608,48 @@ export async function updateChecklistItem(
 ): Promise<{ success: boolean; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (!isUuid(caseId) || !isUuid(itemId)) return { success: false, error: 'Checklist item not found' };
 
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
+  const changes = pickChecklistChanges(updates);
+  if (Object.keys(changes).length === 0) return { success: false, error: 'Nothing to change.' };
 
-  const itemIndex = existing.checklist.findIndex((c) => c.id === itemId);
-  if (itemIndex === -1) return { success: false, error: 'Checklist item not found' };
-
+  const actor = actorOf(allowed.caller);
   const nowIso = new Date().toISOString();
-  const oldItem = existing.checklist[itemIndex];
-  const updatedItem: OffboardingChecklistItem = {
-    ...oldItem,
-    ...updates,
-    updated_at: nowIso,
-    completed_at: updates.status === 'completed' ? nowIso : updates.status ? null : oldItem.completed_at,
-  };
-
-  existing.checklist[itemIndex] = updatedItem;
-
-  // Add activity log
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-chk`,
-    offboarding_id: caseId,
-    actor_name: updates.completed_by || 'P&C Operations',
-    actor_role: 'pnc',
-    action: 'Checklist Item Updated',
-    description: `"${updatedItem.title}" marked as ${updatedItem.status.toUpperCase()}${updates.notes ? ` — Note: ${updates.notes}` : ''}`,
-    created_at: nowIso,
-  });
-
-  // DB Sync
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('offboarding_checklists').update(updates).eq('id', itemId);
-  } catch {
-    // fallback
+  const patch: Record<string, unknown> = { ...changes, updated_at: nowIso };
+  if (changes.status) {
+    patch.completed_at = changes.status === 'completed' ? nowIso : null;
+    patch.completed_by = changes.status === 'completed' ? actor : null;
   }
 
-  await recordAuditLog('offboarding_checklists', itemId, 'update', {
-    caseId,
-    title: updatedItem.title,
-    status: updatedItem.status,
-  });
+  const db = await createServerSupabaseClient();
+  const { data, error } = await db
+    .from('offboarding_checklists')
+    .update(patch)
+    .eq('id', itemId)
+    .eq('offboarding_id', caseId)
+    .select('title, status')
+    .maybeSingle();
+  if (error) {
+    logDbError('checklist update failed', error);
+    return { success: false, error: SAVE_FAILED };
+  }
+  if (!data) return { success: false, error: 'Checklist item not found' };
+
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'pnc',
+      action: 'Checklist Item Updated',
+      description: `"${data.title}" marked as ${String(data.status).toUpperCase()}${changes.notes ? ` — Note: ${changes.notes}` : ''}`,
+    },
+  ]);
+  await recordAuditLog('offboarding_checklists', itemId, 'update', { caseId, title: data.title, status: data.status }, actor);
 
   revalidatePath(`/offboarding/${caseId}`);
   return { success: true };
 }
 
-/**
- * Update an asset clearance status.
- */
 export async function updateAssetClearance(
   caseId: string,
   assetId: string,
@@ -699,83 +657,141 @@ export async function updateAssetClearance(
 ): Promise<{ success: boolean; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (!isUuid(caseId) || !isUuid(assetId)) return { success: false, error: 'Asset record not found' };
 
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
+  const changes = pickAssetChanges(updates);
+  if (Object.keys(changes).length === 0) return { success: false, error: 'Nothing to change.' };
 
-  const assetIndex = existing.assets.findIndex((a) => a.id === assetId);
-  if (assetIndex === -1) return { success: false, error: 'Asset record not found' };
-
+  const actor = actorOf(allowed.caller);
   const nowIso = new Date().toISOString();
-  const updatedAsset: OffboardingAssetItem = {
-    ...existing.assets[assetIndex],
-    ...updates,
-    updated_at: nowIso,
-    verified_at: updates.return_status === 'cleared' || updates.return_status === 'returned' ? nowIso : existing.assets[assetIndex].verified_at,
-  };
+  const patch: Record<string, unknown> = { ...changes, updated_at: nowIso };
+  if (changes.return_status) {
+    const verified = changes.return_status === 'cleared' || changes.return_status === 'returned';
+    patch.verified_at = verified ? nowIso : null;
+    patch.verified_by = verified ? actor : null;
+  }
 
-  existing.assets[assetIndex] = updatedAsset;
+  const db = await createServerSupabaseClient();
+  const { data: asset, error } = await db
+    .from('offboarding_asset_clearances')
+    .update(patch)
+    .eq('id', assetId)
+    .eq('offboarding_id', caseId)
+    .select('asset_name, return_status, recovery_amount, clearance_notes')
+    .maybeSingle();
+  if (error) {
+    logDbError('asset update failed', error);
+    return { success: false, error: SAVE_FAILED };
+  }
+  if (!asset) return { success: false, error: 'Asset record not found' };
 
-  // Update IT NDC status automatically if all assets cleared
-  const allAssetsCleared = existing.assets.every(
-    (a) => a.return_status === 'cleared' || a.return_status === 'returned' || a.return_status === 'waived'
-  );
-
-  const itNdc = existing.ndc.find((n) => n.department === 'it_admin');
-  if (itNdc) {
-    if (allAssetsCleared && itNdc.status !== 'cleared') {
-      itNdc.status = 'cleared';
-      itNdc.cleared_at = nowIso;
-      itNdc.cleared_by = updates.verified_by || 'IT Admin Desk';
-      itNdc.remarks = 'All assigned assets inspected and verified cleared.';
-      itNdc.blocker_reason = null;
-    } else if (!allAssetsCleared && updatedAsset.return_status === 'under_recovery') {
-      itNdc.status = 'blocked';
-      itNdc.blocker_reason = `Asset recovery pending: ₹${updatedAsset.recovery_amount || 0}`;
+  // The IT No Dues sign-off follows the assets, in either direction
+  // (`itSignOffChange`), and F&F follows the sign-offs. The asset change is
+  // saved either way; a failure here is reported once it is recorded.
+  let synced = true;
+  const [{ data: allAssets, error: assetsError }, { data: itNdc, error: itNdcError }] = await Promise.all([
+    db.from('offboarding_asset_clearances').select('return_status, recovery_amount').eq('offboarding_id', caseId),
+    db
+      .from('offboarding_ndc')
+      .select('status, blocker_reason')
+      .eq('offboarding_id', caseId)
+      .eq('department', 'it_admin')
+      .maybeSingle(),
+  ]);
+  if (assetsError || itNdcError) {
+    logDbError('IT sign-off read failed', assetsError ?? itNdcError);
+    synced = false;
+  } else if (itNdc) {
+    const change = itSignOffChange(
+      itNdc as Pick<OffboardingNDCDepartment, 'status' | 'blocker_reason'>,
+      (allAssets ?? []) as Pick<OffboardingAssetItem, 'return_status' | 'recovery_amount'>[]
+    );
+    if (change) {
+      if (change.status === 'cleared') Object.assign(change, { cleared_at: nowIso, cleared_by: actor });
+      const { error: ndcError } = await db
+        .from('offboarding_ndc')
+        .update({ ...change, updated_at: nowIso })
+        .eq('offboarding_id', caseId)
+        .eq('department', 'it_admin');
+      if (ndcError) {
+        logDbError('IT sign-off update failed', ndcError);
+        synced = false;
+      } else {
+        synced = (await refreshFnfBlockers(caseId)).ok;
+      }
     }
   }
 
-  // Add activity log
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-asset`,
-    offboarding_id: caseId,
-    actor_name: updates.verified_by || 'IT Asset Desk',
-    actor_role: 'it_admin',
-    action: 'Asset Clearance Status Changed',
-    description: `Asset "${updatedAsset.asset_name}" marked as ${updatedAsset.return_status.toUpperCase()}${updatedAsset.clearance_notes ? ` (${updatedAsset.clearance_notes})` : ''}`,
-    created_at: nowIso,
-  });
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'it_admin',
+      action: 'Asset Clearance Status Changed',
+      description: `Asset "${asset.asset_name}" marked as ${String(asset.return_status).toUpperCase()}${asset.clearance_notes ? ` (${asset.clearance_notes})` : ''}`,
+    },
+  ]);
+  await recordAuditLog(
+    'offboarding_asset_clearances',
+    assetId,
+    'update',
+    { caseId, asset_name: asset.asset_name, return_status: asset.return_status },
+    actor
+  );
 
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('offboarding_asset_clearances').update(updates).eq('id', assetId);
-  } catch {
-    // fallback
+  const caseRecord = await readCase(db, caseId);
+  if (caseRecord) {
+    await auditOffboarding.clearanceUpdated({
+      subject: auditSubject(caseRecord),
+      actorName: actor,
+      entityId: caseId,
+      area: `Asset — ${asset.asset_name}`,
+      status: asset.return_status,
+      severity: asset.return_status === 'under_recovery' ? 'warning' : 'info',
+      metadata: { asset_id: assetId, recovery_amount: asset.recovery_amount },
+    });
   }
 
-  await recordAuditLog('offboarding_asset_clearances', assetId, 'update', {
-    caseId,
-    asset_name: updatedAsset.asset_name,
-    return_status: updatedAsset.return_status,
-  });
-
-  await auditOffboarding.clearanceUpdated({
-    subject: auditSubject(existing.caseRecord),
-    actorName: updates.verified_by || 'IT Asset Desk',
-    entityId: caseId,
-    area: `Asset — ${updatedAsset.asset_name}`,
-    status: updatedAsset.return_status,
-    severity: updatedAsset.return_status === 'under_recovery' ? 'warning' : 'info',
-    metadata: { asset_id: assetId, recovery_amount: updatedAsset.recovery_amount },
-  });
-
   revalidatePath(`/offboarding/${caseId}`);
-  return { success: true };
+  return synced ? { success: true } : { success: false, error: SYNC_FAILED };
 }
 
 /**
- * Update Departmental NDC (No Dues Certificate) Sign-off.
+ * Brings the F&F row's status and blockers in line with the No Dues sign-offs,
+ * in either direction (`fnfFollowingClearances`). Not ok when a read or the
+ * write fails, which the calling action reports.
+ *
+ * With the service-role client: `offboarding_fnf` is closed to PnC Ops, who
+ * clear departments, and this writes only what follows from the clearances.
+ * Called only from actions that have passed the offboarding guard.
  */
+async function refreshFnfBlockers(caseId: string): Promise<{ ok: boolean }> {
+  const db = serviceDb();
+  if (!db) return { ok: false };
+  const [{ data: ndc, error: ndcError }, { data: fnf, error: fnfError }] = await Promise.all([
+    db.from('offboarding_ndc').select('department_label, status, blocker_reason').eq('offboarding_id', caseId),
+    db.from('offboarding_fnf').select('status').eq('offboarding_id', caseId).maybeSingle(),
+  ]);
+  if (ndcError || fnfError) {
+    logDbError('F&F blockers read failed', ndcError ?? fnfError);
+    return { ok: false };
+  }
+  if (!fnf) return { ok: true };
+  const patch = fnfFollowingClearances(
+    String(fnf.status),
+    (ndc ?? []) as Pick<OffboardingNDCDepartment, 'department_label' | 'status' | 'blocker_reason'>[]
+  );
+  const { error } = await db
+    .from('offboarding_fnf')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('offboarding_id', caseId);
+  if (error) {
+    logDbError('F&F blockers update failed', error);
+    return { ok: false };
+  }
+  return { ok: true };
+}
+
 export async function updateNDCDepartment(
   caseId: string,
   department: string,
@@ -783,78 +799,64 @@ export async function updateNDCDepartment(
 ): Promise<{ success: boolean; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (!isUuid(caseId) || !isNdcDepartment(department)) return { success: false, error: 'Department NDC record not found' };
 
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
+  const changes = pickNdcChanges(updates);
+  if (Object.keys(changes).length === 0) return { success: false, error: 'Nothing to change.' };
 
-  const ndcIndex = existing.ndc.findIndex((n) => n.department === department);
-  if (ndcIndex === -1) return { success: false, error: 'Department NDC record not found' };
-
+  const actor = actorOf(allowed.caller);
   const nowIso = new Date().toISOString();
-  const updatedNdc: OffboardingNDCDepartment = {
-    ...existing.ndc[ndcIndex],
-    ...updates,
-    updated_at: nowIso,
-    cleared_at: updates.status === 'cleared' ? nowIso : updates.status ? null : existing.ndc[ndcIndex].cleared_at,
-  };
-
-  existing.ndc[ndcIndex] = updatedNdc;
-
-  // Add activity log
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-ndc`,
-    offboarding_id: caseId,
-    actor_name: updates.cleared_by || 'Department Authority',
-    actor_role: 'pnc',
-    action: 'NDC Clearance Updated',
-    description: `${updatedNdc.department_label} clearance marked as ${updatedNdc.status.toUpperCase()}${updates.remarks ? ` — ${updates.remarks}` : ''}`,
-    created_at: nowIso,
-  });
-
-  // Check if all NDC departments are cleared
-  const allNdcCleared = existing.ndc.every((n) => n.status === 'cleared');
-  if (allNdcCleared) {
-    if (existing.fnf.status === 'awaiting_clearance' || existing.fnf.status === 'not_started') {
-      existing.fnf.status = 'computation_pending';
-      existing.fnf.blocked_reasons = [];
-      existing.fnf.remarks = 'All departmental NDC sign-offs complete. Ready for F&F computation.';
-    }
-  } else {
-    const blockers = existing.ndc
-      .filter((n) => n.status !== 'cleared')
-      .map((n) => `${n.department_label}: ${n.blocker_reason || n.status}`);
-    existing.fnf.blocked_reasons = blockers;
+  const patch: Record<string, unknown> = { ...changes, updated_at: nowIso };
+  if (changes.status) {
+    patch.cleared_at = changes.status === 'cleared' ? nowIso : null;
+    patch.cleared_by = changes.status === 'cleared' ? actor : null;
   }
 
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('offboarding_ndc').update(updates).eq('offboarding_id', caseId).eq('department', department);
-  } catch {
-    // fallback
+  const db = await createServerSupabaseClient();
+  const { data: ndc, error } = await db
+    .from('offboarding_ndc')
+    .update(patch)
+    .eq('offboarding_id', caseId)
+    .eq('department', department)
+    .select('department_label, status')
+    .maybeSingle();
+  if (error) {
+    logDbError('NDC update failed', error);
+    return { success: false, error: SAVE_FAILED };
   }
+  if (!ndc) return { success: false, error: 'Department NDC record not found' };
 
-  await recordAuditLog('offboarding_ndc', caseId, 'update', {
-    department,
-    status: updatedNdc.status,
-  });
+  // The sign-off is saved either way; a failure here is reported once it is recorded.
+  const synced = await refreshFnfBlockers(caseId);
 
-  await auditOffboarding.clearanceUpdated({
-    subject: auditSubject(existing.caseRecord),
-    actorName: updates.cleared_by || 'Department Authority',
-    entityId: caseId,
-    area: updatedNdc.department_label,
-    status: updatedNdc.status,
-    severity: updatedNdc.status === 'blocked' ? 'warning' : 'info',
-    metadata: { department, remarks: updates.remarks },
-  });
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'pnc',
+      action: 'NDC Clearance Updated',
+      description: `${ndc.department_label} clearance marked as ${String(ndc.status).toUpperCase()}${changes.remarks ? ` — ${changes.remarks}` : ''}`,
+    },
+  ]);
+  await recordAuditLog('offboarding_ndc', caseId, 'update', { department, status: ndc.status }, actor);
+
+  const caseRecord = await readCase(db, caseId);
+  if (caseRecord) {
+    await auditOffboarding.clearanceUpdated({
+      subject: auditSubject(caseRecord),
+      actorName: actor,
+      entityId: caseId,
+      area: ndc.department_label,
+      status: ndc.status,
+      severity: ndc.status === 'blocked' ? 'warning' : 'info',
+      metadata: { department, remarks: changes.remarks },
+    });
+  }
 
   revalidatePath(`/offboarding/${caseId}`);
-  return { success: true };
+  return synced.ok ? { success: true } : { success: false, error: SYNC_FAILED };
 }
 
-/**
- * Update Full & Final (F&F) Settlement Computation & Payment Details.
- */
 export async function updateFnFDetails(
   caseId: string,
   updates: Partial<OffboardingFnF>
@@ -863,53 +865,55 @@ export async function updateFnFDetails(
   // does not grant: PnC Ops runs the exit but has `salary: none`.
   const allowed = await guardResource('salary', 'edit');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (!isUuid(caseId)) return { success: false, error: NOT_FOUND };
 
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
+  const changes = pickFnfChanges(updates);
+  if (Object.keys(changes).length === 0) return { success: false, error: 'Nothing to change.' };
 
+  const actor = actorOf(allowed.caller);
   const nowIso = new Date().toISOString();
-  const updatedFnf: OffboardingFnF = {
-    ...existing.fnf,
-    ...updates,
-    updated_at: nowIso,
-    processed_at: updates.status === 'processed' ? nowIso : existing.fnf.processed_at,
-  };
-
-  existing.fnf = updatedFnf;
-
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-fnf`,
-    offboarding_id: caseId,
-    actor_name: updates.processed_by || 'Finance Lead',
-    actor_role: 'finance',
-    action: 'F&F Settlement Updated',
-    // No payment reference here: the activity log is shown to everyone who
-    // can open the case, PnC Ops included.
-    description: `F&F status transitioned to ${updatedFnf.status.toUpperCase()}`,
-    created_at: nowIso,
-  });
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('offboarding_fnf').update(updates).eq('offboarding_id', caseId);
-  } catch {
-    // fallback
+  const patch: Record<string, unknown> = { ...changes, updated_at: nowIso };
+  if (changes.status === 'processed') {
+    patch.processed_at = nowIso;
+    patch.processed_by = actor;
   }
 
-  await recordAuditLog('offboarding_fnf', caseId, 'update', {
-    status: updatedFnf.status,
-    payable_days: updatedFnf.payable_days,
-  });
+  const db = await createServerSupabaseClient();
+  const caseRecord = await readCase(db, caseId);
+  if (!caseRecord) return { success: false, error: NOT_FOUND };
+
+  const { data: fnf, error } = await db
+    .from('offboarding_fnf')
+    .upsert({ offboarding_id: caseId, ...patch }, { onConflict: 'offboarding_id' })
+    .select('status, payable_days, payment_reference, net_payable_estimate')
+    .single();
+  if (error || !fnf) {
+    logDbError('F&F update failed', error);
+    return { success: false, error: SAVE_FAILED };
+  }
+
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'finance',
+      action: 'F&F Settlement Updated',
+      // No payment reference here: the activity log is shown to everyone who
+      // can open the case, PnC Ops included.
+      description: `F&F status transitioned to ${String(fnf.status).toUpperCase()}`,
+    },
+  ]);
+  await recordAuditLog('offboarding_fnf', caseId, 'update', { status: fnf.status, payable_days: fnf.payable_days }, actor);
 
   await auditOffboarding.fnfSettled({
-    subject: auditSubject(existing.caseRecord),
-    actorName: updates.processed_by || 'Finance Lead',
+    subject: auditSubject(caseRecord),
+    actorName: actor,
     entityId: caseId,
     metadata: {
-      status: updatedFnf.status,
-      payable_days: updatedFnf.payable_days,
-      payment_reference: updatedFnf.payment_reference,
-      net_payable_estimate: updatedFnf.net_payable_estimate,
+      status: fnf.status,
+      payable_days: fnf.payable_days,
+      payment_reference: fnf.payment_reference,
+      net_payable_estimate: fnf.net_payable_estimate,
     },
   });
 
@@ -917,9 +921,6 @@ export async function updateFnFDetails(
   return { success: true };
 }
 
-/**
- * Update Proposed or Actual Last Working Day.
- */
 export async function updateExitDates(
   caseId: string,
   proposedLwd: string,
@@ -928,53 +929,78 @@ export async function updateExitDates(
 ): Promise<{ success: boolean; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
-
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
-
-  const oldProposed = existing.caseRecord.proposed_lwd;
-  existing.caseRecord.proposed_lwd = proposedLwd;
-  if (actualLwd !== undefined) {
-    existing.caseRecord.actual_lwd = actualLwd;
-  }
-  existing.caseRecord.updated_at = new Date().toISOString();
-
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-lwd`,
-    offboarding_id: caseId,
-    actor_name: 'P&C Operations',
-    actor_role: 'pnc',
-    action: 'Exit Timeline Adjusted',
-    description: `Proposed LWD updated from ${oldProposed} to ${proposedLwd}${actualLwd ? ` (Actual LWD: ${actualLwd})` : ''}${reasonForAdjustment ? `. Reason: ${reasonForAdjustment}` : ''}`,
-    created_at: new Date().toISOString(),
-  });
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase
-      .from('offboarding_cases')
-      .update({ proposed_lwd: proposedLwd, actual_lwd: actualLwd, updated_at: existing.caseRecord.updated_at })
-      .eq('id', caseId);
-  } catch {
-    // fallback
+  if (!isIsoDate(proposedLwd)) return { success: false, error: 'Enter the proposed last working day.' };
+  if (actualLwd !== undefined && actualLwd !== null && actualLwd !== '' && !isIsoDate(actualLwd)) {
+    return { success: false, error: 'Enter a valid actual last working day.' };
   }
 
-  await recordAuditLog('offboarding_cases', caseId, 'update', {
-    oldProposed,
-    newProposed: proposedLwd,
-    actualLwd,
-  });
+  const db = await createServerSupabaseClient();
+  const existing = await readCase(db, caseId);
+  if (!existing) return { success: false, error: NOT_FOUND };
+  if (!isOpenStatus(existing.status)) {
+    return { success: false, error: 'This exit is closed; its dates can no longer change.' };
+  }
 
+  const actor = actorOf(allowed.caller);
+  const nowIso = new Date().toISOString();
+  const patch: Record<string, unknown> = { proposed_lwd: proposedLwd, updated_at: nowIso };
+  if (actualLwd !== undefined) patch.actual_lwd = actualLwd || null;
+
+  const { error } = await db.from('offboarding_cases').update(patch).eq('id', caseId);
+  if (error) {
+    logDbError('exit dates update failed', error);
+    return { success: false, error: SAVE_FAILED };
+  }
+  const updated = {
+    ...existing,
+    proposed_lwd: proposedLwd,
+    actual_lwd: actualLwd === undefined ? existing.actual_lwd : actualLwd || null,
+  };
+
+  const reason = typeof reasonForAdjustment === 'string' ? reasonForAdjustment.slice(0, 1000) : undefined;
+  await appendActivity([
+    {
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'pnc',
+      action: 'Exit Timeline Adjusted',
+      description: `Proposed LWD updated from ${existing.proposed_lwd} to ${proposedLwd}${updated.actual_lwd ? ` (Actual LWD: ${updated.actual_lwd})` : ''}${reason ? `. Reason: ${reason}` : ''}`,
+    },
+  ]);
+
+  // A last working day brought forward into the 72-hour window ends the
+  // stored role now. One pushed back out does not give it back: whoever can
+  // grant the role restores it on the users screen.
+  await applyPreExitRoleRule(
+    {
+      caseId,
+      employeeId: existing.employee_id,
+      employeeEmail: existing.employee_email || (await employeeEmail(existing.employee_id)),
+      employeeName: existing.employee_name,
+      lastWorkingDay: lastWorkingDayOf(updated),
+      status: existing.status,
+    },
+    { now: new Date(), trigger: 'exit dates changed' }
+  );
+
+  await recordAuditLog(
+    'offboarding_cases',
+    caseId,
+    'update',
+    { oldProposed: existing.proposed_lwd, newProposed: proposedLwd, actualLwd: updated.actual_lwd },
+    actor
+  );
   await auditOffboarding.statusChanged({
-    subject: auditSubject(existing.caseRecord),
+    subject: auditSubject(existing),
+    actorName: actor,
     entityId: caseId,
-    to: existing.caseRecord.status,
+    to: existing.status,
     severity: 'notice',
     changes: [
-      { field: 'proposed_lwd', label: 'Proposed Last Working Day', from: oldProposed, to: proposedLwd },
-      ...(actualLwd ? [{ field: 'actual_lwd', label: 'Actual Last Working Day', to: actualLwd }] : []),
+      { field: 'proposed_lwd', label: 'Proposed Last Working Day', from: existing.proposed_lwd, to: proposedLwd },
+      ...(updated.actual_lwd ? [{ field: 'actual_lwd', label: 'Actual Last Working Day', to: updated.actual_lwd }] : []),
     ],
-    metadata: { reason: reasonForAdjustment },
+    metadata: { reason },
   });
 
   revalidatePath(`/offboarding/${caseId}`);
@@ -982,121 +1008,122 @@ export async function updateExitDates(
 }
 
 /**
- * Formally Close Exit and officially mark employee as Exited.
+ * Closes the exit: the employee is marked exited, the case completed, and
+ * their platform access ended. Closing an exit that is already completed
+ * retries ending the access, which is what the error below asks for.
  */
 export async function closeOffboardingCase(
   caseId: string,
-  closedBy: string = 'P&C Operations Lead',
+  closedBy?: string,
   actualLwd?: string
 ): Promise<{ success: boolean; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
-
-  // A case started on another server instance is only in the database.
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId) ?? (await getOffboardingById(caseId));
-  if (!existing) return { success: false, error: 'Case not found' };
-
-  // Verification checks: ensure asset and NDC clearances are fulfilled
-  const hasUnclearedAssets = existing.assets.some(
-    (a) => a.return_status === 'pending_return' || a.return_status === 'under_recovery'
-  );
-  if (hasUnclearedAssets && MEMORY_SETTINGS.require_asset_clearance_before_closure) {
-    return {
-      success: false,
-      error: 'Cannot close exit: Outstanding assets are pending return or recovery clearance.',
-    };
+  void closedBy; // Who closed it comes from the session.
+  if (actualLwd !== undefined && actualLwd !== '' && !isIsoDate(actualLwd)) {
+    return { success: false, error: 'Enter a valid last working day.' };
   }
 
-  const hasPendingNdc = existing.ndc.some((n) => n.status !== 'cleared');
-  if (hasPendingNdc && MEMORY_SETTINGS.require_all_ndc_before_fnf) {
-    return {
-      success: false,
-      error: 'Cannot close exit: Not all departments have cleared the No Dues Certificate.',
-    };
+  const db = await createServerSupabaseClient();
+  const existing = await loadCase(db, caseId, allowed.caller);
+  if (!existing) return { success: false, error: NOT_FOUND };
+
+  const actor = actorOf(allowed.caller);
+  const settings = await readSettings(db);
+  const alreadyClosed = existing.caseRecord.status === 'completed';
+
+  if (!alreadyClosed) {
+    if (existing.caseRecord.status === 'cancelled') {
+      return { success: false, error: 'This exit was cancelled and cannot be closed.' };
+    }
+    if (hasOutstandingAssets(existing.assets) && settings.require_asset_clearance_before_closure) {
+      return {
+        success: false,
+        error: 'Cannot close exit: Outstanding assets are pending return or recovery clearance.',
+      };
+    }
+    if (existing.ndc.some((n) => n.status !== 'cleared') && settings.require_all_ndc_before_fnf) {
+      return {
+        success: false,
+        error: 'Cannot close exit: Not all departments have cleared the No Dues Certificate.',
+      };
+    }
   }
 
   const nowIso = new Date().toISOString();
   const finalLwd = actualLwd || existing.caseRecord.actual_lwd || existing.caseRecord.proposed_lwd;
 
-  existing.caseRecord.status = 'completed';
-  existing.caseRecord.actual_lwd = finalLwd;
-  existing.caseRecord.exit_closed_at = nowIso;
-  existing.caseRecord.exit_closed_by = closedBy;
-  existing.caseRecord.updated_at = nowIso;
-
-  // Add activity log
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-close`,
-    offboarding_id: caseId,
-    actor_name: closedBy,
-    actor_role: 'pnc',
-    action: 'Exit Case Officially Closed',
-    description: `Formal exit closure finalized. Employee records updated to Exited (Official LWD: ${finalLwd}). Relieving documentation issued.`,
-    created_at: nowIso,
-  });
-
-  // Ensure documents are created
-  if (!existing.documents.some((d) => d.document_type === 'experience_letter')) {
-    existing.documents.push({
-      id: `doc-${Date.now()}-exp`,
-      offboarding_id: caseId,
-      document_type: 'experience_letter',
-      document_name: `Relieving & Experience Certificate — ${existing.caseRecord.employee_name}.pdf`,
-      status: 'generated',
-      generated_at: nowIso,
-    });
-  }
-
-  // Update employee record in employees table: status = 'exited', exit_date = finalLwd
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { error: employeeError } = await supabase
+  if (!alreadyClosed) {
+    const { error: employeeError } = await db
       .from('employees')
-      .update({
-        status: 'exited',
-        exit_date: finalLwd,
-      })
+      .update({ status: 'exited', exit_date: finalLwd })
       .eq('id', existing.caseRecord.employee_id);
     if (employeeError) {
+      logDbError('employee exit update failed', employeeError);
       return { success: false, error: 'Could not mark the employee as exited. Try again.' };
     }
 
-    // Also update offboarding case table in DB
-    await supabase
+    const { error: caseError } = await db
       .from('offboarding_cases')
       .update({
         status: 'completed',
         actual_lwd: finalLwd,
         exit_closed_at: nowIso,
-        exit_closed_by: closedBy,
+        exit_closed_by: actor,
         updated_at: nowIso,
       })
       .eq('id', caseId);
-  } catch {
-    // fallback
+    if (caseError) {
+      logDbError('case close update failed', caseError);
+      return { success: false, error: 'The employee is marked exited, but the case could not be closed. Try again.' };
+    }
+
+    const entries: ActivityEntry[] = [
+      {
+        offboarding_id: caseId,
+        actor_name: actor,
+        actor_role: 'pnc',
+        action: 'Exit Case Officially Closed',
+        description: `Formal exit closure finalized. Employee records updated to Exited (Official LWD: ${finalLwd}). Relieving documentation issued.`,
+      },
+    ];
+    if (!existing.documents.some((d) => d.document_type === 'experience_letter')) {
+      entries.push({
+        offboarding_id: caseId,
+        actor_name: actor,
+        actor_role: 'pnc',
+        action: DOCUMENT_GENERATED,
+        description: `Generated ${documentName('experience_letter', existing.caseRecord.employee_name)}.`,
+        metadata: {
+          document_type: 'experience_letter',
+          document_name: documentName('experience_letter', existing.caseRecord.employee_name),
+        },
+      });
+    }
+    await appendActivity(entries);
+
+    await recordAuditLog(
+      'offboarding_cases',
+      caseId,
+      'update',
+      { action: 'close_exit', status: 'completed', actual_lwd: finalLwd },
+      actor
+    );
+    await auditOffboarding.statusChanged({
+      subject: auditSubject(existing.caseRecord),
+      actorName: actor,
+      entityId: caseId,
+      to: 'completed',
+      severity: 'critical',
+      metadata: { actual_lwd: finalLwd },
+    });
   }
-
-  await recordAuditLog('offboarding_cases', caseId, 'update', {
-    action: 'close_exit',
-    status: 'completed',
-    actual_lwd: finalLwd,
-    closedBy,
-  });
-
-  await auditOffboarding.statusChanged({
-    subject: auditSubject(existing.caseRecord),
-    actorName: closedBy,
-    entityId: caseId,
-    to: 'completed',
-    severity: 'critical',
-    metadata: { actual_lwd: finalLwd },
-  });
 
   // Exit ends the person's platform access: their stored role goes, the
   // account is marked ended, and its sessions cannot be renewed. The
   // revocation is recorded once that has succeeded.
   const email = existing.caseRecord.employee_email || (await employeeEmail(existing.caseRecord.employee_id));
-  const ended = await endPlatformAccess(email, { endedBy: allowed.caller.email ?? closedBy, now: new Date(nowIso) });
+  const ended = await endPlatformAccess(email, { endedBy: actor, now: new Date(nowIso) });
   if (!ended.ok) {
     return {
       success: false,
@@ -1105,28 +1132,29 @@ export async function closeOffboardingCase(
   }
   await auditAccess.revoked({
     subject: auditSubject(existing.caseRecord),
-    actorName: closedBy,
+    actorName: actor,
     entityId: caseId,
     system: 'ELC platform',
     metadata: { account_found: ended.userId !== null },
   });
 
-  // Send formal relieving & experience letter email
-  try {
-    await sendEmail(
-      'offboarding_relieving_experience_letter',
-      {
-        subject: 'Relieving Documents & Service Certificate — NavGurukul Foundation',
-        employee_name: existing.caseRecord.employee_name,
-        job_title: existing.caseRecord.employee_designation,
-        last_working_day: finalLwd,
-        document_download_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${caseId}?tab=documents`,
-        finance_poc_email: 'finance@navgurukul.org',
-      },
-      existing.caseRecord.employee_email
-    );
-  } catch (mailErr) {
-    console.warn('Could not dispatch final relieving email:', mailErr);
+  if (!alreadyClosed) {
+    try {
+      await sendEmail(
+        'offboarding_relieving_experience_letter',
+        {
+          subject: 'Relieving Documents & Service Certificate — NavGurukul Foundation',
+          employee_name: existing.caseRecord.employee_name,
+          job_title: existing.caseRecord.employee_designation,
+          last_working_day: finalLwd,
+          document_download_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${caseId}?tab=documents`,
+          finance_poc_email: 'finance@navgurukul.org',
+        },
+        existing.caseRecord.employee_email
+      );
+    } catch {
+      console.warn('Offboarding: could not send the relieving letter');
+    }
   }
 
   revalidatePath('/offboarding');
@@ -1136,7 +1164,9 @@ export async function closeOffboardingCase(
 }
 
 /**
- * Generate an Exit Document (NDC or Experience Letter).
+ * Generates an exit document (No Dues Certificate or Experience Letter). The
+ * document is rendered on demand; generating it is recorded in the activity
+ * log, which is what the documents tab is read from.
  */
 export async function generateExitDocument(
   caseId: string,
@@ -1144,135 +1174,63 @@ export async function generateExitDocument(
 ): Promise<{ success: boolean; document?: ExitDocument; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
-
-  const existing = MEMORY_OFFBOARDING_STORE.get(caseId);
-  if (!existing) return { success: false, error: 'Case not found' };
-
-  const nowIso = new Date().toISOString();
-  const docName =
-    docType === 'ndc'
-      ? `No Dues Certificate — ${existing.caseRecord.employee_name}.pdf`
-      : `Relieving & Experience Certificate — ${existing.caseRecord.employee_name}.pdf`;
-
-  const newDoc: ExitDocument = {
-    id: `doc-${Date.now()}-${docType}`,
-    offboarding_id: caseId,
-    document_type: docType,
-    document_name: docName,
-    status: 'generated',
-    generated_at: nowIso,
-  };
-
-  const docIdx = existing.documents.findIndex((d) => d.document_type === docType);
-  if (docIdx >= 0) {
-    existing.documents[docIdx] = newDoc;
-  } else {
-    existing.documents.push(newDoc);
+  if (docType !== 'ndc' && docType !== 'experience_letter' && docType !== 'relieving_letter') {
+    return { success: false, error: 'Unknown document type' };
   }
 
-  existing.activityLogs.unshift({
-    id: `log-${Date.now()}-doc`,
-    offboarding_id: caseId,
-    actor_name: 'P&C Operations',
-    actor_role: 'pnc',
-    action: 'Exit Document Generated',
-    description: `Generated ${docName}.`,
-    created_at: nowIso,
-  });
+  const db = await createServerSupabaseClient();
+  const caseRecord = await readCase(db, caseId);
+  if (!caseRecord) return { success: false, error: NOT_FOUND };
+
+  const actor = actorOf(allowed.caller);
+  const name = documentName(docType, caseRecord.employee_name);
+  const id = randomUUID();
+  const generatedAt = new Date().toISOString();
+  await appendActivity([
+    {
+      id,
+      offboarding_id: caseId,
+      actor_name: actor,
+      actor_role: 'pnc',
+      action: DOCUMENT_GENERATED,
+      description: `Generated ${name}.`,
+      metadata: { document_type: docType, document_name: name },
+    },
+  ]);
 
   revalidatePath(`/offboarding/${caseId}`);
-  return { success: true, document: newDoc };
+  return {
+    success: true,
+    document: { id, offboarding_id: caseId, document_type: docType, document_name: name, status: 'generated', generated_at: generatedAt },
+  };
 }
 
-/**
- * Send Automated Reminders for pending offboarding actions.
- */
+/** The "send reminders" button. The scheduled run is `reminders.ts`, behind the cron secret. */
 export async function sendOffboardingReminders(): Promise<{
   success: boolean;
   remindersSent: number;
   details: string[];
 }> {
-  // The "send reminders" button on the offboarding screen. The scheduled run
-  // does not come through here: it has no session to guard, so it lives in
-  // `reminders.ts`, which only the cron route imports.
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, remindersSent: 0, details: [allowed.error] };
-
-  const cases = Array.from(MEMORY_OFFBOARDING_STORE.values()).filter(
-    (c) => c.caseRecord.status === 'notice_period' || c.caseRecord.status === 'clearance_in_progress'
-  );
-
-  let remindersSent = 0;
-  const details: string[] = [];
-
-  for (const c of cases) {
-    const pendingNdcDepts = c.ndc.filter((n) => n.status !== 'cleared').map((n) => n.department_label);
-    const pendingChecklist = c.checklist.filter((i) => i.status !== 'completed' && i.status !== 'waived');
-
-    if (pendingNdcDepts.length > 0 || pendingChecklist.length > 0) {
-      try {
-        const mailResult = await sendEmail(
-          'offboarding_clearance_reminder',
-          {
-            subject: `Action Required: Clearance Checkpoints for ${c.caseRecord.employee_name} (LWD: ${c.caseRecord.proposed_lwd})`,
-            employee_name: c.caseRecord.employee_name,
-            last_working_day: c.caseRecord.proposed_lwd,
-            pending_departments: pendingNdcDepts.join(', ') || 'Pending Checkpoints',
-            clearance_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${c.caseRecord.id}`,
-          },
-          c.caseRecord.employee_email
-        );
-
-        if (mailResult.success) {
-          remindersSent++;
-          details.push(`Reminder sent to ${c.caseRecord.employee_name} for ${pendingNdcDepts.length} pending clearances.`);
-
-          c.activityLogs.unshift({
-            id: `log-${Date.now()}-rem`,
-            offboarding_id: c.caseRecord.id,
-            actor_name: 'Automated Reminder Engine',
-            actor_role: 'system',
-            action: 'Automated Clearance Reminder Dispatched',
-            description: `Sent reminder for pending departments: ${pendingNdcDepts.join(', ')}.`,
-            created_at: new Date().toISOString(),
-          });
-        }
-      } catch (err: any) {
-        console.error('Failed to send reminder for case:', c.caseRecord.id, err);
-      }
-    }
-  }
-
-  return { success: true, remindersSent, details };
+  const db = await createServerSupabaseClient();
+  const result = await remindOpenExits(db);
+  return { success: result.success, remindersSent: result.remindersSent, details: result.details };
 }
 
-/**
- * Get configurable offboarding policy settings.
- */
+// ============================================================================
+// SETTINGS
+// ============================================================================
+
 export async function getOffboardingSettings(): Promise<OffboardingSettings> {
   // Read by the Offboarding tab of /manage/settings as well as by the exit
   // screens, so either feature admits. The policy holds nothing sensitive;
   // a refused caller gets the built-in defaults.
   const allowed = await guard([...FEATURE_ACCESS.offboarding, ...FEATURE_ACCESS.platformConfig]);
   if (!allowed.ok) return { ...DEFAULT_OFFBOARDING_SETTINGS };
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase.from('offboarding_settings').select('*').limit(1).single();
-    if (!error && data) {
-      MEMORY_SETTINGS = { ...DEFAULT_OFFBOARDING_SETTINGS, ...data };
-      return MEMORY_SETTINGS;
-    }
-  } catch {
-    // fallback
-  }
-
-  return MEMORY_SETTINGS;
+  return readSettings(await createServerSupabaseClient());
 }
 
-/**
- * Update offboarding policy settings.
- */
 export async function updateOffboardingSettings(
   settings: Partial<OffboardingSettings>
 ): Promise<{ success: boolean; error?: string }> {
@@ -1282,114 +1240,163 @@ export async function updateOffboardingSettings(
   const refused = await platformConfigRefusal();
   if (refused) return refused;
 
-  MEMORY_SETTINGS = { ...MEMORY_SETTINGS, ...settings, updated_at: new Date().toISOString() };
+  const changes = pickSettingsChanges(settings);
+  if (Object.keys(changes).length === 0) return { success: false, error: 'Nothing to change.' };
 
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('offboarding_settings').upsert({
-      ...MEMORY_SETTINGS,
-      updated_at: new Date().toISOString(),
-    });
-  } catch {
-    // fallback
+  const db = await createServerSupabaseClient();
+  const { data: current, error: readError } = await db
+    .from('offboarding_settings')
+    .select('id')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readError) {
+    logDbError('settings read failed', readError);
+    return { success: false, error: SAVE_FAILED };
   }
 
-  await recordAuditLog('offboarding_settings', 'singleton', 'update', settings);
+  const row = { ...changes, updated_at: new Date().toISOString() };
+  // One row holds the policy: update it, or create it the first time.
+  const { error } = current
+    ? await db.from('offboarding_settings').update(row).eq('id', current.id)
+    : await db.from('offboarding_settings').insert({ ...DEFAULT_OFFBOARDING_SETTINGS, ...row });
+  if (error) {
+    logDbError('settings write failed', error);
+    return { success: false, error: SAVE_FAILED };
+  }
+
+  await recordAuditLog('offboarding_settings', 'singleton', 'update', changes, 'Platform settings');
   revalidatePath('/manage/settings/offboarding');
   return { success: true };
 }
 
 // ============================================================================
-// STAGE 1: RESIGNATION REQUESTS & DECISION WORKFLOW ENGINE
+// RESIGNATIONS
 // ============================================================================
 
-const MEMORY_RESIGNATION_STORE: Map<string, ResignationRequest> = new Map();
+async function readRequest(db: Db, id: string): Promise<ResignationRequest | null> {
+  if (!isUuid(id)) return null;
+  const { data, error } = await db
+    .from('resignation_requests')
+    .select(`*, employees(${PERSON_SELECT})`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    logDbError('resignation read failed', error);
+    return null;
+  }
+  if (!data) return null;
+  return toRequest(data, await managerNames(db, managerIdsOf([data])));
+}
 
-function initResignationSeedScenarios() {
-  // In-memory store starts empty in production.
+/** What opening the exit for an accepted resignation needs. */
+function exitInputFor(req: ResignationRequest): InitiateOffboardingInput {
+  return {
+    employee_id: req.employee_id,
+    employee_name: req.employee_name,
+    employee_email: req.employee_email,
+    employee_designation: req.employee_designation,
+    employee_department: req.employee_department,
+    employee_type: req.employee_designation,
+    manager_name: req.manager_name ?? undefined,
+    exit_type: 'resignation',
+    initiated_date: req.resignation_date,
+    initiated_by: '',
+    proposed_lwd: req.proposed_lwd,
+    notice_period_days: req.notice_period_days,
+    reason: req.reason,
+    reason_details: req.reason_details ?? undefined,
+  };
 }
 
 /**
- * Fetch all resignation requests.
- * Uses a fast timeout to avoid hanging when the resignation_requests table
- * doesn't exist in the remote database.
+ * Moves a resignation on from the status it was read in, and opens its exit
+ * when the move accepts it.
+ *
+ * The move is claimed first: the update matches only the status that was
+ * read, so of two decisions made at once only one goes through, and only that
+ * one can open an exit. The exit is opened after the claim and then linked.
+ * If it cannot be opened, the resignation is put back as it was, so the
+ * decision can be made again.
  */
+async function moveResignation(
+  db: Db,
+  req: ResignationRequest,
+  patch: Partial<ResignationRequest>,
+  exit: { salary: boolean; initiatedBy: string } | null
+): Promise<{ ok: true; request: ResignationRequest } | { ok: false; error: string }> {
+  const { data: claimed, error: claimError } = await db
+    .from('resignation_requests')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', req.id)
+    .eq('status', req.status)
+    .select('id')
+    .maybeSingle();
+  if (claimError) {
+    logDbError('resignation update failed', claimError);
+    return { ok: false, error: SAVE_FAILED };
+  }
+  if (!claimed) return { ok: false, error: REQUEST_CHANGED };
+
+  let offboardingCaseId: string | null = req.offboarding_case_id ?? null;
+  if (exit) {
+    const opened = await openOffboardingCase(exitInputFor(req), db, exit);
+    if (!opened.success || !opened.caseId) {
+      const before = req as unknown as Record<string, unknown>;
+      const restore = Object.fromEntries(Object.keys(patch).map((key) => [key, before[key] ?? null]));
+      const { error: restoreError } = await db
+        .from('resignation_requests')
+        .update({ ...restore, updated_at: new Date().toISOString() })
+        .eq('id', req.id)
+        .eq('status', patch.status ?? req.status);
+      if (restoreError) {
+        logDbError('resignation restore failed', restoreError);
+        return {
+          ok: false,
+          error: `${opened.error ?? 'The exit could not be opened.'} The resignation may show as accepted; reload before trying again.`,
+        };
+      }
+      return { ok: false, error: opened.error ?? 'The exit could not be opened. Try again.' };
+    }
+    offboardingCaseId = opened.caseId;
+    const { error: linkError } = await db
+      .from('resignation_requests')
+      .update({ offboarding_case_id: offboardingCaseId, updated_at: new Date().toISOString() })
+      .eq('id', req.id);
+    if (linkError) {
+      logDbError('resignation link failed', linkError);
+      return { ok: false, error: 'The exit is open, but could not be linked to this resignation. Find it under Offboarding.' };
+    }
+  }
+  return { ok: true, request: { ...req, ...patch, offboarding_case_id: offboardingCaseId } };
+}
+
 export async function getAllResignationRequests(): Promise<ResignationRequest[]> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return [];
 
-  initResignationSeedScenarios();
-  initSeedScenarios();
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const { data, error } = await supabase
-      .from('resignation_requests')
-      .select('*, employees(name, email, team)')
-      .order('created_at', { ascending: false })
-      .abortSignal(controller.signal);
-
-    clearTimeout(timeout);
-
-    if (!error && data) {
-      return data.map((row: any) => ({
-        ...row,
-        employee_name: row.employees?.name || row.employee_name,
-        employee_email: row.employees?.email || row.employee_email,
-      }));
-    }
-  } catch {
-    // Fallback to memory (timeout, missing table, or network error)
+  const db = await createServerSupabaseClient();
+  const { data, error } = await db
+    .from('resignation_requests')
+    .select(`*, employees(${PERSON_SELECT})`)
+    .order('created_at', { ascending: false });
+  if (error) {
+    logDbError('resignation list read failed', error);
+    return [];
   }
-
-  return Array.from(MEMORY_RESIGNATION_STORE.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const managers = await managerNames(db, managerIdsOf(data ?? []));
+  return (data ?? []).map((row) => toRequest(row, managers));
 }
 
-/**
- * Fetch a single resignation request by ID.
- */
 export async function getResignationRequestById(id: string): Promise<ResignationRequest | null> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return null;
-
-  initResignationSeedScenarios();
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const { data, error } = await supabase
-      .from('resignation_requests')
-      .select('*, employees(*)')
-      .eq('id', id)
-      .abortSignal(controller.signal)
-      .single();
-
-    clearTimeout(timeout);
-
-    if (!error && data) {
-      return {
-        ...data,
-        employee_name: data.employees?.name || data.employee_name,
-        employee_email: data.employees?.email || data.employee_email,
-      };
-    }
-  } catch {
-    // Fallback (timeout, missing table, or network error)
-  }
-
-  return MEMORY_RESIGNATION_STORE.get(id) || null;
+  return readRequest(await createServerSupabaseClient(), id);
 }
 
 /**
- * Submit a Resignation Request (Entry Points: Platform, Ingested Email, or P&C Manual Entry).
- * Does NOT create an Offboarding Case!
+ * Submits a resignation (from the platform, an email or PnC's own entry).
+ * It does not open an exit: that waits for the manager and PnC.
  */
 export async function submitResignationRequest(
   input: SubmitResignationInput
@@ -1399,130 +1406,105 @@ export async function submitResignationRequest(
   // theirs to file, and a P&C entry is accepted on P&C's behalf the moment
   // it is created.
   const allowed = await guard('offboarding');
-  if (!allowed.ok) {
+  let actor: string;
+  if (allowed.ok) {
+    actor = actorOf(allowed.caller);
+  } else {
     const self = await guard('self');
     const ownId = self.ok ? await currentEmployeeId() : null;
-    if (!ownId || ownId !== input.employee_id || input.source !== 'platform') {
+    if (!self.ok || !ownId || ownId !== input?.employee_id || input.source !== 'platform') {
       return { success: false, error: allowed.error };
     }
+    actor = actorOf(self.caller);
   }
 
-  initResignationSeedScenarios();
+  if (!isUuid(input?.employee_id)) return { success: false, error: 'Choose an employee.' };
+  if (input.source !== 'platform' && input.source !== 'email' && input.source !== 'pnc') {
+    return { success: false, error: 'Unknown source.' };
+  }
+  if (!isIsoDate(input.proposed_lwd)) return { success: false, error: 'Enter the last working day.' };
+  if (typeof input.reason !== 'string' || input.reason.trim() === '') return { success: false, error: 'Enter a reason.' };
 
-  try {
-    const allEmployees = await getEmployees();
-    const emp = allEmployees.find((e) => e.id === input.employee_id);
+  const nowIso = new Date().toISOString();
+  const byPnc = input.source === 'pnc';
+  const clip = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : null);
 
-    const nowIso = new Date().toISOString();
-    const requestId = `res-req-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
-
-    const newRequest: ResignationRequest = {
-      id: requestId,
+  const db = await createServerSupabaseClient();
+  const { data, error } = await db
+    .from('resignation_requests')
+    .insert({
       employee_id: input.employee_id,
-      employee_name: emp?.name || 'NavGurukul Member',
-      employee_email: emp?.email || 'member@navgurukul.org',
-      employee_designation: emp?.employee_type || 'Team Member',
-      employee_department: emp?.team || 'Operations',
-      manager_name: 'Reporting Manager',
       source: input.source,
-      resignation_date: input.resignation_date || nowIso.split('T')[0],
+      resignation_date: isIsoDate(input.resignation_date) ? input.resignation_date : nowIso.slice(0, 10),
       proposed_lwd: input.proposed_lwd,
-      notice_period_days: input.notice_period_days || 30,
-      reason: input.reason,
-      reason_details: input.reason_details,
-      employee_comments: input.employee_comments,
-      email_subject: input.email_subject,
-      email_sender: input.email_sender,
-      email_body: input.email_body,
+      notice_period_days:
+        typeof input.notice_period_days === 'number' && input.notice_period_days >= 0 ? Math.round(input.notice_period_days) : 30,
+      reason: input.reason.slice(0, 500),
+      reason_details: clip(input.reason_details),
+      employee_comments: clip(input.employee_comments),
+      email_subject: clip(input.email_subject, 500),
+      email_sender: clip(input.email_sender, 320),
+      email_body: clip(input.email_body, 20000),
       email_received_at: input.source === 'email' ? nowIso : null,
       manager_decision: 'pending',
-      pnc_decision: input.source === 'pnc' ? 'accepted' : 'pending',
-      pnc_decision_at: input.source === 'pnc' ? nowIso : null,
-      pnc_decision_by: input.source === 'pnc' ? 'P&C Operations Partner' : null,
-      employee_retention_response: 'pending',
-      status: input.source === 'pnc' ? 'manager_pending' : 'submitted',
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    MEMORY_RESIGNATION_STORE.set(requestId, newRequest);
-
-    // Attempt persist to Supabase
-    try {
-      const supabase = await createServerSupabaseClient();
-      await supabase.from('resignation_requests').insert({
-        id: newRequest.id,
-        employee_id: newRequest.employee_id,
-        source: newRequest.source,
-        resignation_date: newRequest.resignation_date,
-        proposed_lwd: newRequest.proposed_lwd,
-        notice_period_days: newRequest.notice_period_days,
-        reason: newRequest.reason,
-        reason_details: newRequest.reason_details,
-        employee_comments: newRequest.employee_comments,
-        email_subject: newRequest.email_subject,
-        email_sender: newRequest.email_sender,
-        email_body: newRequest.email_body,
-        email_received_at: newRequest.email_received_at,
-        manager_decision: newRequest.manager_decision,
-        pnc_decision: newRequest.pnc_decision,
-        status: newRequest.status,
-      });
-    } catch {
-      // Memory fallback handles it
-    }
-
-    // Global audit trail
-    await recordAuditLog('resignation_requests', requestId, 'insert', {
-      source: input.source,
-      employee_id: input.employee_id,
-      employee_name: newRequest.employee_name,
-      proposed_lwd: input.proposed_lwd,
-    });
-
-    // Notify Manager + P&C of new submission
-    try {
-      await sendEmail(
-        'offboarding_resignation_ack',
-        {
-          subject: `Resignation Request Received: ${newRequest.employee_name} (${input.source.toUpperCase()})`,
-          employee_name: newRequest.employee_name,
-          resignation_date: newRequest.resignation_date,
-          notice_period_duration: `${newRequest.notice_period_days} Days`,
-          last_working_day: newRequest.proposed_lwd,
-          offboarding_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding?tab=resignations`,
-          hr_poc_name: 'People & Culture Review Board',
-        },
-        newRequest.employee_email
-      );
-    } catch (mailErr) {
-      console.warn('Could not dispatch resignation notification email:', mailErr);
-    }
-
-    await auditOffboarding.resignationReceived({
-      subject: auditSubject(newRequest),
-      actorType: newRequest.source === 'platform' ? 'employee' : 'pnc',
-      actorName: newRequest.employee_name,
-      entityId: newRequest.id,
-      channel: newRequest.source,
-      lastWorkingDay: newRequest.proposed_lwd,
-      metadata: {
-        reason: newRequest.reason,
-        notice_period_days: newRequest.notice_period_days,
-      },
-    });
-
-    revalidatePath('/offboarding');
-    return { success: true, request: newRequest };
-  } catch (err: any) {
-    console.error('Error submitting resignation request:', err);
-    return { success: false, error: err?.message || 'Failed to submit resignation request' };
+      pnc_decision: byPnc ? 'accepted' : 'pending',
+      pnc_decision_at: byPnc ? nowIso : null,
+      pnc_decision_by: byPnc ? actor : null,
+      status: byPnc ? 'manager_pending' : 'submitted',
+    })
+    .select(`*, employees(${PERSON_SELECT})`)
+    .single();
+  if (error || !data) {
+    logDbError('resignation insert failed', error);
+    return { success: false, error: 'The resignation could not be saved. Try again.' };
   }
+  const request = toRequest(data, await managerNames(db, managerIdsOf([data])));
+
+  await recordAuditLog(
+    'resignation_requests',
+    request.id,
+    'insert',
+    { source: input.source, employee_id: input.employee_id, proposed_lwd: input.proposed_lwd },
+    actor
+  );
+
+  try {
+    if (request.employee_email) await sendEmail(
+      'offboarding_resignation_ack',
+      {
+        subject: `Resignation Request Received: ${request.employee_name} (${input.source.toUpperCase()})`,
+        employee_name: request.employee_name,
+        resignation_date: request.resignation_date,
+        notice_period_duration: `${request.notice_period_days} Days`,
+        last_working_day: request.proposed_lwd,
+        offboarding_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding?tab=resignations`,
+        hr_poc_name: 'People & Culture Review Board',
+      },
+      request.employee_email
+    );
+  } catch {
+    console.warn('Offboarding: could not send the resignation notification');
+  }
+
+  await auditOffboarding.resignationReceived({
+    subject: auditSubject(request),
+    actorType: request.source === 'platform' ? 'employee' : 'pnc',
+    actorName: request.source === 'platform' ? request.employee_name : actor,
+    entityId: request.id,
+    channel: request.source,
+    lastWorkingDay: request.proposed_lwd,
+    metadata: { reason: request.reason, notice_period_days: request.notice_period_days },
+  });
+
+  revalidatePath('/offboarding');
+  return { success: true, request };
 }
 
 /**
- * Record Manager or P&C Decision on a Resignation Request.
- * Decisions: 'accepted' | 'retention_proposed' | 'on_hold'.
+ * Records the manager's or PnC's decision on a resignation. PnC records the
+ * manager's too: managers do not use this screen. Both accepting opens the
+ * exit (`moveResignation`); if it cannot be opened, the decision is not
+ * saved, so it can be made again.
  */
 export async function submitReviewDecision(
   requestId: string,
@@ -1533,118 +1515,51 @@ export async function submitReviewDecision(
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (reviewerRole !== 'manager' && reviewerRole !== 'pnc') return { success: false, error: 'Unknown reviewer.' };
+  if (!isReviewDecision(decision)) return { success: false, error: 'Unknown decision.' };
 
-  initResignationSeedScenarios();
-  const req = MEMORY_RESIGNATION_STORE.get(requestId);
-  if (!req) return { success: false, error: 'Resignation request not found' };
-
-  const nowIso = new Date().toISOString();
-  const formatYMD = (d: Date) => d.toISOString().split('T')[0];
-
-  // Update specific reviewer decision
-  if (reviewerRole === 'manager') {
-    req.manager_decision = decision;
-    req.manager_decision_at = nowIso;
-    req.manager_decision_by = 'Reporting Manager';
-    req.manager_notes = notes || null;
-  } else {
-    req.pnc_decision = decision;
-    req.pnc_decision_at = nowIso;
-    req.pnc_decision_by = 'P&C Operations';
-    req.pnc_notes = notes || null;
+  const db = await createServerSupabaseClient();
+  const req = await readRequest(db, requestId);
+  if (!req) return { success: false, error: REQUEST_NOT_FOUND };
+  if (req.status === 'resignation_accepted' || req.status === 'withdrawn_by_employee' || req.status === 'cancelled') {
+    return { success: false, error: 'This resignation has already been decided.' };
   }
 
-  // Lifecycle state evaluation
-  if (decision === 'on_hold' || req.manager_decision === 'on_hold' || req.pnc_decision === 'on_hold') {
-    const days = holdDays || MEMORY_SETTINGS.standard_hold_period_days || 7;
-    const holdDate = new Date();
-    holdDate.setDate(holdDate.getDate() + days);
-    req.hold_until_date = formatYMD(holdDate);
-    req.status = 'on_hold';
-    req.retention_notes = notes ? `Hold Reason: ${notes}` : `7-day retention discussion window initiated.`;
-  } else if (req.manager_decision === 'accepted' && req.pnc_decision === 'accepted') {
-    // BOTH ACCEPTED -> Transition to Resignation Accepted & Activate Offboarding Case!
-    req.status = 'resignation_accepted';
-
-    // Activate the downstream offboarding case
-    const initRes = await openOffboardingCase({
-      employee_id: req.employee_id,
-      employee_name: req.employee_name,
-      employee_email: req.employee_email,
-      employee_designation: req.employee_designation,
-      employee_department: req.employee_department,
-      employee_type: 'Full-Time Employee',
-      manager_name: req.manager_name || 'Reporting Manager',
-      exit_type: 'resignation',
-      initiated_date: req.resignation_date,
-      initiated_by: `Approved by Manager & P&C (Request ${req.id})`,
-      proposed_lwd: req.proposed_lwd,
-      notice_period_days: req.notice_period_days,
-      reason: req.reason,
-      reason_details: req.reason_details || undefined,
-    });
-
-    if (initRes.success && initRes.caseId) {
-      req.offboarding_case_id = initRes.caseId;
-    }
-  } else if (req.manager_decision === 'retention_proposed' && req.pnc_decision === 'retention_proposed') {
-    // BOTH PROPOSE RETENTION -> Surface retention proposal to employee
-    req.status = 'withdrawal_proposed';
-    req.retention_notes = notes || 'Management proposes retention dialogue and resignation withdrawal.';
-  } else if (
-    (req.manager_decision === 'accepted' && req.pnc_decision === 'retention_proposed') ||
-    (req.manager_decision === 'retention_proposed' && req.pnc_decision === 'accepted')
-  ) {
-    // DISAGREEMENT -> Decision Pending / P&C Resolution
-    req.status = 'decision_pending';
-    req.retention_notes = `Disagreement between Manager (${req.manager_decision}) and P&C (${req.pnc_decision}). Resolution required.`;
-  } else if (req.manager_decision === 'accepted' && req.pnc_decision === 'pending') {
-    req.status = 'pnc_pending';
-  } else if (req.pnc_decision === 'accepted' && req.manager_decision === 'pending') {
-    req.status = 'manager_pending';
-  } else if (req.manager_decision === 'retention_proposed' || req.pnc_decision === 'retention_proposed') {
-    req.status = 'withdrawal_proposed';
-    req.retention_notes = notes || 'Retention proposed. Awaiting employee feedback.';
-  }
-
-  req.updated_at = nowIso;
-  MEMORY_RESIGNATION_STORE.set(requestId, req);
-
-  // Update Supabase if available
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('resignation_requests').update({
-      manager_decision: req.manager_decision,
-      manager_decision_at: req.manager_decision_at,
-      manager_decision_by: req.manager_decision_by,
-      manager_notes: req.manager_notes,
-      pnc_decision: req.pnc_decision,
-      pnc_decision_at: req.pnc_decision_at,
-      pnc_decision_by: req.pnc_decision_by,
-      pnc_notes: req.pnc_notes,
-      hold_until_date: req.hold_until_date,
-      retention_notes: req.retention_notes,
-      status: req.status,
-      offboarding_case_id: req.offboarding_case_id,
-      updated_at: nowIso,
-    }).eq('id', requestId);
-  } catch {
-    // fallback
-  }
-
-  await recordAuditLog('resignation_requests', requestId, 'update', {
+  const actor = actorOf(allowed.caller);
+  const settings = await readSettings(db);
+  const safeNotes = typeof notes === 'string' ? notes.slice(0, 4000) : null;
+  const { patch, opensExit } = decideResignation(req, {
     reviewerRole,
     decision,
-    newStatus: req.status,
-    notes,
+    notes: safeNotes,
+    holdDays: typeof holdDays === 'number' ? holdDays : null,
+    defaultHoldDays: settings.standard_hold_period_days || 7,
+    actor: reviewerRole === 'manager' ? `Reporting Manager (recorded by ${actor})` : actor,
+    now: new Date(),
   });
 
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    opensExit ? { salary: maySeeSalary(allowed.caller), initiatedBy: `Approved by Manager & P&C (${actor})` } : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
+
+  await recordAuditLog(
+    'resignation_requests',
+    req.id,
+    'update',
+    { reviewerRole, decision, newStatus: updated.status, notes: safeNotes },
+    actor
+  );
   await auditOffboarding.statusChanged({
-    subject: auditSubject(req),
+    subject: auditSubject(updated),
     actorType: reviewerRole === 'manager' ? 'manager' : 'pnc',
-    actorName: reviewerRole === 'manager' ? req.manager_decision_by : req.pnc_decision_by,
-    entityId: requestId,
-    to: req.status,
+    actorName: reviewerRole === 'manager' ? updated.manager_decision_by : updated.pnc_decision_by,
+    entityId: req.id,
+    to: updated.status,
     severity: 'notice',
     changes: [
       {
@@ -1653,17 +1568,16 @@ export async function submitReviewDecision(
         to: decision,
       },
     ],
-    metadata: { notes, hold_until: req.hold_until_date },
+    metadata: { notes: safeNotes, hold_until: updated.hold_until_date },
   });
 
   revalidatePath('/offboarding');
-  return { success: true, request: req };
+  return { success: true, request: updated };
 }
 
 /**
- * Handle Employee Response to Retention Proposal:
- * - 'accepted_withdrawal': Employee agrees to stay! Resignation closed. Employee remains Active. No offboarding case created!
- * - 'declined_withdrawal': Employee still wants to leave! Resignation accepted -> Offboarding case created.
+ * The employee's answer to a retention offer: staying closes the resignation;
+ * declining opens the exit. Only while an offer is open.
  */
 export async function respondToRetention(
   requestId: string,
@@ -1676,79 +1590,66 @@ export async function respondToRetention(
   const self = allowed.ok ? null : await guard('self');
   const ownId = self?.ok ? await currentEmployeeId() : null;
   if (!allowed.ok && !ownId) return { success: false, error: allowed.error };
+  if (response !== 'accepted_withdrawal' && response !== 'declined_withdrawal') {
+    return { success: false, error: 'Unknown response.' };
+  }
 
-  initResignationSeedScenarios();
-  const req = MEMORY_RESIGNATION_STORE.get(requestId);
-  if (!req) return { success: false, error: 'Resignation request not found' };
+  const session = await createServerSupabaseClient();
+  const req = await readRequest(session, requestId);
+  if (!req) return { success: false, error: REQUEST_NOT_FOUND };
   if (!allowed.ok && req.employee_id !== ownId) return { success: false, error: allowed.error };
-
-  const nowIso = new Date().toISOString();
-  req.employee_retention_response = response;
-  req.employee_response_at = nowIso;
-  req.employee_response_notes = notes || null;
-  req.updated_at = nowIso;
-
-  if (response === 'accepted_withdrawal') {
-    // Employee stays! Resignation closed. Employee remains active.
-    req.status = 'withdrawn_by_employee';
-    req.retention_notes = notes ? `Withdrawal Accepted: ${notes}` : 'Employee agreed to retention proposal and withdrew resignation.';
-  } else {
-    // Employee declines retention -> Proceed to Exit Initiated!
-    req.status = 'resignation_accepted';
-
-    const initRes = await openOffboardingCase({
-      employee_id: req.employee_id,
-      employee_name: req.employee_name,
-      employee_email: req.employee_email,
-      employee_designation: req.employee_designation,
-      employee_department: req.employee_department,
-      employee_type: 'Full-Time Employee',
-      manager_name: req.manager_name || 'Reporting Manager',
-      exit_type: 'resignation',
-      initiated_date: req.resignation_date,
-      initiated_by: `Employee Declined Retention (Request ${req.id})`,
-      proposed_lwd: req.proposed_lwd,
-      notice_period_days: req.notice_period_days,
-      reason: req.reason,
-      reason_details: req.reason_details || undefined,
-    });
-
-    if (initRes.success && initRes.caseId) {
-      req.offboarding_case_id = initRes.caseId;
-    }
+  if (req.status !== 'withdrawal_proposed') {
+    return { success: false, error: 'There is no retention offer to answer on this resignation.' };
   }
 
-  MEMORY_RESIGNATION_STORE.set(requestId, req);
+  // The employee's own session may read their resignation but not change it,
+  // and opening their exit writes offboarding tables they cannot reach: both
+  // go through the service-role client, now that the request is theirs and
+  // an offer is open.
+  const db = allowed.ok ? session : serviceDb();
+  if (!db) return { success: false, error: 'Responses are unavailable: no service-role key.' };
+  const actor = allowed.ok ? actorOf(allowed.caller) : req.employee_name;
 
-  // Update Supabase if available
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('resignation_requests').update({
-      employee_retention_response: req.employee_retention_response,
-      employee_response_at: req.employee_response_at,
-      employee_response_notes: req.employee_response_notes,
-      status: req.status,
-      offboarding_case_id: req.offboarding_case_id,
-      retention_notes: req.retention_notes,
-      updated_at: nowIso,
-    }).eq('id', requestId);
-  } catch {
-    // fallback
-  }
+  const safeNotes = typeof notes === 'string' ? notes.slice(0, 4000) : null;
+  const declined = response === 'declined_withdrawal';
+  const patch: Partial<ResignationRequest> = {
+    employee_retention_response: response,
+    employee_response_at: new Date().toISOString(),
+    employee_response_notes: safeNotes,
+    status: declined ? 'resignation_accepted' : 'withdrawn_by_employee',
+    ...(declined
+      ? {}
+      : {
+          retention_notes: safeNotes
+            ? `Withdrawal Accepted: ${safeNotes}`
+            : 'Employee agreed to retention proposal and withdrew resignation.',
+        }),
+  };
 
-  await recordAuditLog('resignation_requests', requestId, 'update', {
-    employee_response: response,
-    newStatus: req.status,
-    notes,
-  });
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    declined
+      ? { salary: allowed.ok ? maySeeSalary(allowed.caller) : true, initiatedBy: `Employee declined retention (${actor})` }
+      : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
+
+  await recordAuditLog(
+    'resignation_requests',
+    req.id,
+    'update',
+    { employee_response: response, newStatus: updated.status, notes: safeNotes },
+    actor
+  );
 
   revalidatePath('/offboarding');
-  return { success: true, request: req };
+  return { success: true, request: updated };
 }
 
-/**
- * Resolve Disagreement between Manager and P&C (by Authorized P&C Role).
- */
+/** PnC resolves a disagreement between the manager's decision and their own. */
 export async function resolveDisagreement(
   requestId: string,
   resolvedDecision: 'accepted' | 'retention_proposed',
@@ -1756,68 +1657,47 @@ export async function resolveDisagreement(
 ): Promise<{ success: boolean; request?: ResignationRequest; error?: string }> {
   const allowed = await guard('offboarding');
   if (!allowed.ok) return { success: false, error: allowed.error };
+  if (resolvedDecision !== 'accepted' && resolvedDecision !== 'retention_proposed') {
+    return { success: false, error: 'Unknown decision.' };
+  }
 
-  initResignationSeedScenarios();
-  const req = MEMORY_RESIGNATION_STORE.get(requestId);
-  if (!req) return { success: false, error: 'Resignation request not found' };
+  const db = await createServerSupabaseClient();
+  const req = await readRequest(db, requestId);
+  if (!req) return { success: false, error: REQUEST_NOT_FOUND };
+  if (req.status !== 'decision_pending') return { success: false, error: 'There is no disagreement to resolve.' };
 
-  const nowIso = new Date().toISOString();
-  req.updated_at = nowIso;
-  req.retention_notes = notes || `Disagreement formally resolved by P&C Authority to: ${resolvedDecision.toUpperCase()}`;
+  const actor = actorOf(allowed.caller);
+  const safeNotes = typeof notes === 'string' ? notes.slice(0, 4000) : null;
+  const patch: Partial<ResignationRequest> = {
+    retention_notes: safeNotes || `Disagreement formally resolved by P&C Authority to: ${resolvedDecision.toUpperCase()}`,
+  };
 
-  if (resolvedDecision === 'accepted') {
-    req.manager_decision = 'accepted';
-    req.pnc_decision = 'accepted';
-    req.status = 'resignation_accepted';
-
-    const initRes = await openOffboardingCase({
-      employee_id: req.employee_id,
-      employee_name: req.employee_name,
-      employee_email: req.employee_email,
-      employee_designation: req.employee_designation,
-      employee_department: req.employee_department,
-      employee_type: 'Full-Time Employee',
-      manager_name: req.manager_name || 'Reporting Manager',
-      exit_type: 'resignation',
-      initiated_date: req.resignation_date,
-      initiated_by: `P&C Disagreement Resolution (Request ${req.id})`,
-      proposed_lwd: req.proposed_lwd,
-      notice_period_days: req.notice_period_days,
-      reason: req.reason,
-      reason_details: req.reason_details || undefined,
-    });
-
-    if (initRes.success && initRes.caseId) {
-      req.offboarding_case_id = initRes.caseId;
-    }
+  const accepted = resolvedDecision === 'accepted';
+  if (accepted) {
+    patch.manager_decision = 'accepted';
+    patch.pnc_decision = 'accepted';
+    patch.status = 'resignation_accepted';
   } else {
-    req.status = 'withdrawal_proposed';
+    patch.status = 'withdrawal_proposed';
   }
 
-  MEMORY_RESIGNATION_STORE.set(requestId, req);
+  const moved = await moveResignation(
+    db,
+    req,
+    patch,
+    accepted ? { salary: maySeeSalary(allowed.caller), initiatedBy: `P&C disagreement resolution (${actor})` } : null
+  );
+  if (!moved.ok) return { success: false, error: moved.error };
+  const updated = moved.request;
 
-  // Update Supabase if available
-  try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.from('resignation_requests').update({
-      manager_decision: req.manager_decision,
-      pnc_decision: req.pnc_decision,
-      status: req.status,
-      offboarding_case_id: req.offboarding_case_id,
-      retention_notes: req.retention_notes,
-      updated_at: nowIso,
-    }).eq('id', requestId);
-  } catch {
-    // fallback
-  }
-
-  await recordAuditLog('resignation_requests', requestId, 'update', {
-    resolvedDecision,
-    newStatus: req.status,
-    notes,
-  });
+  await recordAuditLog(
+    'resignation_requests',
+    req.id,
+    'update',
+    { resolvedDecision, newStatus: updated.status, notes: safeNotes },
+    actor
+  );
 
   revalidatePath('/offboarding');
-  return { success: true, request: req };
+  return { success: true, request: updated };
 }
-

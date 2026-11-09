@@ -150,3 +150,74 @@ export function accessEndedAt(appMetadata: Record<string, unknown> | null | unde
   const value = appMetadata?.access_ended_at
   return typeof value === 'string' && value.trim() !== '' ? value : null
 }
+
+// ---------------------------------------------------------------------------
+// Before exit
+// ---------------------------------------------------------------------------
+// A leaver's stored role (PnC Admin, Fin Ops, Platform Admin…) ends 72 hours
+// before their last working day. They keep the `employee` baseline to finish
+// their handover; closing the exit then ends everything (`endPlatformAccess`).
+//
+// The lead time is the point: anything that quietly depended on their access
+// (an approval queue, a report, a login set up under their name) breaks while
+// they are still there to hand it over, rather than after they have gone.
+// ---------------------------------------------------------------------------
+
+/** How long before the last working day begins a leaver's stored role ends. */
+export const PRE_EXIT_ROLE_LEAD_HOURS = 72
+
+// Exit dates are calendar days in India: UTC+05:30, no daylight saving.
+const IST_OFFSET_MS = 330 * 60_000
+const HOUR_MS = 3_600_000
+
+/**
+ * When the stored role of someone whose last working day is `lastWorkingDay`
+ * (`YYYY-MM-DD`) ends: 72 hours before that day begins in India. Null for
+ * anything that is not a real calendar date.
+ *
+ * Last working day Friday 20 November → the role ends at 00:00 IST on
+ * Tuesday 17 November.
+ */
+export function preExitRoleEndsAt(lastWorkingDay: string | null | undefined): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(lastWorkingDay ?? '')
+  if (!match) return null
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  const midnightUtc = Date.UTC(year, month - 1, day)
+  const parsed = new Date(midnightUtc)
+  // Date.UTC rolls 2026-02-31 over into March; refuse it instead.
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    return null
+  }
+  return new Date(midnightUtc - IST_OFFSET_MS - PRE_EXIT_ROLE_LEAD_HOURS * HOUR_MS)
+}
+
+/** Whether the stored role of someone leaving on `lastWorkingDay` has ended by `now`. */
+export function isPreExitRoleDue(lastWorkingDay: string | null | undefined, now: Date): boolean {
+  const endsAt = preExitRoleEndsAt(lastWorkingDay)
+  return endsAt !== null && now.getTime() >= endsAt.getTime()
+}
+
+/**
+ * When the account's stored role was ended ahead of an exit, or null.
+ *
+ * Written by `endRoleBeforeExit`. Cleared by anything that sets a role by hand
+ * (`CLEARED_PRE_EXIT_MARKERS`), so a cancelled exit leaves no trace once the
+ * role is given back. Break-glass access does not apply while it is set.
+ */
+export function roleEndedBeforeExitAt(appMetadata: Record<string, unknown> | null | undefined): string | null {
+  const value = appMetadata?.role_ended_before_exit_at
+  return typeof value === 'string' && value.trim() !== '' ? value : null
+}
+
+/** The stored role the account held before it was ended ahead of an exit, as stored. */
+export function roleBeforeExit(appMetadata: Record<string, unknown> | null | undefined): string | null {
+  if (!roleEndedBeforeExitAt(appMetadata)) return null
+  const value = appMetadata?.role_before_exit
+  return typeof value === 'string' && value.trim() !== '' ? value : null
+}
+
+/** Spread into `app_metadata` on any write that sets a role by hand. Null deletes the key. */
+export const CLEARED_PRE_EXIT_MARKERS = {
+  role_before_exit: null,
+  role_ended_before_exit_at: null,
+} as const

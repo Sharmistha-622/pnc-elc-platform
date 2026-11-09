@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { guard } from '@/lib/rbac/guard'
 import { getAppraisalReportData, TeamCohortBreakdown } from '@/lib/appraisals/getAppraisalReportData'
+import { departmentOf } from '@/lib/employees/department'
 
 export interface ConfirmationReportItem {
   id: string
@@ -120,7 +121,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   try {
     const { data: confRows, error } = await supabase
       .from('confirmations')
-      .select('id, status, manager_decision, recommendation, created_at, employees(name, designation, teams(name), employee_types(name))')
+      .select('id, status, manager_decision, recommendation, created_at, employees(name, designation, team, teams(name), employee_types(name))')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -139,7 +140,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
           created_at: row.created_at,
           employee_name: emp.name || 'Unknown Employee',
           designation: emp.designation,
-          team_name: emp.teams?.name || 'Unassigned',
+          team_name: departmentOf(emp) || 'Unassigned',
           employee_type: emp.employee_types?.name || 'Standard',
         })
       }
@@ -200,13 +201,13 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   try {
     const { data: empRows, error } = await supabase
       .from('employees')
-      .select('id, name, email, designation, joining_date, is_alumni, employee_types(name), teams(name), locations(name)')
+      .select('id, name, email, designation, joining_date, is_alumni, team, employee_types(name), teams(name), locations(name)')
       .order('name', { ascending: true })
 
     if (!error && empRows) {
       for (const row of empRows as any[]) {
         const typeName = row.employee_types?.name || 'Unclassified'
-        const teamName = row.teams?.name || 'Unassigned'
+        const teamName = departmentOf(row) || 'Unassigned'
         const locationName = row.locations?.name || 'Remote / Unassigned'
 
         byType[typeName] = (byType[typeName] || 0) + 1

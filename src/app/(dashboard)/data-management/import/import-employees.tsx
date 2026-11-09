@@ -93,6 +93,7 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
       }
       setResult(res);
       toast.success(`${res.created} added, ${res.updated} updated.`);
+      if (res.warning) toast.warning(res.warning);
       // Show the directory as it now stands: every row should read "No change".
       await check(csvText);
     } catch {

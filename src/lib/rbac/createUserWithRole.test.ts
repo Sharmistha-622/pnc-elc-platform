@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
   created: [] as any[],
   createError: null as null | { code?: string; message: string },
   trail: [] as any[],
+  synced: [] as any[],
+  syncFails: false,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -40,6 +42,13 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 
+vi.mock('@/lib/employees/syncDepartment', () => ({
+  syncEmployeeDepartment: vi.fn(async (_admin: unknown, target: unknown) => {
+    state.synced.push(target)
+    return state.syncFails ? { ok: false, error: 'x' } : { ok: true }
+  }),
+}))
+
 import { createUserWithRole } from './createUserWithRole'
 
 function as(role: string, email = `${role}@navgurukul.org`) {
@@ -51,9 +60,32 @@ beforeEach(() => {
   state.created = []
   state.createError = null
   state.trail = []
+  state.synced = []
+  state.syncFails = false
 })
 
 describe('createUserWithRole', () => {
+  it('writes the department onto the employee record as well as the account', async () => {
+    as('super_admin')
+    const res = await createUserWithRole({ email: 'new@navgurukul.org', role: 'pnc_ops', team: 'CEO Office' })
+    expect(res.success).toBe(true)
+    expect(state.synced).toEqual([{ email: 'new@navgurukul.org', department: 'CEO Office' }])
+    expect(res).not.toHaveProperty('warning')
+  })
+
+  it('leaves the employee record alone when no department is chosen', async () => {
+    as('super_admin')
+    await createUserWithRole({ email: 'new@navgurukul.org', role: 'pnc_ops' })
+    expect(state.synced).toEqual([])
+  })
+
+  it('creates the account but warns when the employee record could not be updated', async () => {
+    as('super_admin')
+    state.syncFails = true
+    const res = await createUserWithRole({ email: 'new@navgurukul.org', role: 'pnc_ops', team: 'CEO Office' })
+    expect(res).toMatchObject({ success: true, warning: expect.stringContaining('department was not set') })
+  })
+
   it('refuses a caller the users screen refuses, before anything else', async () => {
     state.guarded = false
     as('pnc_ops')

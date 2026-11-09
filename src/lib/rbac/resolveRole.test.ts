@@ -42,6 +42,15 @@ describe('resolveRole', () => {
     expect(ended.role).toBeNull()
   })
 
+  it('flags an account whose stored role ended ahead of its exit, and leaves it the baseline', () => {
+    const leaving = resolveRole(
+      user('leaving@navgurukul.org', { role_before_exit: 'pnc_admin', role_ended_before_exit_at: '2026-11-16T19:00:00Z' })
+    )
+    expect(leaving.role).toBe('employee')
+    expect(leaving.roleEndedBeforeExit).toBe(true)
+    expect(resolveRole(user('pa@navgurukul.org', { role: 'pnc_admin' })).roleEndedBeforeExit).toBe(false)
+  })
+
   it('keeps the owner pinned to super_admin', () => {
     expect(resolveRole(user('nitin@navgurukul.org', { access_ended_at: '2026-11-07T00:00:00Z' })).role).toBe('super_admin')
   })

@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { profileAccess } from './access'
+import { departmentOf } from '@/lib/employees/department'
 
 export type EmployeeDetail = {
   id: string
@@ -41,6 +42,7 @@ export async function getProfileData(employeeId: string) {
         joining_date,
         exit_date,
         status,
+        team,
         employee_types ( name ),
         teams ( name )
       `)
@@ -56,6 +58,7 @@ export async function getProfileData(employeeId: string) {
           email,
           joining_date,
           status,
+          team,
           employee_types ( name ),
           teams ( name )
         `)
@@ -85,7 +88,7 @@ export async function getProfileData(employeeId: string) {
         exit_date: (employeeData as any).exit_date || null,
         status: employeeData.status || 'active',
         employee_type: (employeeData.employee_types as any)?.name || 'Full-Time',
-        team: (employeeData.teams as any)?.name || null,
+        team: departmentOf(employeeData as { team?: string | null; teams?: { name?: string | null } | null }),
       }
     : null
 

@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAppraisalReferenceDate } from './getAppraisalReferenceDate'
 import { getAppraisalCohort } from './getAppraisalCohort'
+import { departmentOf } from '@/lib/employees/department'
 
 export type TeamCohortBreakdown = {
   team: string
@@ -14,7 +15,7 @@ export async function getAppraisalReportData() {
 
   const { data, error } = await supabase
     .from('employees')
-    .select('name, joining_date, conversion_date, employee_types(name), teams(name)')
+    .select('name, joining_date, conversion_date, team, employee_types(name), teams(name)')
 
   if (error) {
     console.error('Error fetching report data:', error.message)
@@ -28,7 +29,7 @@ export async function getAppraisalReportData() {
 
   for (const row of data || []) {
     const employeeType = (row as any).employee_types?.name
-    const teamName = (row as any).teams?.name || 'Unassigned'
+    const teamName = departmentOf(row as { team?: string | null }) || 'Unassigned'
 
     if (!employeeType) continue
 

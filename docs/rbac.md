@@ -163,11 +163,33 @@ Status is the single field the automation reads; the role follows from it.
 | Active | `employee` | marked joined on Day 1 |
 | Confirmed | `employee` | probation confirmed |
 | **Withdrawn** | *none* | declined, offer pulled or no-show |
+| **Leaving** | `employee` | 72 hours before the last working day: any stored role is removed |
 | **Exited** | *none* | exit closed: any granted role ends too, the account is closed and its sessions cannot be renewed |
+
+Leaving starts 72 hours before the last working day begins in India (the
+confirmed day if set, else the proposed one): last working day Friday, stored
+role gone from 00:00 IST on Tuesday. The person keeps the `employee` baseline
+to finish their handover. The point of the lead time is that anything which
+depended on their access breaks while they are still there to hand it over.
+A daily job (`/api/cron/pre-exit-roles`) applies it to every open exit, and
+opening an exit or moving its last working day applies it at once. Each
+removal is in the audit trail with the old role and the number of active
+reportees still to reassign. The old role is kept on the account
+(`app_metadata.role_before_exit`) and shown on Users & Roles; it is not given
+back automatically if the exit is cancelled or moved out, and setting a role
+by hand clears that record. A role given back while the exit is still open and
+inside the 72 hours is removed again on the next daily run. Break-glass access
+does not apply to a leaver.
+A stored `manager` is removed like any other role; a leaver still sees their
+own reportees on My Team until those reportees are moved to a new manager,
+which is why the count is recorded.
 
 Exited is terminal for access: closing an exit removes the stored role, marks
 the account ended (`app_metadata.access_ended_at`) and bans it, and the
-database gives an ended, banned or exited account no role at all. A Super Admin
+database gives an ended, banned or exited account no role at all. An import
+that sets someone to `exited` does the same, and the daily pre-exit job closes
+the account of anyone whose only employee record is `exited`, however it was
+set. A Super Admin
 can re-open the account from Users & Roles ("Restore access"), for a re-hire or
 a mistake; the role is assigned again by hand.
 

@@ -76,11 +76,8 @@ real work.** Items are grouped by area.
 
 ## Offboarding
 
-- When the offboarding tables are empty or unreachable, the module shows
-  **built-in sample cases and resignations**. Changes may not be kept, and
-  real cases can sometimes fail with *"Case not found"*. **Check with the
-  platform team that you're looking at real data before using it for live
-  exits.**
+- Exits saved before November 2026 were kept only in the server's memory and
+  are gone. Open them again if they are still under way.
 - The **asset, attendance and leave** panels use placeholder data.
 - The **exit interview** is only a checklist item; there's no interview form.
 - The scheduled clearance-reminder job isn't switched on. Use **Send

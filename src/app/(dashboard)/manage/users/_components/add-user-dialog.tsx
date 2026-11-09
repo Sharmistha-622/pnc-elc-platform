@@ -112,6 +112,7 @@ export function AddUserDialog({
       }
 
       toast.success(`User ${res.user.email} added as ${roleLabel(res.user.role)}.`);
+      if (res.warning) toast.warning(res.warning);
       if (onUserAdded) onUserAdded(res.user);
       resetForm();
       onOpenChange(false);
