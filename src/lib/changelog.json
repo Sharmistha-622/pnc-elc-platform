@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.12.00",
+    "date": "2026-11-09",
+    "title": "Pre-exit role removal, and exits saved to the database",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "A leaver's role is removed 72 hours before their last working day, so anything tied to their access shows up before they go; the audit trail records each removal."
+      },
+      {
+        "category": "Features",
+        "description": "An import that marks someone exited ends their platform access, as closing an exit does."
+      },
+      {
+        "category": "Fixes",
+        "description": "Offboarding cases and resignations are saved and no longer disappear."
+      },
+      {
+        "category": "Fixes",
+        "description": "Departments set on Users & Roles show in the directory, profile and reports."
+      }
+    ]
+  },
+  {
     "version": "2.11.01",
     "date": "2026-11-09",
     "title": "Feat/role dashboard panels",
