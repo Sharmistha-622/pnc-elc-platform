@@ -5,8 +5,6 @@ import Link from 'next/link'
 import {
   Users,
   Building2,
-  ShieldCheck,
-  UserX,
   ChevronDown,
   ChevronRight,
   FolderOpen,
@@ -18,7 +16,6 @@ import {
   CheckCircle2,
   Clock,
   Layers,
-  ArrowUpRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -221,29 +218,6 @@ export function OrgChart({
 
             <div className="truncate text-[11px] text-muted-foreground" title={node.email || 'No email'}>
               {node.email || 'No email registered'}
-            </div>
-
-            {/* Platform User Linkage Badge */}
-            <div className="mt-1">
-              {node.user_id ? (
-                <Link
-                  href={`/manage/users?search=${encodeURIComponent(node.email || '')}`}
-                  className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-200/60 dark:border-indigo-800/60 transition-colors"
-                  title={`Linked Platform User Account (${node.user_id.slice(0, 8)}...) - click to view in Users`}
-                >
-                  <ShieldCheck className="size-2.5 text-indigo-600 dark:text-indigo-400" />
-                  <span className="capitalize">{node.user_role ? node.user_role.replace('_', ' ') : 'Platform User'}</span>
-                  <ArrowUpRight className="size-2 opacity-60" />
-                </Link>
-              ) : (
-                <span
-                  className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground/70 bg-muted/50 px-1.5 py-0.5 rounded border border-border/40"
-                  title="No platform user account created for this employee email"
-                >
-                  <UserX className="size-2.5" />
-                  <span>No Platform User</span>
-                </span>
-              )}
             </div>
           </div>
         </div>
