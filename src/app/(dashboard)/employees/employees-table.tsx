@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Search,
-  ArrowUpRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -14,10 +13,28 @@ import {
   UserX,
   Filter,
   GraduationCap,
+  Users,
+  CheckCircle2,
+  AlertCircle,
+  ClipboardList,
+  FolderOpen,
+  ChevronRight,
+  List,
+  GitFork,
+  Building2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -27,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
+import { OrgChart } from '@/components/shared/org-chart';
 import { Employee } from '@/lib/employees/getEmployees';
 import {
   calculateTenure,
@@ -39,6 +57,7 @@ type SortField = 'name' | 'type' | 'team' | 'tenure' | 'joining_date' | 'exit_da
 type SortOrder = 'asc' | 'desc';
 
 export function EmployeesTable({ employees }: { employees: Employee[] }) {
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const [activeTab, setActiveTab] = useState<'active' | 'exited'>('active');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -60,6 +79,13 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
     () => employees.filter((emp) => emp.status?.toLowerCase() === 'exited'),
     [employees]
   );
+
+  // Stats for the 4 top cards (matching /my-team)
+  const totalActive = activeEmployees.length;
+  const confirmedCount = activeEmployees.filter(
+    (emp) => emp.status?.toLowerCase() === 'confirmed' || Boolean(emp.confirmation_date)
+  ).length;
+  const probationCount = totalActive - confirmedCount;
 
   // Available filter options based on all employees
   const availableTypes = useMemo(() => {
@@ -119,7 +145,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
         if (statusFilter === 'confirmed' && !isConfirmed) {
           return false;
         }
-        if (statusFilter === 'active' && isConfirmed) {
+        if (statusFilter === 'probation' && isConfirmed) {
           return false;
         }
       }
@@ -160,32 +186,35 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
           break;
         }
         case 'joining_date': {
-          const aDate = new Date(a.joining_date || 0).getTime();
-          const bDate = new Date(b.joining_date || 0).getTime();
+          const aDate = new Date(a.joining_date).getTime() || 0;
+          const bDate = new Date(b.joining_date).getTime() || 0;
           comparison = aDate - bDate;
           break;
         }
         case 'exit_date': {
-          const aDate = new Date(a.exit_date || 0).getTime();
-          const bDate = new Date(b.exit_date || 0).getTime();
+          const aDate = new Date(a.exit_date || 0).getTime() || 0;
+          const bDate = new Date(b.exit_date || 0).getTime() || 0;
           comparison = aDate - bDate;
           break;
         }
-        case 'status':
-          comparison = (a.status || '').localeCompare(b.status || '');
+        case 'status': {
+          const aConfirmed = a.status?.toLowerCase() === 'confirmed' || Boolean(a.confirmation_date);
+          const bConfirmed = b.status?.toLowerCase() === 'confirmed' || Boolean(b.confirmation_date);
+          comparison = (aConfirmed ? 1 : 0) - (bConfirmed ? 1 : 0);
           break;
-        default:
-          comparison = 0;
+        }
       }
 
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [filtered, sortField, sortOrder]);
 
-  // Paginated list
+  // Pagination
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginated = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return sorted.slice(startIndex, startIndex + pageSize);
+    const start = (currentPage - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
   }, [sorted, currentPage, pageSize]);
 
   // Handle header click sorting
@@ -236,15 +265,15 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
     const clean = (type || '').toLowerCase();
 
     let colorClasses = 'border-slate-500/30 bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300';
-    if (clean === 'fte') {
+    if (clean === 'fte' || clean.includes('fte') || clean.includes('full-time')) {
       colorClasses = 'border-blue-500/30 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
     } else if (clean === 'ftc') {
       colorClasses = 'border-purple-500/30 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
     } else if (clean.includes('apprentice')) {
       colorClasses = 'border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-    } else if (clean === 'intern') {
+    } else if (clean === 'intern' || clean.includes('intern')) {
       colorClasses = 'border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
-    } else if (clean === 'contractor') {
+    } else if (clean === 'contractor' || clean.includes('contract')) {
       colorClasses = 'border-zinc-500/30 bg-zinc-50 text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300';
     }
 
@@ -256,248 +285,338 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Tabs: Active & Exited */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(val) => {
-          setActiveTab(val as 'active' | 'exited');
-          setCurrentPage(1);
-        }}
-        className="w-full"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-border/60">
+    <div className="space-y-6">
+      {/* 1. Stat Cards (Matching /my-team) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Total Directory
+            </span>
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold tracking-tight text-foreground">{totalActive}</div>
+          <p className="text-[11px] text-muted-foreground mt-1">Active staff roster</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Confirmed Staff
+            </span>
+            <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+            {confirmedCount}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Completed probation review</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              On Probation
+            </span>
+            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
+            {probationCount}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">In-flight probation review</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 backdrop-blur-md p-4 shadow-xs">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Directory Actions
+            </span>
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
+              <ClipboardList className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-sm font-bold text-foreground mt-1 flex items-center gap-1.5">
+            <Link href="/onboarding">
+              <Button size="sm" variant="outline" className="h-7 text-xs rounded-lg font-semibold">
+                Onboarding Hub
+              </Button>
+            </Link>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">Manage new hires and workflows</p>
+        </div>
+      </div>
+
+      {/* 2. Top View Mode Tabs: Directory Roster vs Org Chart */}
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'table' | 'chart')} className="w-full">
+        <div className="flex items-center justify-between pb-1 border-b border-border/60 mb-4">
           <TabsList className="bg-muted/60 p-1 rounded-lg">
             <TabsTrigger
-              value="active"
+              value="table"
               className="gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs px-3.5 py-1.5 rounded-lg"
             >
-              <UserCheck className="size-3.5 text-emerald-700 dark:text-emerald-400" />
-              <span>Active Employees</span>
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
-                {activeEmployees.length}
+              <List className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Directory Roster</span>
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-muted text-muted-foreground">
+                {employees.length}
               </span>
             </TabsTrigger>
             <TabsTrigger
-              value="exited"
+              value="chart"
               className="gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs px-3.5 py-1.5 rounded-lg"
             >
-              <UserX className="size-3.5 text-zinc-500 dark:text-zinc-400" />
-              <span>Exited Employees</span>
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-muted text-muted-foreground">
-                {exitedEmployees.length}
-              </span>
+              <GitFork className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Org Chart</span>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* Filter Controls Toolbar */}
-        <div className="pt-4 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, team, employment type..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9 pr-8 h-9 rounded-lg bg-card text-xs sm:text-sm"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCurrentPage(1);
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-                aria-label="Clear search"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
+        {/* Tab 1: Table View */}
+        <TabsContent value="table" className="space-y-4 m-0">
+          {/* Active vs Exited Sub-Tabs */}
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => {
+              setActiveTab(val as 'active' | 'exited');
+              setCurrentPage(1);
+            }}
+            className="w-full"
+          >
+            <div className="flex items-center justify-between pb-1">
+              <TabsList className="bg-muted/60 p-1 rounded-lg">
+                <TabsTrigger
+                  value="active"
+                  className="gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs px-3.5 py-1.5 rounded-lg"
+                >
+                  <UserCheck className="size-3.5 text-emerald-700 dark:text-emerald-400" />
+                  <span>Active Employees</span>
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
+                    {activeEmployees.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="exited"
+                  className="gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs px-3.5 py-1.5 rounded-lg"
+                >
+                  <UserX className="size-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Exited Employees</span>
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-muted text-muted-foreground">
+                    {exitedEmployees.length}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          {/* Dropdown Filters & Clear */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Filter by Employment Type */}
-            <Select
-              value={typeFilter}
-              onValueChange={(val) => {
-                setTypeFilter(val);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[160px]">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Filter className="size-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Type:</span>
-                  <SelectValue placeholder="All Types" />
-                </div>
-              </SelectTrigger>
-              <SelectContent position="popper" className="text-xs">
-                <SelectItem value="all">All Types</SelectItem>
-                {availableTypes.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {formatEmploymentType(t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filter Controls Toolbar (Matching /my-team styling) */}
+            <div className="mt-3 flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between bg-card/60 backdrop-blur-md p-3 rounded-lg border border-border shadow-xs">
+              {/* Search Box */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, team, employment type..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-8 pr-8 h-8 rounded-lg text-xs"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                    aria-label="Clear search"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
 
-            {/* Filter by Team */}
-            <Select
-              value={teamFilter}
-              onValueChange={(val) => {
-                setTeamFilter(val);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[150px]">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-muted-foreground">Team:</span>
-                  <SelectValue placeholder="All Teams" />
-                </div>
-              </SelectTrigger>
-              <SelectContent position="popper" className="text-xs">
-                <SelectItem value="all">All Teams</SelectItem>
-                {availableTeams.map((team) => (
-                  <SelectItem key={team} value={team}>
-                    {team}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {/* Dropdown Filters & Clear */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter by Employment Type */}
+                <Select
+                  value={typeFilter}
+                  onValueChange={(val) => {
+                    setTypeFilter(val);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs rounded-lg min-w-[130px]">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Filter className="size-3 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">Type:</span>
+                      <SelectValue placeholder="All Types" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="text-xs rounded-lg">
+                    <SelectItem value="all" className="rounded-lg">All Types</SelectItem>
+                    {availableTypes.map((t) => (
+                      <SelectItem key={t} value={t} className="rounded-lg">
+                        {formatEmploymentType(t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            {/* Filter by Status (Only in Active Tab) */}
-            {activeTab === 'active' && (
-              <Select
-                value={statusFilter}
-                onValueChange={(val) => {
-                  setStatusFilter(val);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[140px]">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-muted-foreground">Status:</span>
-                    <SelectValue placeholder="All Statuses" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent position="popper" className="text-xs">
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+                {/* Filter by Team */}
+                <Select
+                  value={teamFilter}
+                  onValueChange={(val) => {
+                    setTeamFilter(val);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs rounded-lg min-w-[130px]">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-muted-foreground">Team:</span>
+                      <SelectValue placeholder="All Teams" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="text-xs rounded-lg">
+                    <SelectItem value="all" className="rounded-lg">All Teams</SelectItem>
+                    {availableTeams.map((t) => (
+                      <SelectItem key={t} value={t} className="rounded-lg">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            {/* Filter by Alumni Background */}
-            <Select
-              value={alumniFilter}
-              onValueChange={(val) => {
-                setAlumniFilter(val as 'all' | 'alumni' | 'external');
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs rounded-lg bg-card min-w-[145px]">
-                <div className="flex items-center gap-1.5 truncate">
-                  <GraduationCap className="size-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Alumni:</span>
-                  <SelectValue placeholder="All" />
-                </div>
-              </SelectTrigger>
-              <SelectContent position="popper" className="text-xs">
-                <SelectItem value="all">All Backgrounds</SelectItem>
-                <SelectItem value="alumni">NavGurukul Alumni</SelectItem>
-                <SelectItem value="external">External Hire</SelectItem>
-              </SelectContent>
-            </Select>
+                {/* Filter by Status (active tab only) */}
+                {activeTab === 'active' && (
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(val) => {
+                      setStatusFilter(val);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs rounded-lg min-w-[130px]">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="text-muted-foreground">Status:</span>
+                        <SelectValue placeholder="All Statuses" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="text-xs rounded-lg">
+                      <SelectItem value="all" className="rounded-lg">All Statuses</SelectItem>
+                      <SelectItem value="confirmed" className="rounded-lg">Confirmed</SelectItem>
+                      <SelectItem value="probation" className="rounded-lg">Probation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
 
-            {/* Clear Action */}
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFiltersAndSort}
-                className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 shrink-0 gap-1.5 border-dashed rounded-lg transition-all animate-in fade-in"
-                title="Clear filters, search, and sorting"
-                aria-label="Clear filters, search, and sorting"
-              >
-                <X className="size-3.5 text-muted-foreground" />
-                <span>Clear</span>
-              </Button>
-            )}
-          </div>
-        </div>
+                {/* Filter by Alumni Background */}
+                <Select
+                  value={alumniFilter}
+                  onValueChange={(val) => {
+                    setAlumniFilter(val as 'all' | 'alumni' | 'external');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs rounded-lg min-w-[140px]">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <GraduationCap className="size-3 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">Alumni:</span>
+                      <SelectValue placeholder="All Backgrounds" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="text-xs rounded-lg">
+                    <SelectItem value="all" className="rounded-lg">All Backgrounds</SelectItem>
+                    <SelectItem value="alumni" className="rounded-lg">NavGurukul Alumni</SelectItem>
+                    <SelectItem value="external" className="rounded-lg">External Hires</SelectItem>
+                  </SelectContent>
+                </Select>
 
-        {/* Tab Content: ACTIVE EMPLOYEES */}
-        <TabsContent value="active" className="mt-4">
-          <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase font-semibold">
-                  <tr>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                {/* Reset Filters */}
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFiltersAndSort}
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-lg"
+                  >
+                    <RotateCcw className="size-3 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Table Container (Using Shadcn Table matching /my-team) */}
+            <div className="mt-3 rounded-lg border border-border bg-card/60 backdrop-blur-md shadow-xs overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow>
+                    <TableHead
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none text-xs font-bold uppercase tracking-wider text-muted-foreground"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center">
-                        <span>Name</span>
+                        <span>Employee</span>
                         {renderSortIcon('name')}
                       </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                    </TableHead>
+                    <TableHead
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none text-xs font-bold uppercase tracking-wider text-muted-foreground"
                       onClick={() => handleSort('type')}
                     >
                       <div className="flex items-center">
-                        <span>Employment Type</span>
+                        <span>Role & Type</span>
                         {renderSortIcon('type')}
                       </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                    </TableHead>
+                    <TableHead
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none text-xs font-bold uppercase tracking-wider text-muted-foreground"
                       onClick={() => handleSort('team')}
                     >
                       <div className="flex items-center">
-                        <span>Team</span>
+                        <span>Department</span>
                         {renderSortIcon('team')}
                       </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                    </TableHead>
+                    <TableHead
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none text-xs font-bold uppercase tracking-wider text-muted-foreground"
                       onClick={() => handleSort('tenure')}
                     >
                       <div className="flex items-center">
                         <span>Tenure</span>
                         {renderSortIcon('tenure')}
                       </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
+                    </TableHead>
+                    <TableHead
+                      className="py-2.5 px-3 cursor-pointer hover:text-foreground select-none text-xs font-bold uppercase tracking-wider text-muted-foreground"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center">
                         <span>Status</span>
                         {renderSortIcon('status')}
                       </div>
-                    </th>
-                    <th className="py-3 px-4 text-right">Profile</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+                    </TableHead>
+                    <TableHead className="py-2.5 px-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
                         <div className="max-w-xs mx-auto space-y-2">
-                          <p className="font-medium text-foreground">No active employees found</p>
-                          <p className="text-xs">
+                          <Users className="size-8 mx-auto text-muted-foreground/40" />
+                          <p className="font-semibold text-foreground text-sm">No employees found</p>
+                          <p className="text-xs text-muted-foreground">
                             {hasActiveFilters
-                              ? 'Try adjusting your search or filters.'
-                              : 'No active employee records available.'}
+                              ? 'Try adjusting your search query or filters.'
+                              : 'No employee records are available in this roster.'}
                           </p>
                           {hasActiveFilters && (
                             <Button
@@ -510,272 +629,140 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                             </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     paginated.map((emp) => {
                       const tenureText = calculateTenure(emp.joining_date);
+                      const isConfirmed = emp.status?.toLowerCase() === 'confirmed' || Boolean(emp.confirmation_date);
 
                       return (
-                        <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-foreground">
+                        <TableRow key={emp.id} className="hover:bg-muted/30 transition-colors">
+                          {/* 1. Name & Avatar & User Link */}
+                          <TableCell className="py-2.5 px-3">
                             <div className="flex items-center gap-2.5">
-                              <div className="size-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 ring-1 ring-indigo-500/20">
-                                {emp.name?.charAt(0) || 'U'}
-                              </div>
+                              <Avatar className="size-8 rounded-lg shrink-0 border border-border/50">
+                                {emp.avatar_url && (
+                                  <AvatarImage src={emp.avatar_url} alt={emp.name} className="object-cover" />
+                                )}
+                                <AvatarFallback className="text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                                  {emp.name?.trim().charAt(0).toUpperCase() || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="truncate text-foreground text-sm font-semibold">
+                                  <span className="truncate text-foreground text-xs font-semibold">
                                     {emp.name}
                                   </span>
                                   {emp.is_alumni && (
-                                    <Badge variant="secondary" className="shrink-0 text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60 px-1.5 py-0 h-4">
+                                    <Badge
+                                      variant="secondary"
+                                      className="shrink-0 text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60 px-1.5 py-0 h-4"
+                                    >
                                       Alumni
                                     </Badge>
                                   )}
                                 </div>
-                                {emp.email && (
-                                  <span className="block truncate text-xs text-muted-foreground font-normal">
-                                    {emp.email}
-                                  </span>
-                                )}
+                                <div className="truncate text-[11px] text-muted-foreground">
+                                  {emp.email || 'No email registered'}
+                                </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="py-3 px-4">{renderTypeBadge(emp.employee_type)}</td>
-                          <td className="py-3 px-4 text-muted-foreground font-medium">
-                            {emp.team || '—'}
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+
+                          {/* 2. Employment Type */}
+                          <TableCell className="py-2.5 px-3">
+                            {renderTypeBadge(emp.employee_type)}
+                          </TableCell>
+
+                          {/* 3. Department / Team */}
+                          <TableCell className="py-2.5 px-3 text-xs text-muted-foreground font-medium">
+                            {emp.team || 'None'}
+                          </TableCell>
+
+                          {/* 4. Tenure */}
+                          <TableCell className="py-2.5 px-3">
                             <div>
-                              <span className="font-semibold text-foreground text-xs sm:text-sm">
+                              <span className="font-semibold text-foreground text-xs">
                                 {tenureText}
                               </span>
-                              <span className="block text-[11px] text-muted-foreground font-normal">
+                              <span className="block text-[11px] text-muted-foreground font-normal font-mono" suppressHydrationWarning>
                                 Since {formatDate(emp.joining_date)}
                               </span>
                             </div>
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+
+                          {/* 5. Status Badge */}
+                          <TableCell className="py-2.5 px-3">
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold capitalize ${
-                                emp.status?.toLowerCase() === 'confirmed'
+                                isConfirmed
                                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                                   : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
                               }`}
                             >
-                              {emp.status || 'Active'}
+                              {isConfirmed ? 'Confirmed' : 'Probation'}
                             </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Link
-                              href={`/employees/${emp.id}/profile`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
-                            >
-                              <span>View</span>
-                              <ArrowUpRight className="size-3.5" />
-                            </Link>
-                            <Link
-                              href={`/employees/${emp.id}/documents`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
-                            >
-                              <span>Documents</span>
-                            </Link>
-                          </td>
-                        </tr>
+                          </TableCell>
+
+                          {/* 6. Action Links (Matching /my-team) */}
+                          <TableCell className="py-2.5 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Link href={`/employees/${emp.id}/documents`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                                >
+                                  <FolderOpen className="h-3 w-3" />
+                                  <span>Docs</span>
+                                </Button>
+                              </Link>
+                              <Link href={`/employees/${emp.id}/profile`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 gap-1"
+                                >
+                                  <span>Profile</span>
+                                  <ChevronRight className="h-3 w-3" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       );
                     })
                   )}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
 
-            {/* Pagination Bar */}
-            <DataTablePagination
-              pageIndex={currentPage}
-              pageSize={pageSize}
-              totalItems={filtered.length}
-              pageSizeOptions={[10, 25, 50, 100]}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-              itemLabel="active employees"
-            />
-          </div>
+              {totalItems > 0 && (
+                <div className="p-3 border-t border-border">
+                  <DataTablePagination
+                    pageIndex={currentPage}
+                    pageSize={pageSize}
+                    totalItems={totalItems}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(val) => {
+                      setPageSize(val);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </Tabs>
         </TabsContent>
 
-        {/* Tab Content: EXITED EMPLOYEES */}
-        <TabsContent value="exited" className="mt-4">
-          <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase font-semibold">
-                  <tr>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('name')}
-                    >
-                      <div className="flex items-center">
-                        <span>Name</span>
-                        {renderSortIcon('name')}
-                      </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('type')}
-                    >
-                      <div className="flex items-center">
-                        <span>Employment Type</span>
-                        {renderSortIcon('type')}
-                      </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('team')}
-                    >
-                      <div className="flex items-center">
-                        <span>Team</span>
-                        {renderSortIcon('team')}
-                      </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('joining_date')}
-                    >
-                      <div className="flex items-center">
-                        <span>Joining Date</span>
-                        {renderSortIcon('joining_date')}
-                      </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('exit_date')}
-                    >
-                      <div className="flex items-center">
-                        <span>Exit Date</span>
-                        {renderSortIcon('exit_date')}
-                      </div>
-                    </th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
-                      onClick={() => handleSort('tenure')}
-                    >
-                      <div className="flex items-center">
-                        <span>Tenure</span>
-                        {renderSortIcon('tenure')}
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 text-right">Profile</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-12 text-muted-foreground text-sm">
-                        <div className="max-w-xs mx-auto space-y-2">
-                          <p className="font-medium text-foreground">No exited employees found</p>
-                          <p className="text-xs">
-                            {hasActiveFilters
-                              ? 'Try adjusting your search or filters.'
-                              : 'No past or exited employee records recorded.'}
-                          </p>
-                          {hasActiveFilters && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={clearFiltersAndSort}
-                              className="mt-2 text-xs rounded-lg"
-                            >
-                              Clear filters
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginated.map((emp) => {
-                      const tenureText = calculateTenure(emp.joining_date, emp.exit_date);
-
-                      return (
-                        <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-foreground">
-                            <div className="flex items-center gap-2.5">
-                              <div className="size-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center font-bold text-xs shrink-0">
-                                {emp.name?.charAt(0) || 'U'}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="truncate text-foreground text-sm font-semibold">
-                                    {emp.name}
-                                  </span>
-                                  {emp.is_alumni && (
-                                    <Badge variant="secondary" className="shrink-0 text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60 px-1.5 py-0 h-4">
-                                      Alumni
-                                    </Badge>
-                                  )}
-                                </div>
-                                {emp.email && (
-                                  <span className="block truncate text-xs text-muted-foreground font-normal">
-                                    {emp.email}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">{renderTypeBadge(emp.employee_type)}</td>
-                          <td className="py-3 px-4 text-muted-foreground font-medium">
-                            {emp.team || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-muted-foreground">
-                            {formatDate(emp.joining_date)}
-                          </td>
-                          <td className="py-3 px-4 text-muted-foreground">
-                            {emp.exit_date ? (
-                              <span className="font-medium text-rose-600 dark:text-rose-400">
-                                {formatDate(emp.exit_date)}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-semibold text-foreground text-xs sm:text-sm">
-                              {tenureText}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Link
-                              href={`/employees/${emp.id}/profile`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
-                            >
-                              <span>View</span>
-                              <ArrowUpRight className="size-3.5" />
-                            </Link>
-                            <Link
-                              href={`/employees/${emp.id}/documents`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
-                            >
-                              <span>Documents</span>
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Bar */}
-            <DataTablePagination
-              pageIndex={currentPage}
-              pageSize={pageSize}
-              totalItems={filtered.length}
-              pageSizeOptions={[10, 25, 50, 100]}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-              itemLabel="exited employees"
-            />
-          </div>
+        {/* Tab 2: Org Chart with Department Filter */}
+        <TabsContent value="chart" className="m-0">
+          <OrgChart
+            employees={employees}
+            title="Company Organization Chart"
+            subtitle="Explore organizational hierarchy, reporting managers, and department teams."
+            showDepartmentFilter={true}
+          />
         </TabsContent>
       </Tabs>
     </div>

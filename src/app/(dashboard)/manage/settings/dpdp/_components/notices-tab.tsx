@@ -30,9 +30,9 @@ export const NoticesTab = ({ bundle, canEdit }: { bundle: DpdpSettingsBundle; ca
     <div className="space-y-4">
       <Panel
         title="Languages"
-        description="A person may read a notice in English or any Eighth Schedule language. English is always offered; add Hindi at least."
+        description="A person may read a notice in English or Hindi. English is always offered; add Hindi as needed."
       >
-        <fieldset disabled={!canEdit || pending} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <fieldset disabled={!canEdit || pending} className="flex flex-wrap items-center gap-6">
           {Object.entries(NOTICE_LANGUAGES).map(([code, label]) => (
             <div key={code} className="flex items-center gap-2">
               <Checkbox

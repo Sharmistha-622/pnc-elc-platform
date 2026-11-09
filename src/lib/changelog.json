@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.11.01",
+    "date": "2026-11-09",
+    "title": "Feat/role dashboard panels",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Feat/role dashboard panels"
+      }
+    ]
+  },
+  {
     "version": "2.11.00",
     "date": "2026-11-07",
     "title": "Role-specific dashboards with registry-driven panels",

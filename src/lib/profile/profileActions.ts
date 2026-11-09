@@ -7,6 +7,8 @@ import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { guardResource } from '@/lib/rbac/guard'
 import { accessFor } from '@/lib/rbac/roles'
 import { departmentOf } from '@/lib/employees/department'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { getSafeAvatarUrl } from '@/lib/avatar'
 
 export interface EmployeeProfileData {
   id: string
@@ -18,11 +20,14 @@ export interface EmployeeProfileData {
   joiningDate: string | null
   confirmationDate: string | null
   role: string
+  avatarUrl?: string | null
+  userId?: string | null
   manager: {
     id: string
     name: string
     email: string | null
     team: string | null
+    avatarUrl?: string | null
   } | null
   reportees: {
     id: string
@@ -32,6 +37,11 @@ export interface EmployeeProfileData {
     employeeType: string | null
     status: string
     joiningDate: string | null
+    confirmationDate?: string | null
+    managerId?: string | null
+    userId?: string | null
+    avatarUrl?: string | null
+    userRole?: string | null
   }[]
 }
 
@@ -71,6 +81,30 @@ export async function getMyProfileData(): Promise<{
       userEmail: user.email,
       profile: null,
       allEmployees,
+    }
+  }
+
+  // Fetch user accounts to enrich avatars, roles and user linkage
+  const userMap = new Map<string, { id: string; avatarUrl: string | null; role: string | null }>()
+  const admin = createAdminSupabaseClient()
+  if (admin) {
+    try {
+      const { data: usersData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      if (usersData?.users) {
+        for (const u of usersData.users) {
+          if (u.email) {
+            userMap.set(u.email.toLowerCase(), {
+              id: u.id,
+              avatarUrl: getSafeAvatarUrl(u.user_metadata),
+              role: (u.email.toLowerCase() === 'nitin@navgurukul.org')
+                ? 'super_admin'
+                : (u.app_metadata?.role as string) || 'member',
+            })
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch auth users for profile enrichment:', e)
     }
   }
 
@@ -117,6 +151,7 @@ export async function getMyProfileData(): Promise<{
         name: mgr.name,
         email: mgr.email ?? null,
         team: departmentOf(mgr as { team?: string | null }),
+        avatarUrl: mgr.email ? userMap.get(mgr.email.toLowerCase())?.avatarUrl || null : null,
       }
     }
   }
@@ -131,6 +166,7 @@ export async function getMyProfileData(): Promise<{
       team,
       status,
       joining_date,
+      confirmation_date,
       employee_type,
       teams(name),
       employee_types(name)
@@ -146,6 +182,11 @@ export async function getMyProfileData(): Promise<{
     employeeType: (r as any).employee_types?.name || (r as any).employee_type || 'FTE',
     status: r.status || 'active',
     joiningDate: r.joining_date ?? null,
+    confirmationDate: r.confirmation_date ?? null,
+    managerId: empRecord.id,
+    userId: r.email ? userMap.get(r.email.toLowerCase())?.id || null : null,
+    avatarUrl: r.email ? userMap.get(r.email.toLowerCase())?.avatarUrl || null : null,
+    userRole: r.email ? userMap.get(r.email.toLowerCase())?.role || null : null,
   }))
 
   const profile: EmployeeProfileData = {
@@ -158,6 +199,8 @@ export async function getMyProfileData(): Promise<{
     joiningDate: empRecord.joining_date ?? null,
     confirmationDate: empRecord.confirmation_date ?? null,
     role: userRole.role || 'Member',
+    avatarUrl: (empRecord.email ? userMap.get(empRecord.email.toLowerCase())?.avatarUrl : null) || (user.email ? userMap.get(user.email.toLowerCase())?.avatarUrl : null) || null,
+    userId: (empRecord.email ? userMap.get(empRecord.email.toLowerCase())?.id : null) || user.id,
     manager: managerInfo,
     reportees,
   }
