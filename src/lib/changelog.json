@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.12.01",
+    "date": "2026-11-10",
+    "title": "Offboarding: audit events record status, not settlement figures",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Offboarding: audit events record status, not settlement figures"
+      }
+    ]
+  },
+  {
     "version": "2.12.00",
     "date": "2026-11-09",
     "title": "Pre-exit role removal, and exits saved to the database",
