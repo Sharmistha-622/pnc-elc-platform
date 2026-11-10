@@ -33,6 +33,28 @@ interface BaseOptions {
   occurredAt?: string;
 }
 
+/**
+ * Settlement figures never go in audit metadata: the audit trail is read by
+ * roles without salary access. They stay in the F&F and clearance tables,
+ * behind those tables' own rules.
+ */
+export const SETTLEMENT_FIGURE_KEYS = [
+  'amount',
+  'asset_recovery_amount',
+  'net_payable_estimate',
+  'other_deductions',
+  'payment_reference',
+  'recovery_amount',
+] as const;
+
+function withoutSettlementFigures(metadata: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!metadata) return null;
+  const kept = Object.fromEntries(
+    Object.entries(metadata).filter(([key]) => !(SETTLEMENT_FIGURE_KEYS as readonly string[]).includes(key))
+  );
+  return Object.keys(kept).length > 0 ? kept : null;
+}
+
 function toInput(
   module: AuditModule,
   action: string,
@@ -53,7 +75,7 @@ function toInput(
     entity_type: opts.entityType ?? null,
     entity_id: opts.entityId ?? null,
     changes: opts.changes ?? null,
-    metadata: opts.metadata ?? null,
+    metadata: withoutSettlementFigures(opts.metadata),
     occurred_at: opts.occurredAt,
   };
 }
@@ -411,12 +433,12 @@ export const auditOffboarding = {
       entityType: 'offboarding_case',
     }),
 
-  fnfSettled: (o: BaseOptions & { amount?: number }) =>
+  fnfSettled: (o: BaseOptions) =>
     auditEvent(
       'offboarding',
       'offboarding.fnf.settled',
       'Full & final settlement recorded.',
-      { ...o, metadata: withDetail(o, { amount: o.amount }), entityType: 'offboarding_fnf', severity: 'notice' }
+      { ...o, entityType: 'offboarding_fnf', severity: 'notice' }
     ),
 
   accessRevoked: (o: BaseOptions & { system?: string }) =>

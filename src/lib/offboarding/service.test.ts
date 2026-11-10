@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
   self: null as null | { role: string; originalRole: string; userId: string; email: string },
   ownEmployeeId: null as string | null,
   calls: [] as string[],
+  audits: [] as Array<{ label: string; metadata: Record<string, unknown> | null | undefined }>,
   endResult: { ok: true, userId: 'u-1' } as { ok: true; userId: string | null } | { ok: false; error: string },
   preExit: [] as Array<Record<string, unknown>>,
 }))
@@ -189,8 +190,9 @@ vi.mock('@/lib/offboarding/preExitRoles', async () => {
   }
 })
 vi.mock('@/lib/audit/events', () => {
-  const record = (label: string) => async () => {
+  const record = (label: string) => async (opts?: { metadata?: Record<string, unknown> | null }) => {
     state.calls.push(label)
+    state.audits.push({ label, metadata: opts?.metadata })
   }
   return {
     auditOffboarding: new Proxy({}, { get: (_t, key) => record(`offboarding.${String(key)}`) }),
@@ -264,6 +266,7 @@ beforeEach(() => {
   state.self = null
   state.ownEmployeeId = null
   state.calls = []
+  state.audits = []
   state.endResult = { ok: true, userId: 'u-1' }
   state.preExit = []
 })
@@ -434,6 +437,21 @@ describe('working the exit', () => {
     expect(res.success).toBe(true)
     expect(rowsOf('offboarding_fnf', caseId)[0]).toMatchObject({ status: 'processed', payable_days: 12, processed_by: 'pa@example.com' })
     expect(rowsOf('offboarding_fnf', OTHER)).toHaveLength(0)
+  })
+
+  it('records F&F and asset changes in the audit trail without settlement figures', async () => {
+    const caseId = await openCase()
+    const asset = rowsOf('offboarding_asset_clearances', caseId)[0]
+    await offboarding.updateAssetClearance(caseId, asset.id as string, { return_status: 'under_recovery', recovery_amount: 500 })
+    await offboarding.updateFnFDetails(caseId, {
+      status: 'processed',
+      payable_days: 12,
+      net_payable_estimate: '42000',
+      payment_reference: 'REF-1',
+    } as never)
+    const asAudited = (label: string) => state.audits.filter((a) => a.label === label).map((a) => a.metadata)
+    expect(asAudited('offboarding.clearanceUpdated')).toContainEqual({ asset_id: asset.id })
+    expect(asAudited('offboarding.fnfSettled')).toEqual([{ status: 'processed', payable_days: 12 }])
   })
 
   it('moves the last working day and checks the 72-hour rule against the new one', async () => {

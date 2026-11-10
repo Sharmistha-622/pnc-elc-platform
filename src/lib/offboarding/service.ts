@@ -748,7 +748,7 @@ export async function updateAssetClearance(
       area: `Asset — ${asset.asset_name}`,
       status: asset.return_status,
       severity: asset.return_status === 'under_recovery' ? 'warning' : 'info',
-      metadata: { asset_id: assetId, recovery_amount: asset.recovery_amount },
+      metadata: { asset_id: assetId },
     });
   }
 
@@ -909,12 +909,7 @@ export async function updateFnFDetails(
     subject: auditSubject(caseRecord),
     actorName: actor,
     entityId: caseId,
-    metadata: {
-      status: fnf.status,
-      payable_days: fnf.payable_days,
-      payment_reference: fnf.payment_reference,
-      net_payable_estimate: fnf.net_payable_estimate,
-    },
+    metadata: { status: fnf.status, payable_days: fnf.payable_days },
   });
 
   revalidatePath(`/offboarding/${caseId}`);
