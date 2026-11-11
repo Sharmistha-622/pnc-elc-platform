@@ -45,6 +45,7 @@ insert into public.candidate_letters (candidate_name, template_name, letter_type
   values ('A Candidate', 'Offer', 'offer', 'FTE', 'Your CTC is ₹60,000 per month');
 
 insert into public.email_provider_config (id) values ('probe') on conflict do nothing;
+insert into public.mail_account_credentials (account_id, refresh_token) values ('probe', 'probe-token') on conflict do nothing;
 
 -- A review cycle for R: R reflects, M (R's manager) reviews, X is a peer.
 insert into public.review_cycles (id, kind, employee_id, manager_id, period_key, stage)
@@ -185,6 +186,8 @@ insert into pg_temp.expectations values
   ('candidate_letters',      '{pnc_admin,fin_admin,super_admin}'),
   -- Provider secrets: config editors.
   ('email_provider_config',  '{platform_admin,super_admin}'),
+  -- Mail account credentials: the service role only, no session at all.
+  ('mail_account_credentials', '{}'),
   ('audit_log',              '{pnc_admin,platform_admin,platform_ops,super_admin}'),
   -- Review cycles: the review roles, R's manager and R. Not the peer: a peer
   -- sees only their own form. Not Finance, not the platform team.
