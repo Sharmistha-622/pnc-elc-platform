@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { getActiveRedFlagKeywords, getPeerFeedbackSettings } from '@/lib/settings/service'
 import { guard } from '@/lib/rbac/guard'
 import { isTeamScoped, managesEmployee, mayReadFeedbackText } from './access'
@@ -32,6 +33,31 @@ export type CompiledFeedback = {
   responses: string[] | null
 }
 
+type FeedbackRow = {
+  id: string
+  peer_name: string | null
+  response_status: string
+  submitted_at: string | null
+  feedback_text?: string | null
+}
+
+/**
+ * Submitted texts, for the flagged-term check only, for a caller who may not
+ * read them. Read with the service role after the caller's guard and team
+ * check have passed; only whether a term matched leaves this file. Without the
+ * service key there is nothing to check, and no keyword flag is raised.
+ */
+async function submittedTextsForFlagging(confirmationId: string): Promise<string[]> {
+  const admin = createAdminSupabaseClient()
+  if (!admin) return []
+  const { data } = await admin
+    .from('peer_feedback')
+    .select('feedback_text')
+    .eq('confirmation_id', confirmationId)
+    .eq('response_status', 'submitted')
+  return ((data ?? []) as { feedback_text: string | null }[]).map((r) => r.feedback_text ?? '')
+}
+
 // Fallback keyword list and threshold if settings are unseeded
 const DEFAULT_RED_FLAG_KEYWORDS = ['concern', 'issue', 'problem', 'difficult', 'poor', 'unprofessional', 'late']
 const DEFAULT_RESPONSE_THRESHOLD = 0.5
@@ -61,18 +87,27 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
     return null
   }
 
-  const { data: feedbackRows, error: feedbackError } = await supabase
-    .from('peer_feedback')
-    .select('*')
-    .eq('confirmation_id', confirmationId)
+  // A status-only reader (PnC Ops) reads who was asked and who answered from
+  // `peer_feedback_status`; the database gives them no text. Everyone else
+  // reads the rows themselves.
+  const { data: feedbackRows, error: feedbackError } = canReadText
+    ? await supabase
+        .from('peer_feedback')
+        .select('id, peer_name, response_status, submitted_at, feedback_text')
+        .eq('confirmation_id', confirmationId)
+    : await supabase
+        .from('peer_feedback_status')
+        .select('id, peer_name, response_status, submitted_at')
+        .eq('confirmation_id', confirmationId)
 
   if (feedbackError) {
     console.error('Error fetching feedback:', feedbackError.message)
     return null
   }
 
-  const totalNominated = feedbackRows?.length || 0
-  const submitted = feedbackRows?.filter((f) => f.response_status === 'submitted') || []
+  const rows = (feedbackRows ?? []) as FeedbackRow[]
+  const totalNominated = rows.length
+  const submitted = rows.filter((f) => f.response_status === 'submitted')
   const totalSubmitted = submitted.length
   const totalPending = totalNominated - totalSubmitted
 
@@ -94,8 +129,11 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
     redFlagReason = `Less than ${Math.round(threshold * 100)}% of nominated peers have responded`
   }
 
-  for (const entry of submitted) {
-    const text = (entry.feedback_text || '').toLowerCase()
+  const texts = canReadText
+    ? submitted.map((f) => f.feedback_text ?? '')
+    : await submittedTextsForFlagging(confirmationId)
+  for (const entry of texts) {
+    const text = entry.toLowerCase()
     const matchedKeyword = keywords.find((kw) => text.includes(kw.toLowerCase()))
     if (matchedKeyword) {
       redFlag = true
@@ -118,9 +156,9 @@ export async function getCompiledFeedback(confirmationId: string): Promise<Compi
     totalPending,
     redFlag,
     redFlagReason,
-    peers: (feedbackRows || []).map((f) => ({
+    peers: rows.map((f) => ({
       id: f.id,
-      peerName: f.peer_name,
+      peerName: f.peer_name ?? '',
       responseStatus: f.response_status,
       submittedAt: f.submitted_at,
     })),
