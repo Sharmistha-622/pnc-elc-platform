@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.13.00",
+    "date": "2026-11-11",
+    "title": "Candidate portal links carry an end date",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "candidate portal links expire after the period set in DPDP & Privacy (7 days by default), and each resend issues a new link"
+      },
+      {
+        "category": "Improvements",
+        "description": "a candidate with an expired or unknown link is told what to do, instead of the portal never finishing loading"
+      }
+    ]
+  },
+  {
     "version": "2.12.02",
     "date": "2026-11-11",
     "title": "Keep mail account credentials apart from settings",
