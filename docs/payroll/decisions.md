@@ -58,7 +58,7 @@ inputs still owed.
 
 | # | Decision | Detail | Owner |
 |---|---|---|---|
-| D-19 | Phase 1 is everything needed to run payroll | Compute and validations, bank files, payslips, statutory files, salary TDS (both regimes, with declarations), advances / loans, one-time bonus / incentive, arrears. | Nitin |
+| D-19 | Phase 1 is everything needed to run payroll | Compute and validations, bank files, payslips, statutory files, salary TDS (both regimes; employees' TDS declarations come in a later phase, O-07), advances / loans, one-time bonus / incentive, arrears. | Nitin |
 | D-20 | Later or out of scope | Consultant invoices (OTP e-accept, RM approval) come later. Reimbursements are out of scope; the reimbursement dashboard's API can be read later for extra data points if needed. | Nitin |
 | D-21 | Allocation | A person can be 100% on one project and donor, split across projects for one donor, or split across several projects and donors. | Nitin |
 | D-22 | Employee self-view | Monthly payslips, current salary structure, Form 16, and raising a payroll query. | Nitin |
@@ -94,13 +94,13 @@ calculator; detail and worked examples in [`pnc-rules.md`](./pnc-rules.md).
 
 | # | Question | Options | Owner | Status |
 |---|---|---|---|---|
-| O-01 | `ftc` label | Rename ELC's `ftc` to "Fixed-term employee" and add `consultant_ft`; or keep `ftc` = Full-Time Consultant and add `fixed_term`. Existing rows need mapping either way. | Nitin + P&C | Open |
+| O-01 | `ftc` label | Rename ELC's `ftc` to "Fixed-term employee" and add `consultant_ft`; or keep `ftc` = Full-Time Consultant and add `fixed_term`. Existing rows need mapping either way. | P&C | Open. Nitin has no preference (2026-11-11); P&C decides, together with onboarding #6 |
 | O-02 | Sign-off chain | Which roles, in which order, for regular, FnF and adjustment runs. Is there a CEO step in the system? `exec_view` is view-only, so an approver needs a `ceo` role or an `approve_payroll` qualifier. | Nitin + Finance | Open |
 | O-03 | Totals through core | Totals contain amounts. Serving them to managers (who have no vault login) means core proxies a vault aggregate. Acceptable, given no individual figures? | Nitin | **Decided 2026-11-04:** yes, but to the head of department only (`departments.head_of_department_id`), for their own department. Never to line managers. A department with fewer than 3 people shows no total, because it would give away individual pay |
 | O-04 | Vault secrets in Vercel | `CORE_SUBMISSION_SECRET` marked Sensitive; production env editable by owners only. Confirm who those owners are. | Nitin | **Decided 2026-11-04:** Nitin and Sharmistha, for now |
-| O-05 | Sheets export and residency | Google Sheets export puts amounts in Google Drive. Allowed, or CSV / XLSX download only? | Finance | Open |
-| O-06 | xlsx library | Needed for imports and exports. Choice deferred to the slice that needs it. | Tech | Open |
-| O-07 | TDS declarations in Phase 1 | The scope document puts the declaration portal out of Phase 1; D-19 puts it in. Confirm. | Finance | Open |
+| O-05 | Sheets export and residency | Google Sheets export puts amounts in Google Drive. Allowed, or CSV / XLSX download only? | Nitin | **Decided 2026-11-11:** CSV / XLSX download only; no amounts in Drive. Every download is audit-logged with the person, their email, the time and a reason they give, which is asked for before the file is made (DPDP) |
+| O-06 | xlsx library | Needed for imports and exports. Choice deferred to the slice that needs it. | Tech | **Decided 2026-11-11:** `exceljs` (MIT, maintained on npm, reads and writes). Not SheetJS: its npm release is old and carries a security advisory |
+| O-07 | TDS declarations in Phase 1 | The scope document puts the declaration portal out of Phase 1; D-19 puts it in. Confirm. | Nitin | **Decided 2026-11-11:** a later phase, as the scope document says. Phase 1 computes salary TDS without the declarations portal; D-19 is corrected |
 
 ## Open — Finance inputs
 

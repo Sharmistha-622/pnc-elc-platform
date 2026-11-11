@@ -533,6 +533,7 @@ under IT Act s. 43A, which lapses on 13 May 2027 `[visionwingsmarketing]`.
 | Labour Codes (in force 21 Nov 2025; Central Rules 8 May 2026) `[hrcalcy]` | In force | Electronic registers allowed; 5-year retention `[hrcalcy]`. Model Standing Orders require worker records to include mobile, email and ESI number `[business-standard] [hrcalcy]` |
 | Income-tax Act 2025 / Rules 2026, Companies Act 2013, FCRA 2010 | In force | Retention minimums (§3.5); FCRA salary records available for inspection |
 | POSH Act 2013 | In force | Confidentiality of complaints (s. 16); restricted storage |
+| Transgender Persons (Protection of Rights) Act 2019 | In force | Recognises a person's self-perceived gender identity (s. 4). The specified reason the candidate form offers **Transgender** as a gender option; gender stays optional, with no default (decided 2026-11-11) |
 | RTI amendment via DPDP s. 44(3) | In force; under Supreme Court challenge `[dpdprules]` | Not directly relevant (NavGurukul is not a public authority) |
 
 ---

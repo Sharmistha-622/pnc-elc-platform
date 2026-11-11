@@ -159,10 +159,11 @@ Review these four lists quarterly, alongside `vault_roles`.
 
 The vault-related decisions in [`rbac.md`](./rbac.md) (#3 candidate access,
 #6 withdrawn joiners' documents, #9 full document numbers) were settled on
-2026-11-04. This document's own three were settled the same day:
+2026-11-04. This document's own three were settled the same day, and P4 on 2026-11-11:
 
 | # | Question | Decision |
 |---|---|---|
 | P1 | Do contact details (phone, address, emergency contact, date of birth) belong in the vault? | **No.** They stay in core behind RLS (the person themselves, plus identity-edit roles). They are needed daily and low-harm next to the list above. ID and address-proof **numbers** go to the vault |
 | P2 | Where do rendered letters live? | **In the vault**, delivered through the `letter` route. Core keeps type, status and signature date. This needs a vault letter store, which does not exist yet |
 | P3 | Should confirmation and appraisal form answers seal like peer feedback? | **Yes**, same trigger (the cycle closes) and the same 30-day budget |
+| P4 | Are the sealing budgets fixed ceilings? | **Yes** (2026-11-11, #111). At most 14 days for a verified document and 30 days for written feedback, enforced in `dpdp_settings`. PnC can lower either in Settings, never raise it |

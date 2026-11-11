@@ -1,5 +1,4 @@
 import { DEFAULT_OPTIONAL_FIELDS } from '../optional-fields'
-import { DEFAULT_DRIVE_COPY_TYPES } from '@/lib/onboarding/document-classes'
 import type { DpdpSettings } from './types'
 
 /**
@@ -28,7 +27,8 @@ export const DEFAULT_DPDP_SETTINGS: DpdpSettings = {
   staging_budget_feedback_days: 30,
   retention_mode: 'dry_run',
   optional_fields: DEFAULT_OPTIONAL_FIELDS,
-  drive_copy_document_types: [...DEFAULT_DRIVE_COPY_TYPES],
+  // Nothing is copied to Drive unless PnC chooses types (decided 2026-11-11).
+  drive_copy_document_types: [],
   breach_internal_contacts: '',
   certin_contact: '',
   board_contact: '',
