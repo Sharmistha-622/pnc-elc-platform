@@ -31,7 +31,10 @@ export async function nominatePeers(
   // would never arrive.
   if (peers.some((peer) => peer.email && !isAllowedEmail(peer.email))) return null
 
-   const rows = peers.map((peer) => ({
+  // Ids are made here, so the insert needs no read-back: a status-only role
+  // (PnC Ops) may nominate peers but may not read the feedback rows.
+  const rows = peers.map((peer) => ({
+    id: crypto.randomUUID(),
     confirmation_id: confirmationId,
     peer_name: peer.name,
     peer_email: peer.email || null,
@@ -39,10 +42,7 @@ export async function nominatePeers(
     response_status: 'pending',
   }))
 
-  const { data, error } = await supabase
-    .from('peer_feedback')
-    .insert(rows)
-    .select()
+  const { error } = await supabase.from('peer_feedback').insert(rows)
 
   if (error) {
     console.error('Error nominating peers:', error.message, error.details, error.hint)
@@ -55,7 +55,7 @@ export async function nominatePeers(
   // Send notification email to each peer that has an email address
   for (let i = 0; i < peers.length; i++) {
     const peer = peers[i]
-    const feedbackRecord = data?.[i]
+    const feedbackRecord = rows[i]
 
     if (peer.email && feedbackRecord) {
       const feedbackLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/feedback/${feedbackRecord.id}`
@@ -79,5 +79,5 @@ export async function nominatePeers(
     metadata: { peers: peers.map((p) => p.name) },
   })
 
-  return data
+  return rows
 }

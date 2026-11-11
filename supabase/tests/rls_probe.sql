@@ -178,7 +178,9 @@ insert into pg_temp.expectations values
   ('confirmations',          '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,exec_view,super_admin}'),
   -- Feedback text: never the subject, never Finance or the platform team.
   -- (pnc_ops is a known, documented residual — see the migration.)
-  ('peer_feedback',          '{"peer (X)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  ('peer_feedback',          '{"peer (X)","manager (M)",pnc_admin,exec_view,super_admin}'),
+  -- Who was asked and who answered, never the text: PnC Ops reads this.
+  ('peer_feedback_status',   '{"manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
   -- Full and final is salary.
   ('offboarding_fnf',        '{pnc_admin,fin_admin,super_admin}'),
   ('offboarding_cases',      '{pnc_ops,pnc_admin,fin_admin,super_admin}'),
@@ -324,6 +326,23 @@ do $$
 begin
   if (select state_code from public.ng_locations where name = 'Navigo Pune') is distinct from 'GA' then
     insert into pg_temp.failures values ('pnc_admin', 'ng_locations', 'can set a location''s state', 0);
+  end if;
+end $$;
+
+-- PnC Ops nominates peers; only the peer and P&C admins change a feedback row.
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('ops@navgurukul.org'), false); end $$;
+set role authenticated;
+update public.peer_feedback set feedback_text = 'rewritten';
+insert into public.peer_feedback (id, confirmation_id, peer_name, response_status)
+  values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000c1', 'Nominated', 'pending');
+reset role;
+do $$
+begin
+  if exists (select 1 from public.peer_feedback where feedback_text = 'rewritten') then
+    insert into pg_temp.failures values ('pnc_ops', 'peer_feedback', 'feedback text unchanged', 1);
+  end if;
+  if not exists (select 1 from public.peer_feedback where id = '00000000-0000-0000-0000-0000000000f9') then
+    insert into pg_temp.failures values ('pnc_ops', 'peer_feedback', 'can nominate a peer', 0);
   end if;
 end $$;
 
