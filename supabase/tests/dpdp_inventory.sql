@@ -617,6 +617,7 @@ insert into dpdp_inventory (store, table_name, column_name, class, staged, perso
   ('core', 'onboarding_records', 'status', 'meta', false, true),
   ('core', 'onboarding_records', 'progress_percentage', 'meta', false, true),
   ('core', 'onboarding_records', 'invitation_token', 'meta', false, true),
+  ('core', 'onboarding_records', 'invitation_expires_at', 'meta', false, true),
   ('core', 'onboarding_records', 'invited_at', 'meta', false, true),
   ('core', 'onboarding_records', 'submitted_at', 'meta', false, true),
   ('core', 'onboarding_records', 'approved_at', 'meta', false, true),

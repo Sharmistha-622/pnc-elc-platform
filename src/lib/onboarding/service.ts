@@ -27,6 +27,7 @@ import {
 } from './types';
 import { GENERATED_DOCUMENT_LABELS } from './types';
 import { onboardingDb, assertOk, isUuid, mapRecord, RECORD_SELECT } from './db';
+import { getPortalPrivacySettings } from '@/lib/dpdp/portal';
 import { upsertSalaryStructure } from './salary';
 import { renderLettersForRecord, storeGeneratedLetters } from './letter-generation';
 import { sendInvitationEmail } from './invitation-email';
@@ -255,11 +256,23 @@ const PORTAL_CLOSED_STATUS = new Set(['completed']);
  * a session and a role check.
  */
 export async function getOnboardingByToken(token: string): Promise<FullOnboardingData | null> {
-  if (!token || isUuid(token)) return null;
-  const db = onboardingDb();
-  const res = await db
+  const link = await portalLink(token);
+  return link.state === 'open' ? getOnboardingById(link.id) : null;
+}
+
+export type PortalLinkState = { state: 'open'; id: string } | { state: 'expired' } | { state: 'unknown' };
+
+/**
+ * Whether a portal link works. A link is good until its end date
+ * (`invitation_expires_at`), which each send of the invitation sets; one
+ * without an end date was never sent and does not work. A closed record's
+ * link reads as unknown, as before.
+ */
+export async function portalLink(token: string, now: Date = new Date()): Promise<PortalLinkState> {
+  if (!token || isUuid(token)) return { state: 'unknown' };
+  const res = await onboardingDb()
     .from('onboarding_records')
-    .select('id, status, joiner_status')
+    .select('id, status, joiner_status, invitation_expires_at')
     .eq('invitation_token', token)
     .maybeSingle();
   assertOk(res.error, 'Failed to load onboarding record by token');
@@ -268,9 +281,11 @@ export async function getOnboardingByToken(token: string): Promise<FullOnboardin
     PORTAL_CLOSED_JOINER.has(res.data.joiner_status as string) ||
     PORTAL_CLOSED_STATUS.has(res.data.status as string)
   ) {
-    return null;
+    return { state: 'unknown' };
   }
-  return getOnboardingById(res.data.id as string);
+  const expiresAt = res.data.invitation_expires_at ? new Date(res.data.invitation_expires_at as string) : null;
+  if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt <= now) return { state: 'expired' };
+  return { state: 'open', id: res.data.id as string };
 }
 
 /**
@@ -456,10 +471,16 @@ export async function sendOnboardingInvitation(id: string): Promise<FullOnboardi
   const data = await getOnboardingById(id);
   if (!data) return null;
 
+  // Every send issues a new link with a new end date, so a resend also ends
+  // the previous link. The window is the DPDP setting (1 to 30 days).
+  const { invitation_validity_days: validityDays } = await getPortalPrivacySettings();
+  const token = generateInvitationToken(data.record.candidate_name);
+  const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+
   // Send first, record second. A record marked `invited` when nothing was sent
   // is worse than one still marked `draft`: it tells P&C the candidate has the
-  // link when they do not.
-  const result = await sendInvitationEmail(data.record);
+  // link when they do not. Until the new link is saved, the old one stands.
+  const result = await sendInvitationEmail({ ...data.record, invitation_token: token });
 
   if (!result.sent) {
     await logActivity(
@@ -473,7 +494,7 @@ export async function sendOnboardingInvitation(id: string): Promise<FullOnboardi
   }
 
   const now = new Date().toISOString();
-  await touchRecord(id, { status: 'invited', invited_at: now });
+  await touchRecord(id, { status: 'invited', invited_at: now, invitation_token: token, invitation_expires_at: expiresAt });
 
   await logActivity(
     id,

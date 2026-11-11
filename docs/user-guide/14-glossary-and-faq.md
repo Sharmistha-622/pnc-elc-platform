@@ -71,8 +71,9 @@ for everyone.
 
 **A candidate says they didn't get the invitation.**
 Check **Email Center › Delivery Monitor & Outbox**, and the email address on
-the candidate. Then use **Resend Invitation Email** on the candidate. (*Resend*
-in the outbox doesn't send anything.)
+the candidate. Then use **Resend Invitation Email** on the candidate. It sends
+a new link, valid for 7 days, and the old one stops working. (*Resend* in the
+outbox doesn't send anything.)
 
 **Why can't PnC Ops make an offer?**
 Making an offer means entering the CTC, which is salary data. Only PnC Admin

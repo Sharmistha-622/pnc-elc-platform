@@ -40,8 +40,6 @@ real work.** Items are grouped by area.
 - The **Letters & Annexure** tab on the review page may show placeholder text
   instead of the real letter. Use **Issued Letters** to read the real one.
 - On the **Final Review** tab, approval doesn't require the checks to pass.
-- Invitation links **don't expire by date**, despite "7-day token link" on
-  the Overview.
 - The candidate list's **team filter** is a fixed list, not the department
   list.
 - The **hardware panel**, and the **manager calendar** used to pick check-in

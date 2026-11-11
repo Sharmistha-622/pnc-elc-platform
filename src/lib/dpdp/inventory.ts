@@ -260,7 +260,7 @@ const CORE_TABLES: InventoryTable[] = [
     none: 'title, description, content',
   }),
   personal('core', 'onboarding_records', { principals: ['candidate'], basis: '7a', retention: 'rejected_candidates', processors: CORE_MAIL }, {
-    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status, withdrawn_at`,
+    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invitation_expires_at, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status, withdrawn_at`,
     general: 'candidate_name, designation, department, location, joining_date, probation_period, notice_period, is_alumni, role_responsibilities, manager_name, buddy_name, guardian_consent_status',
     contact: 'personal_email, phone',
     salary: 'ctc, ctc_amount, ctc_frequency',
