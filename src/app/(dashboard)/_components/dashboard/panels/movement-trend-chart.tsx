@@ -27,16 +27,27 @@ export function MovementTrendChart({ rows }: { rows: MovementTrendRow[] }) {
     .join("; ");
 
   return (
-    <div className="space-y-3" aria-label={`Monthly movement chart. ${summary}`}>
-      <ChartContainer config={chartConfig} className="h-60 w-full">
+    <div className="space-y-2" aria-label={`Monthly movement chart. ${summary}`}>
+      <div className="flex items-center justify-end gap-3 text-xs font-medium">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="size-2 rounded-full bg-[var(--color-chart-1)]" />
+          Joiners
+        </span>
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="size-2 rounded-full bg-[var(--color-chart-2)]" />
+          Exits
+        </span>
+      </div>
+
+      <ChartContainer config={chartConfig} className="h-52 w-full">
         <BarChart data={rows} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/40" />
           <XAxis
             dataKey="month"
             tickLine={false}
             tickMargin={10}
             axisLine={false}
-            className="text-xs text-muted-foreground"
+            className="text-xs text-muted-foreground font-medium"
           />
           <YAxis
             tickLine={false}
@@ -45,8 +56,8 @@ export function MovementTrendChart({ rows }: { rows: MovementTrendRow[] }) {
             allowDecimals={false}
           />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="joiners" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="exits" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="joiners" fill="var(--color-chart-1)" barSize={12} radius={[9999, 9999, 0, 0]} />
+          <Bar dataKey="exits" fill="var(--color-chart-2)" barSize={12} radius={[9999, 9999, 0, 0]} />
         </BarChart>
       </ChartContainer>
 
@@ -73,4 +84,3 @@ export function MovementTrendChart({ rows }: { rows: MovementTrendRow[] }) {
     </div>
   );
 }
-

@@ -69,6 +69,17 @@ import {
 } from '@/components/ui/select'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 
+const appraisalChartConfig = {
+  july: {
+    label: 'July Mid-Year',
+    color: 'var(--color-chart-1)',
+  },
+  december: {
+    label: 'December Year-End',
+    color: 'var(--color-chart-2)',
+  },
+} satisfies ChartConfig
+
 interface ReportsViewProps {
   data: UnifiedReportsData
 }
@@ -582,53 +593,52 @@ export function ReportsView({ data }: ReportsViewProps) {
                     Comparison of July vs December appraisal review cohorts across largest functional teams
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-3 text-xs">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="size-2.5 rounded-full bg-amber-500" />
+                    <span className="size-2 rounded-full bg-[var(--color-chart-1)]" />
                     July ({julyCycle})
                   </span>
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="size-2.5 rounded-full bg-emerald-500" />
+                    <span className="size-2 rounded-full bg-[var(--color-chart-2)]" />
                     December ({decemberCycle})
                   </span>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-4">
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={appraisalChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                    <XAxis dataKey="team" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      cursor={false}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload
-                          return (
-                            <div className="rounded-lg border border-border/80 bg-popover text-popover-foreground p-2.5 shadow-md text-xs space-y-1">
-                              <p className="font-bold text-foreground">{data.team}</p>
-                              <p className="text-amber-700 dark:text-amber-400 font-mono">
-                                July Cycle: {data.july}
-                              </p>
-                              <p className="text-emerald-700 dark:text-emerald-400 font-mono">
-                                December Cycle: {data.december}
-                              </p>
-                              <p className="font-semibold border-t border-border/60 pt-1 font-mono text-foreground">
-                                Total: {data.total}
-                              </p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }}
-                    />
-                    <Bar dataKey="july" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                    <Bar dataKey="december" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <ChartContainer config={appraisalChartConfig} className="h-64 w-full">
+                <BarChart data={appraisalChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                  <XAxis dataKey="team" tickLine={false} axisLine={false} className="text-xs text-muted-foreground font-medium" />
+                  <YAxis tickLine={false} axisLine={false} className="text-xs text-muted-foreground" allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="july" fill="var(--color-chart-1)" barSize={12} radius={[9999, 9999, 0, 0]} />
+                  <Bar dataKey="december" fill="var(--color-chart-2)" barSize={12} radius={[9999, 9999, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+
+              {/* Accessible screen-reader table alternative */}
+              <table className="sr-only">
+                <caption>Cohort distribution by functional team</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Team</th>
+                    <th scope="col">July Mid-Year</th>
+                    <th scope="col">December Year-End</th>
+                    <th scope="col">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appraisalChartData.map((row) => (
+                    <tr key={row.team}>
+                      <td>{row.team}</td>
+                      <td>{row.july}</td>
+                      <td>{row.december}</td>
+                      <td>{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
 
