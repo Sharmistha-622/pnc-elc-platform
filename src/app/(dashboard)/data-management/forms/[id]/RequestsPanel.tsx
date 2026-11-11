@@ -84,13 +84,13 @@ export async function RequestsPanel({
       <div>
         <h2 className="font-semibold">Send this form</h2>
         <p className="text-sm text-gray-600">
-          The person finds it under <strong>My Forms</strong> after signing in. Email links come later.
+          The person finds it under <strong>My Forms</strong> and is emailed a direct link to open it.
         </p>
       </div>
 
       {sent === '1' && (
         <div className="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800">
-          Form sent. It now appears under My Forms for that person.
+          Form sent. It now appears under My Forms for that person, and an email notification has been sent.
         </div>
       )}
 

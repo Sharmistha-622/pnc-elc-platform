@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { escapeHtml, sendEmail } from '@/lib/email/sendEmail'
+import { guard } from '@/lib/rbac/guard'
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`)
@@ -21,6 +24,9 @@ export async function createFormRequest(formData: FormData): Promise<void> {
   const expiresInDays = Number(text(formData, 'expiresInDays'))
   const path = `/data-management/forms/${formId}`
 
+  const allowed = await guard('dataManagement')
+  if (!allowed.ok) fail(path, allowed.error)
+
   if (!respondentId) fail(path, 'Choose who should fill in the form')
 
   const supabase = await createServerSupabaseClient()
@@ -37,7 +43,7 @@ export async function createFormRequest(formData: FormData): Promise<void> {
 
   const { data: form } = await supabase
     .from('forms')
-    .select('archived_at')
+    .select('name, archived_at')
     .eq('id', formId)
     .maybeSingle()
   if (form?.archived_at) fail(path, 'This form is archived. Restore it before sending it.')
@@ -62,7 +68,9 @@ export async function createFormRequest(formData: FormData): Promise<void> {
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
       : null
 
+  const requestId = crypto.randomUUID()
   const { error } = await supabase.from('form_requests').insert({
+    id: requestId,
     form_version_id: versionId,
     respondent_employee_id: respondentId,
     subject_employee_id: subjectId || null,
@@ -70,6 +78,53 @@ export async function createFormRequest(formData: FormData): Promise<void> {
     expires_at: expiresAt,
   })
   if (error) fail(path, error.message)
+
+  try {
+    const db = createAdminSupabaseClient() ?? supabase
+    const { data: respondent } = await db
+      .from('employees')
+      .select('id, name, email')
+      .eq('id', respondentId)
+      .maybeSingle()
+
+    const recipientEmail = (
+      respondent as { name?: string | null; email?: string | null } | null
+    )?.email?.trim()
+    if (recipientEmail) {
+      const recipientName =
+        (respondent as { name?: string | null } | null)?.name?.trim() || 'Colleague'
+      const formName = (form as { name?: string | null } | null)?.name?.trim() || 'Form'
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(
+        /\/$/,
+        ''
+      )
+      const formUrl = `${appUrl}/my-forms/${requestId}`
+      const dueDateLabel = expiresAt
+        ? new Date(expiresAt).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            timeZone: 'Asia/Kolkata',
+          })
+        : ''
+      const dueClause = dueDateLabel
+        ? ` Please complete it by <strong>${escapeHtml(dueDateLabel)}</strong>.`
+        : ''
+
+      await sendEmail(
+        'form_assigned',
+        {
+          recipient_name: recipientName,
+          form_name: formName,
+          due_clause: dueClause,
+          form_url: formUrl,
+        },
+        recipientEmail
+      )
+    }
+  } catch (err) {
+    console.warn('[createFormRequest] Could not send form assignment email:', err)
+  }
 
   revalidatePath(path)
   redirect(`${path}?sent=1`)
