@@ -24,6 +24,7 @@ for f in "${ROOT}"/supabase/migrations/*.sql; do
   sed '/transaction_timeout/d' "$f" | psql_ -d "${DB}" -f - >/dev/null
 done
 
+psql_ -d "${DB}" -f "${ROOT}/supabase/tests/team_tree.sql"
 psql_ -d "${DB}" -f "${ROOT}/supabase/tests/rls_probe.sql"
 echo "RLS probe passed: every persona sees exactly what the matrix allows."
 psql_ -d postgres -c "drop database ${DB}"
