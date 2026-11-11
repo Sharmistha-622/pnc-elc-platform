@@ -45,6 +45,8 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
 import { OrgChart } from '@/components/shared/org-chart';
+import { useUserContext } from '@/contexts/user-context';
+import { canHandleDocuments } from '@/lib/documents/access';
 import { Employee } from '@/lib/employees/getEmployees';
 import {
   calculateTenure,
@@ -57,6 +59,10 @@ type SortField = 'name' | 'type' | 'team' | 'tenure' | 'joining_date' | 'exit_da
 type SortOrder = 'asc' | 'desc';
 
 export function EmployeesTable({ employees }: { employees: Employee[] }) {
+  const user = useUserContext();
+  // Fin Admin, Fin Ops and Exec View reach this directory but not ID
+  // documents; the documents page refuses them, so the link is not shown.
+  const canOpenDocuments = canHandleDocuments(user?.role ?? null);
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const [activeTab, setActiveTab] = useState<'active' | 'exited'>('active');
   const [search, setSearch] = useState('');
@@ -708,16 +714,18 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
                           {/* 6. Action Links (Matching /my-team) */}
                           <TableCell className="py-2.5 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Link href={`/employees/${emp.id}/documents`}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-                                >
-                                  <FolderOpen className="h-3 w-3" />
-                                  <span>Docs</span>
-                                </Button>
-                              </Link>
+                              {canOpenDocuments && (
+                                <Link href={`/employees/${emp.id}/documents`}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                                  >
+                                    <FolderOpen className="h-3 w-3" />
+                                    <span>Docs</span>
+                                  </Button>
+                                </Link>
+                              )}
                               <Link href={`/employees/${emp.id}/profile`}>
                                 <Button
                                   variant="ghost"
@@ -762,6 +770,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
             title="Company Organization Chart"
             subtitle="Explore organizational hierarchy, reporting managers, and department teams."
             showDepartmentFilter={true}
+            canOpenDocuments={canOpenDocuments}
           />
         </TabsContent>
       </Tabs>
