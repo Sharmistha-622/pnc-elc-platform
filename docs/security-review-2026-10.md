@@ -105,17 +105,16 @@ In order:
 
 ## Known gaps, not fixed here
 
-| Gap | Why it stays for now | Next step |
-|---|---|---|
-| PnC Ops can still select `peer_feedback.feedback_text` through the database API. The app withholds it. | A row policy cannot hide one column, and their status reads in the app use the table | Move their reads to the `peer_feedback_status` view, then drop `pnc_ops` from the policy |
-| Every staff session can read the directory (name, team, email, dates). The matrix gives an Employee their own record only. | Peer feedback, forms and profiles show colleagues' names | A narrow `directory` view, and the table closed to the `employee` role |
-| Salary, ID scans, bank proofs and feedback text still live in core | That is the vault migration ([`vault-inventory.md`](./vault-inventory.md)) | Build the vault, then migrate one resource at a time |
-| The candidate portal promises a 7-day link, but tokens never expire | Expiring tokens mid-onboarding needs a product decision on the window | Add `invitation_expires_at` and refuse after it |
-| Any staff session can append to audit and email logs (not edit or delete) | Several flows write logs through the session client | Move every log write to the service role, then drop the insert policies |
-| Some audit events put reasons and amounts in `description` | The audit API now hides details from the platform roles | Move the values to `metadata` |
-| The audit backfill re-runs on every cold start | It is not access control | Replace it with a one-off migration |
-| The data-management sub-pages show hard-coded demo records, with staff emails | Placeholder screens | Wire them to real data, or remove them |
-| 654 lint warnings, mostly `any` and unused variables | Pre-existing | Turn each rule back into an error once its count reaches zero |
+| Area | Next step |
+|---|---|
+| Audit and email log writes | Move every log write to the service role, then drop the insert policies |
+| Audit event descriptions | Move reasons and amounts to `metadata` |
+| Salary, ID scans, bank proofs and feedback text in core | The vault migration ([`vault-inventory.md`](./vault-inventory.md)): build the vault, then migrate one resource at a time |
+| The audit backfill on every cold start | Replace it with a one-off migration |
+| Data-management sub-pages with hard-coded demo records | Wire them to real data, or remove them |
+| 654 lint warnings, mostly `any` and unused variables | Turn each rule back into an error once its count reaches zero |
+
+Further items are tracked privately.
 
 ## What now runs on every pull request
 
