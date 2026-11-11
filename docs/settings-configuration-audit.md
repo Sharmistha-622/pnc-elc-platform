@@ -32,7 +32,7 @@
 | Intern confirmation | `getConfirmationTriggerDate.ts:9` | 3 months | 3 months | Business may change probation window | `confirmation_rules.intern.offset_value` | integer | 3 | **CONFIGURABLE** |
 | FTE confirmation | `getConfirmationTriggerDate.ts:10` | **12 months** | **3 months** | ⚠️ Code says 12, approved requirement says 3 | `confirmation_rules.fte.offset_value` | integer | **3** (per approved req) | **CONFIGURABLE** |
 | FTC confirmation | `getConfirmationTriggerDate.ts:11` | 3 months | 3 months (fulltime_associate) | Business may change probation window | `confirmation_rules.ftc.offset_value` | integer | 3 | **CONFIGURABLE** |
-| Contractor confirmation | `getConfirmationTriggerDate.ts:12` | `null` (not calculated) | Pending business decision | Should remain manual until business decides | `confirmation_rules.contractor.enabled` | boolean | false | **NEEDS BUSINESS CONFIRMATION** |
+| Contractor confirmation | `getConfirmationTriggerDate.ts:12` | `null` (not calculated) | **Manual** (decided 2026-11-11, #145) | Handled by hand; no rule | `confirmation_rules.contractor.enabled` | boolean | false | **DECIDED** |
 | Confirmation offset unit | `getConfirmationTriggerDate.ts` | Hard-coded as months | months | Allow future flexibility (days/weeks) | `confirmation_rules.*.offset_unit` | enum | months | **CONFIGURABLE** |
 | Confirmation trigger basis | `getConfirmationTriggerDate.ts` | Always joining_date | Joining date | Different types may use different bases | `confirmation_rules.*.trigger_basis` | enum | joining_date | **CONFIGURABLE** |
 | Confirmation enabled per type | Not implemented | All types except contractor | Per business rule | Allow enabling/disabling per type | `confirmation_rules.*.enabled` | boolean | true (except contractor) | **CONFIGURABLE** |
@@ -52,8 +52,8 @@
 | FTC appraisal reference basis | `getAppraisalReferenceDate.ts:10-13` | joining_date | May need to change basis | `appraisal_rules.ftc.reference_basis` | enum | joining_date | **CONFIGURABLE** |
 | FTE/FTC appraisal offset | `getAppraisalReferenceDate.ts:12` | 6 months | Business-specific reference calculation | `appraisal_rules.fte.offset_value` | integer | 6 | **CONFIGURABLE** |
 | Appraisal offset unit | `getAppraisalReferenceDate.ts:12` | months | Allow future flexibility | `appraisal_rules.*.offset_unit` | enum | months | **CONFIGURABLE** |
-| Apprentice appraisal eligibility | `getAppraisalReferenceDate.ts:16-17` | Not eligible (returns null) | Business may add eligibility later | `appraisal_rules.apprentice_tech.eligible` | boolean | false | **CONFIGURABLE** |
-| Contractor appraisal eligibility | `getAppraisalReferenceDate.ts:16-17` | Not eligible (returns null) | Business may add eligibility later | `appraisal_rules.contractor.eligible` | boolean | false | **CONFIGURABLE** |
+| Apprentice appraisal eligibility | `getAppraisalReferenceDate.ts:16-17` | Not eligible (returns null) | **Not eligible** (decided 2026-11-11, #145) | `appraisal_rules.apprentice_tech.eligible` | boolean | false | **CONFIGURABLE** |
+| Contractor appraisal eligibility | `getAppraisalReferenceDate.ts:16-17` | Not eligible (returns null) | **Not eligible** (decided 2026-11-11, #145) | `appraisal_rules.contractor.eligible` | boolean | false | **CONFIGURABLE** |
 
 ---
 
