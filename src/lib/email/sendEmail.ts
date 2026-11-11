@@ -328,9 +328,10 @@ export async function pingEmailProvider(accountId?: string): Promise<EmailPingRe
     }
   }
 
-  const clientId = target.client_id || process.env.GOOGLE_CLIENT_ID
-  const clientSecret = target.client_secret || process.env.GOOGLE_CLIENT_SECRET
-  const refreshToken = target.refresh_token || process.env.GOOGLE_REFRESH_TOKEN
+  // Already resolved for this account: its own credentials, never another's.
+  const clientId = target.client_id
+  const clientSecret = target.client_secret
+  const refreshToken = target.refresh_token
   const senderEmail = target.email || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
 
   if (!clientId || !clientSecret || !refreshToken) {

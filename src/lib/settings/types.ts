@@ -172,6 +172,8 @@ export type EmailProviderConfig = {
 
   // Google Workspace Accounts (Multi-Account & Auto-Failover)
   google_accounts?: GoogleWorkspaceAccount[]
+  /** Set by the server: may this viewer replace mail account credentials? */
+  can_replace_credentials?: boolean
 
   // Google Workspace / Gmail legacy single-account compat
   gmail_account: string

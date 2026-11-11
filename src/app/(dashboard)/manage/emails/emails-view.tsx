@@ -2170,10 +2170,20 @@ export function EmailsView({
                                 type="password"
                                 value={accountForm.refresh_token}
                                 onChange={(e) => setAccountForm({ ...accountForm, refresh_token: e.target.value })}
-                                placeholder={editingAccount?.refresh_token_preview || 'Leave blank to use system GOOGLE_REFRESH_TOKEN'}
+                                placeholder={
+                                  editingAccount?.refresh_token_preview
+                                    ? `${editingAccount.refresh_token_preview} saved. Paste a new one to replace it`
+                                    : "Paste this mailbox's refresh token"
+                                }
+                                disabled={!providerConfig.can_replace_credentials}
+                                autoComplete="off"
                                 className="text-xs h-8.5 font-mono"
                               />
-                              <span className="text-[10px] text-muted-foreground">Leave blank to use default system environment variable credentials</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {providerConfig.can_replace_credentials
+                                  ? 'Each mailbox sends with its own token. A saved token is never shown again; leave blank to keep it.'
+                                  : 'Only Super Admin and Platform Admin can replace credentials.'}
+                              </span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 pt-1">
@@ -2192,7 +2202,9 @@ export function EmailsView({
                                   type="password"
                                   value={accountForm.client_secret}
                                   onChange={(e) => setAccountForm({ ...accountForm, client_secret: e.target.value })}
-                                  placeholder="Defaults to env"
+                                  placeholder="Defaults to the environment's client"
+                                  disabled={!providerConfig.can_replace_credentials}
+                                  autoComplete="off"
                                   className="text-xs h-8 font-mono"
                                 />
                               </div>
