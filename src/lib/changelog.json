@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.14.02",
+    "date": "2026-11-11",
+    "title": "PnC Ops reads peer feedback status from the view",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "PnC Ops reads peer feedback status, not text, at the database as well as in the app"
+      }
+    ]
+  },
+  {
     "version": "2.14.01",
     "date": "2026-11-11",
     "title": "Shorten the known gaps table in the October security review",
