@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { escapeHtml, sendEmail } from '@/lib/email/sendEmail'
 import { getNotificationSettings } from '@/lib/settings/service'
 import { auditPeerFeedback } from '@/lib/audit/events'
@@ -25,6 +26,11 @@ export async function nominatePeers(
   if (!(await mayActOnConfirmationOf(supabase, allowed.caller, subjectId, FEATURE_ACCESS.confirmationsInitiate))) {
     return null
   }
+
+  // A colleague picked from the directory is sent to their own work email,
+  // looked up here: the browser does not hold colleagues' emails, and an
+  // address it sends for a picked colleague is not trusted.
+  peers = await withDirectoryEmails(peers)
 
   // A peer answers by signing in, and only organisation accounts can. Anyone
   // else would be emailed a link they could never use, and their feedback
@@ -80,4 +86,25 @@ export async function nominatePeers(
   })
 
   return rows
+}
+
+/**
+ * Each picked colleague's email from their record. Read with the service role,
+ * after the caller's guard and confirmation check; only used to send the
+ * request. A typed-in peer (no employee id) keeps the address typed.
+ */
+async function withDirectoryEmails(
+  peers: { name: string; employeeId?: string; email?: string }[]
+): Promise<{ name: string; employeeId?: string; email?: string }[]> {
+  const ids = [...new Set(peers.map((p) => p.employeeId).filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return peers
+  const admin = createAdminSupabaseClient()
+  if (!admin) return peers.map((p) => (p.employeeId ? { ...p, email: undefined } : p))
+  const { data } = await admin.from('employees').select('id, email, status').in('id', ids)
+  const emails = new Map(
+    ((data ?? []) as { id: string; email: string | null; status: string }[])
+      .filter((r) => r.status === 'active')
+      .map((r) => [r.id, r.email ?? undefined])
+  )
+  return peers.map((p) => (p.employeeId ? { ...p, email: emails.get(p.employeeId) } : p))
 }

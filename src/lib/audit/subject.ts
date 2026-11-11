@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import type { AuditSubject } from './types';
 
 // ============================================================================
@@ -27,7 +28,11 @@ export async function resolveEmployeeSubject(employeeId: string): Promise<AuditS
   let subject: AuditSubject = { employee_id: employeeId };
 
   try {
-    const supabase = await createServerSupabaseClient();
+    // The subject is often someone the caller may not read (a peer writes
+    // feedback about a colleague). The pair goes only into the audit event,
+    // which callers write after their own guard, so it is read with the
+    // service role; never returned to the browser.
+    const supabase = createAdminSupabaseClient() ?? (await createServerSupabaseClient());
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
 

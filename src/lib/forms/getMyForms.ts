@@ -48,7 +48,7 @@ export async function getMyForms(): Promise<MyFormsResult> {
   const forms = (formRows ?? []) as any[]
 
   const { data: subjectRows } = await supabase
-    .from('employees')
+    .from('directory')
     .select('id, name')
     .in('id', unique(requests.map((r) => r.subject_employee_id ?? '')))
   const subjects = (subjectRows ?? []) as any[]

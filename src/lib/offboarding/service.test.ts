@@ -39,7 +39,8 @@ const CHILDREN = ['offboarding_checklists', 'offboarding_asset_clearances', 'off
 
 function fake(client: Client) {
   const from = (table: string) => {
-    const rows = () => (db.tables[table] ??= [])
+    // The directory view reads the same people as the employees table.
+    const rows = () => (db.tables[table === 'directory' ? 'employees' : table] ??= [])
     const filters: Array<(r: Row) => boolean> = []
     let op: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select'
     let payload: Row | Row[] | null = null

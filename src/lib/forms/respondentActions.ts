@@ -62,7 +62,7 @@ async function persistSubmission(formData: FormData, intent: 'draft' | 'submit')
   if (!check.ok) return refuse(path, check.error)
 
   if (check.pickerIds.length > 0) {
-    const { data: found } = await supabase.from('employees').select('id').in('id', check.pickerIds)
+    const { data: found } = await supabase.from('directory').select('id').in('id', check.pickerIds)
     if ((found ?? []).length !== new Set(check.pickerIds).size) {
       return refuse(path, 'Choose a person from the list')
     }
