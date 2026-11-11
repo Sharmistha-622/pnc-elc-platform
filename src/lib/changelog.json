@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.14.00",
+    "date": "2026-11-11",
+    "title": "Peer answers by question, a minimum of 3, and a logged reveal",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "peer reviews are shown question by question, so one peer's answers are not kept together, and only once 3 peers have answered"
+      },
+      {
+        "category": "Features",
+        "description": "Super Admin can reveal who wrote which peer review on one review, with a reason that is recorded in the audit log"
+      }
+    ]
+  },
+  {
     "version": "2.13.00",
     "date": "2026-11-11",
     "title": "Candidate portal links carry an end date",
