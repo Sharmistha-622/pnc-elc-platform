@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.12.02",
+    "date": "2026-11-11",
+    "title": "Keep mail account credentials apart from settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "mail account credentials are stored apart from settings and are never shown again once saved"
+      },
+      {
+        "category": "Fixes",
+        "description": "a backup mail account sends with its own credentials"
+      }
+    ]
+  },
+  {
     "version": "2.12.01",
     "date": "2026-11-10",
     "title": "Offboarding: audit events record status, not settlement figures",
