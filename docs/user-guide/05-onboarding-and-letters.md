@@ -141,10 +141,10 @@ They can do the six steps in any order:
 | Step | What they do |
 |---|---|
 | **1. Personal, Address & Emergency Contact** | Legal name, address, emergency contact (required), plus DOB, gender, blood group, phone, current address. |
-| **2. Required Document Dossier** | Upload each document (PDF/JPG/PNG/WebP, max 10 MB). Required by default: Resume/CV, passport photo, Aadhaar, PAN, address proof, highest education certificate, bank account proof. Optional: previous experience letter, relieving letter, references. If PnC rejected a file, the reason shows here as *P&C Feedback*. |
+| **2. Required Document Dossier** | Upload each document (PDF/JPG/PNG/WebP, max 10 MB). Required by default: Resume/CV, passport photo, Aadhaar, PAN, address proof, highest education certificate, bank account proof. Optional: previous experience letter, relieving letter, references, signed EPF Form 11. If PnC rejected a file, the reason shows here as *P&C Feedback*. |
 | **3. Employment Terms & Role Acknowledgment** | Check designation, team, joining date, manager, probation and notice period, then **Confirm & Continue**, or **Request Correction** with a note. |
 | **4. Pre-Joining Policies & Handbook** | Read and **Mark as Read**: About NavGurukul, Code of Conduct & Safeguarding, Employee & Consultant Handbook, Leave & Attendance, Information Security & Data Privacy. |
-| **5. Offer & Appointment Letter** | View *Annexure A* (salary breakdown), preview each letter, and **Sign**: draw a signature, type their legal name, tick consent, **Confirm & Affix Signature**. |
+| **5. Offer & Appointment Letter** | View *Annexure A* (salary breakdown), preview each letter, and **Sign**: either **Draw** a signature or **Upload image** (PNG/JPG up to 1 MB), type their legal name, tick consent, **Confirm & Affix Signature**. |
 | **6. Final Submission** | **Submit Onboarding to P&C**. The button unlocks only when details, required documents, terms, all policies and all letters are done; anything missing is listed. |
 
 The link stops working once onboarding is complete, the candidate is
