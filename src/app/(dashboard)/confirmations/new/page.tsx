@@ -66,19 +66,27 @@ export default async function NewConfirmationPage() {
       conversionDate: r.conversion_date || null,
     }))
 
-  // Directory of active employees for peer suggestions
+  // Active colleagues for peer suggestions, from the directory: names, team
+  // and type, not their records. A picked colleague's email is looked up by
+  // the server when they are nominated (nominatePeers).
   const { data: allActiveRows } = await supabase
-    .from('employees')
-    .select('id, name, email, team, employee_types(name), teams(name)')
+    .from('directory')
+    .select('id, name, team, team_id, employee_type_id')
     .eq('status', 'active')
     .order('name', { ascending: true })
+  const [{ data: teamRows }, { data: typeRows }] = await Promise.all([
+    supabase.from('teams').select('id, name'),
+    supabase.from('employee_types').select('id, name'),
+  ])
+  const teamName = new Map(((teamRows ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]))
+  const typeName = new Map(((typeRows ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]))
 
   const directoryEmployees = (allActiveRows || []).map((r: any) => ({
     id: r.id,
     name: r.name,
-    email: r.email || null,
-    employeeType: r.employee_types?.name || 'Employee',
-    team: departmentOf(r),
+    email: null,
+    employeeType: (r.employee_type_id && typeName.get(r.employee_type_id)) || 'Employee',
+    team: departmentOf({ team: r.team, teams: r.team_id ? { name: teamName.get(r.team_id) ?? null } : null } as Parameters<typeof departmentOf>[0]),
   }))
 
   return (

@@ -151,7 +151,9 @@ type Names = Map<string, string>
 async function namesFor(db: Db, ids: (string | null | undefined)[]): Promise<Names> {
   const unique = Array.from(new Set(ids.filter((v): v is string => Boolean(v))))
   if (unique.length === 0) return new Map()
-  const { data } = await db.from('employees').select('id, name').in('id', unique)
+  // Colleagues' names come from the directory: a session reads full records
+  // only for itself and its reports.
+  const { data } = await db.from('directory').select('id, name').in('id', unique)
   return new Map(((data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]))
 }
 
@@ -411,7 +413,7 @@ export async function getCycleDetail(cycleId: string): Promise<CycleDetail | nul
   if (!cycle) return null
 
   const { employee } = await getCurrentEmployee(supabase)
-  const { data: subjectRow } = await supabase.from('employees').select('manager_id').eq('id', cycle.employee_id).maybeSingle()
+  const { data: subjectRow } = await supabase.from('directory').select('manager_id').eq('id', cycle.employee_id).maybeSingle()
   const rel = relationship(allowed.caller, cycle, {
     employeeId: employee?.id ?? null,
     currentManagerOfSubject: (subjectRow?.manager_id as string | null) ?? null,
@@ -474,7 +476,7 @@ export async function getCycleDetail(cycleId: string): Promise<CycleDetail | nul
 
   let nominees: CycleDetail['nominees'] = null
   if ((rel.isSubject && cycle.stage === 'self_review') || (rel.operator && stageOpen)) {
-    const { data: people } = await supabase.from('employees').select('id, name').eq('status', 'active').order('name')
+    const { data: people } = await supabase.from('directory').select('id, name').eq('status', 'active').order('name')
     nominees = ((people ?? []) as { id: string; name: string }[]).filter((p) => p.id !== cycle.employee_id && p.id !== cycle.manager_id)
   }
 

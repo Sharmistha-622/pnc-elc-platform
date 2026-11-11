@@ -77,9 +77,10 @@ export async function getFormFill(requestId: string): Promise<FormFillState> {
     for (const a of (answerRows ?? []) as any[]) answers.set(a.field_id, a.value)
   }
 
-  // Everyone, so the employee picker can offer every employee
+  // Everyone, so the employee picker can offer every employee. Names only,
+  // from the directory: a session reads full records for itself and its reports.
   const { data: employeeRows } = await supabase
-    .from('employees')
+    .from('directory')
     .select('id, name')
     .order('name', { ascending: true })
   const employees = ((employeeRows ?? []) as any[]).map((e) => ({

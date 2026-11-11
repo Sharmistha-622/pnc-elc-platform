@@ -140,7 +140,8 @@ export function NewConfirmationClient({
 
   const handlePeerChange = (index: number, field: 'name' | 'email', value: string) => {
     const updated = [...peers]
-    updated[index] = { ...updated[index], [field]: value }
+    // Editing the name after picking a colleague makes it a typed-in peer.
+    updated[index] = { ...updated[index], [field]: value, ...(field === 'name' ? { id: undefined } : {}) }
     setPeers(updated)
   }
 
@@ -500,8 +501,9 @@ export function NewConfirmationClient({
                             />
                             <Input
                               type="email"
-                              placeholder="Reviewer Email"
-                              value={peer.email}
+                              placeholder={peer.id ? 'Sent to their work email' : 'Reviewer Email'}
+                              value={peer.id ? '' : peer.email}
+                              disabled={Boolean(peer.id)}
                               onChange={(e) => handlePeerChange(idx, 'email', e.target.value)}
                               className="h-8 text-xs rounded-lg"
                             />

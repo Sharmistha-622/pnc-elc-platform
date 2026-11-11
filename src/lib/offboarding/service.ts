@@ -202,7 +202,7 @@ async function appendActivity(entries: ActivityEntry[]): Promise<void> {
 
 async function managerNames(db: Db, ids: string[]): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const { data } = await db.from('employees').select('id, name').in('id', ids);
+  const { data } = await db.from('directory').select('id, name').in('id', ids);
   return new Map(((data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
 }
 

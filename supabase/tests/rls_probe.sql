@@ -167,8 +167,11 @@ insert into pg_temp.expectations values
   -- Service-role only: no session of any kind.
   ('onboarding_records',     '{}'),
   ('salary_structures',      '{}'),
-  -- The directory: staff, not the internet and not outsiders.
-  ('employees',              '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- Employee records: the org-wide general roles, and each person their own
+  -- row (and a manager their reports). "stale token" has no row of its own.
+  ('employees',              '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
+  -- The directory: colleagues' names for all staff, not the internet and not outsiders.
+  ('directory',              '{"stale token","employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,fin_ops,exec_view,platform_admin,platform_ops,super_admin}'),
   -- Identity: the person, and identity: edit roles. Not their manager, not
   -- Finance, not leadership, not the platform team.
   ('employee_profiles',      '{"employee (R)",pnc_ops,pnc_admin,super_admin}'),
@@ -246,6 +249,50 @@ begin
     reset role;
   end loop;
 end $$;
+
+-------------------------------------------------------------------------
+-- How much of the directory each person sees
+-------------------------------------------------------------------------
+-- R and X see their own record only; M sees their own and R's. In the
+-- directory everyone sees every name, and an email only for themselves, their
+-- manager and their reports.
+create function pg_temp.seen_as(p_email text, p_sql text) returns bigint
+  language plpgsql as $$
+declare n bigint;
+begin
+  perform set_config('request.jwt.claims', pg_temp.claims(p_email), false);
+  set local role authenticated;
+  execute p_sql into n;
+  reset role;
+  return n;
+end $$;
+
+do $$
+declare
+  checks text[][] := array[
+    ['r@navgurukul.org', 'select count(*) from public.employees', '1', 'employee (R) reads only their own record'],
+    ['x@navgurukul.org', 'select count(*) from public.employees', '1', 'peer (X) reads only their own record'],
+    ['m@navgurukul.org', 'select count(*) from public.employees', '2', 'manager (M) reads their own and their report''s'],
+    ['ops@navgurukul.org', 'select count(*) from public.employees', '4', 'pnc_ops reads every record'],
+    ['r@navgurukul.org', 'select count(*) from public.directory', '4', 'employee (R) sees every name'],
+    ['r@navgurukul.org', 'select count(*) from public.directory where email is not null', '2', 'employee (R) sees their own and their manager''s email only'],
+    ['x@navgurukul.org', 'select count(*) from public.directory where email is not null', '1', 'peer (X) sees only their own email'],
+    ['m@navgurukul.org', 'select count(*) from public.directory where email is not null', '2', 'manager (M) sees their own and their report''s email only']
+  ];
+  got bigint;
+begin
+  for i in 1 .. array_length(checks, 1) loop
+    begin
+      got := pg_temp.seen_as(checks[i][1], checks[i][2]);
+    exception when insufficient_privilege then
+      got := -1;
+    end;
+    if got <> checks[i][3]::bigint then
+      insert into pg_temp.failures values (checks[i][1], checks[i][4], checks[i][3], got);
+    end if;
+  end loop;
+end $$;
+reset role;
 
 -------------------------------------------------------------------------
 -- Writes that must not land

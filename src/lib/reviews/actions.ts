@@ -68,7 +68,7 @@ async function standing(caller: Guarded, cycleId: string): Promise<{ cycle: Cycl
   const cycle = data as CycleRow | null
   if (!cycle) return null
   const { employee } = await getCurrentEmployee(supabase)
-  const { data: subject } = await supabase.from('employees').select('manager_id').eq('id', cycle.employee_id).maybeSingle()
+  const { data: subject } = await supabase.from('directory').select('manager_id').eq('id', cycle.employee_id).maybeSingle()
   const rel = relationship(caller, cycle, {
     employeeId: employee?.id ?? null,
     currentManagerOfSubject: (subject?.manager_id as string | null) ?? null,
@@ -103,7 +103,7 @@ export async function startReviewCycle(input: { employeeId: string; kind: Review
   if (!pnc) {
     if (input.kind !== 'confirmation') return { ok: false, error: NOT_ALLOWED }
     const { employee } = await getCurrentEmployee(supabase)
-    const { data: e } = await supabase.from('employees').select('manager_id').eq('id', input.employeeId).maybeSingle()
+    const { data: e } = await supabase.from('directory').select('manager_id').eq('id', input.employeeId).maybeSingle()
     if (!employee || e?.manager_id !== employee.id) return { ok: false, error: NOT_ALLOWED }
   }
 

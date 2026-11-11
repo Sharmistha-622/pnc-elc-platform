@@ -139,18 +139,24 @@ export async function getMyProfileData(): Promise<{
   // Fetch Manager info if assigned
   let managerInfo: EmployeeProfileData['manager'] = null
   if (empRecord.manager_id) {
+    // From the directory: a session reads only its own record and its
+    // reports' in `employees`. The directory shows the caller their own
+    // manager's email.
     const { data: mgr } = await supabase
-      .from('employees')
-      .select('id, name, email, team, teams(name)')
+      .from('directory')
+      .select('id, name, email, team, team_id')
       .eq('id', empRecord.manager_id)
       .maybeSingle()
 
     if (mgr) {
+      const { data: mgrTeam } = mgr.team_id
+        ? await supabase.from('teams').select('name').eq('id', mgr.team_id).maybeSingle()
+        : { data: null }
       managerInfo = {
         id: mgr.id,
         name: mgr.name,
         email: mgr.email ?? null,
-        team: departmentOf(mgr as { team?: string | null }),
+        team: departmentOf({ team: mgr.team, teams: mgrTeam } as Parameters<typeof departmentOf>[0]),
         avatarUrl: mgr.email ? userMap.get(mgr.email.toLowerCase())?.avatarUrl || null : null,
       }
     }

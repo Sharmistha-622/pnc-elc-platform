@@ -1,7 +1,10 @@
 import type { PanelLoaderContext, PanelResult } from "./types";
 
 export const COLUMNS =
-  "id, name, team, employee_type, status, joining_date, confirmation_date, manager:employees!manager_id(name, email, team)";
+  "id, name, team, employee_type, status, joining_date, confirmation_date, manager_id";
+
+/** The caller's own manager, from the directory (their email included). */
+const MANAGER_COLUMNS = "name, email, team";
 
 export interface MyProfileRow {
   id: string;
@@ -41,7 +44,17 @@ export async function loadMyProfile(
   }
 
   const raw = data as Record<string, unknown>;
-  const rawMgr = raw.manager as Record<string, unknown> | null;
+  // A session reads only its own record and its reports' in `employees`; the
+  // manager's name and email come from the directory.
+  let rawMgr: Record<string, unknown> | null = null;
+  if (typeof raw.manager_id === "string") {
+    const { data: mgr } = await ctx.db
+      .from("directory")
+      .select(MANAGER_COLUMNS)
+      .eq("id", raw.manager_id)
+      .maybeSingle();
+    rawMgr = (mgr as Record<string, unknown> | null) ?? null;
+  }
 
   const row: MyProfileRow = {
     id: String(raw.id),

@@ -259,7 +259,7 @@ async function loadMyPeerFeedback(
   const open = () =>
     db
       .from("peer_feedback")
-      .select("id, created_at, confirmations(employees(name))")
+      .select("id, created_at, confirmations(employee_id)")
       .in("response_status", OPEN_FEEDBACK)
       .order("created_at", { ascending: true })
       .limit(TASK_LIMIT);
@@ -278,8 +278,24 @@ async function loadMyPeerFeedback(
   for (const r of results) for (const row of r?.data ?? []) byId.set(row.id as string, row as never);
   const data = [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
 
+  // The person under review is a colleague, so their name comes from the
+  // directory rather than their record.
+  const subjectIds = [
+    ...new Set(
+      data
+        .map((row) => (row.confirmations as { employee_id?: string | null } | null)?.employee_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const names = new Map<string, string>();
+  if (subjectIds.length > 0) {
+    const { data: people } = await db.from("directory").select("id, name").in("id", subjectIds);
+    for (const p of (people ?? []) as { id: string; name: string }[]) names.set(p.id, p.name);
+  }
+
   group.items = data.map((row) => {
-    const subject = (row.confirmations as { employees?: { name?: string } | null } | null)?.employees?.name;
+    const subjectId = (row.confirmations as { employee_id?: string | null } | null)?.employee_id;
+    const subject = subjectId ? names.get(subjectId) : undefined;
     return {
       id: row.id as string,
       title: subject ? `Feedback for ${subject}` : "Peer feedback",

@@ -77,7 +77,7 @@ it failed, and nobody is waiting on it any more.
 
 | Data | Why it is core | Who reads it |
 |---|---|---|
-| Name, team, email, joining and exit dates, employee type, manager | General data; the app runs on it | Every staff role (RLS `is_staff()`) |
+| Name, team, email, joining and exit dates, employee type, manager | General data; the app runs on it | The record (`employees`): the org-wide general roles, the person, and their manager. Colleagues' names, team, type and manager: every staff role, through the `directory` view, with an email only for the caller, their manager and their reports |
 | Statuses and outcomes: confirmation decision yes or no, appraisal status, offboarding stage | Outcomes, not reasons | The roles in `FEATURE_ACCESS` |
 | Contact and personal details: phone, address, emergency contact, date of birth, blood group | Needed daily, low harm compared with the list above. Decided: stays in core (P1 below). | The person; Super Admin, PnC Admin, PnC Ops (RLS) |
 | Masked residue: last four characters of a document number, `vault_document_id`, seal state | Lets people identify a record without holding it | As the parent record |

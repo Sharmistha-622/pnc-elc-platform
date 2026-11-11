@@ -20,7 +20,7 @@ export async function getPeerFeedback(peerFeedbackId: string): Promise<PeerFeedb
   // the peer who wrote it: the page never displays it back.
   const { data, error } = await supabase
     .from('peer_feedback')
-    .select('id, confirmation_id, peer_employee_id, peer_email, response_status, confirmations(employee_id, employees(name))')
+    .select('id, confirmation_id, peer_employee_id, peer_email, response_status, confirmations(employee_id)')
     .eq('id', peerFeedbackId)
     .single()
 
@@ -34,6 +34,18 @@ export async function getPeerFeedback(peerFeedbackId: string): Promise<PeerFeedb
   const isAdmin = passes(allowed.caller, ['super_admin', 'pnc_admin'])
   if (!isAdmin && !(await isNominatedPeer(supabase, data))) return null
 
-  // The embedded rows are to-one; the generated select type cannot tell.
-  return data as unknown as PeerFeedbackRequest
+  // The person under review is a colleague of the peer, so their name comes
+  // from the directory rather than their record.
+  // The embedded row is to-one; the generated select type cannot tell.
+  const confirmation = (data as unknown as { confirmations: { employee_id: string } | null }).confirmations
+  let subjectName: string | null = null
+  if (confirmation?.employee_id) {
+    const { data: person } = await supabase.from('directory').select('name').eq('id', confirmation.employee_id).maybeSingle()
+    subjectName = (person?.name as string | undefined) ?? null
+  }
+
+  return {
+    ...(data as unknown as Omit<PeerFeedbackRequest, 'confirmations'>),
+    confirmations: confirmation ? { employee_id: confirmation.employee_id, employees: { name: subjectName } } : null,
+  }
 }
