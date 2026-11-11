@@ -92,6 +92,12 @@ export interface UnifiedReportsData {
   }
 }
 
+export const CONFIRMATIONS_REPORT_SELECT =
+  'id, status, manager_decision, recommendation, created_at, employees(name, team, teams(name), employee_types(name))'
+
+export const HEADCOUNT_EMPLOYEES_SELECT =
+  'id, name, email, joining_date, is_alumni, team, employee_types(name), teams(name)'
+
 export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   const supabase = await createServerSupabaseClient()
   // Candidate records are closed to user sessions at the database (see
@@ -121,7 +127,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   try {
     const { data: confRows, error } = await supabase
       .from('confirmations')
-      .select('id, status, manager_decision, recommendation, created_at, employees(name, designation, team, teams(name), employee_types(name))')
+      .select(CONFIRMATIONS_REPORT_SELECT)
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -201,18 +207,20 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
   try {
     const { data: empRows, error } = await supabase
       .from('employees')
-      .select('id, name, email, designation, joining_date, is_alumni, team, employee_types(name), teams(name), locations(name)')
+      .select(HEADCOUNT_EMPLOYEES_SELECT)
       .order('name', { ascending: true })
 
     if (!error && empRows) {
       for (const row of empRows as any[]) {
         const typeName = row.employee_types?.name || 'Unclassified'
         const teamName = departmentOf(row) || 'Unassigned'
-        const locationName = row.locations?.name || 'Remote / Unassigned'
+        const locationName = row.locations?.name || ''
 
         byType[typeName] = (byType[typeName] || 0) + 1
         byTeam[teamName] = (byTeam[teamName] || 0) + 1
-        byLocation[locationName] = (byLocation[locationName] || 0) + 1
+        if (locationName) {
+          byLocation[locationName] = (byLocation[locationName] || 0) + 1
+        }
         const background = employeeBackground(row.is_alumni)
         byBackground[background]++
 
@@ -220,7 +228,7 @@ export async function getUnifiedReportsData(): Promise<UnifiedReportsData> {
           id: row.id,
           name: row.name,
           email: row.email,
-          designation: row.designation,
+          designation: row.designation ?? null,
           joining_date: row.joining_date,
           employee_type: typeName,
           team_name: teamName,
