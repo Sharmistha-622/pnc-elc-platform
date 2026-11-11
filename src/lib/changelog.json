@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.14.01",
+    "date": "2026-11-11",
+    "title": "Shorten the known gaps table in the October security review",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "the October security review's known-gaps table is shorter"
+      }
+    ]
+  },
+  {
     "version": "2.14.00",
     "date": "2026-11-11",
     "title": "Peer answers by question, a minimum of 3, and a logged reveal",
