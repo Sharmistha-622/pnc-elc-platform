@@ -81,12 +81,28 @@ export interface InvitationResult {
 
 export async function sendInvitationEmail(record: OnboardingRecord): Promise<InvitationResult> {
   const { subject, body } = buildInvitationEmail(record);
+  const firstName = record.candidate_name.split(' ')[0] || record.candidate_name;
+  const joining = record.joining_date
+    ? new Date(record.joining_date).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
+  const joiningClause = joining ? ` from <strong>${escapeHtml(joining)}</strong>` : '';
+  const link = portalUrl(record.invitation_token);
 
   const result = await sendEmail(
     'onboarding_invitation',
     {
       subject,
       body,
+      candidate_name: record.candidate_name,
+      first_name: firstName,
+      job_title: record.designation,
+      joining_date: joining,
+      joining_clause: joiningClause,
+      portal_link: link,
       recipient_name: record.candidate_name,
       recipient_role: record.designation,
     },

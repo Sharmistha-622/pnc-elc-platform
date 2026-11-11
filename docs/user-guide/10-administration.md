@@ -110,11 +110,10 @@ Super Admin and PnC Admin only: these hold personal data.
 | **Email Setup Infrastructure** | The sending provider and domain checks (SPF/DKIM/DMARC). Platform team only. |
 | **Daily Sending Quota & Volume** | How much of the Google daily limit (2,000 emails) has been used. |
 
-> ⚠️ **Important:** the templates on this screen **don't yet control the
-> emails that actually go out**. The real emails are built into the platform
-> and are always sent through Google. *Resend* in the outbox marks the row as
-> delivered but **doesn't actually send again**. See
-> [Known limitations](13-known-limitations.md#emails).
+> **Note:** each outbound email reads its active template from **Templates &
+> Cadence** by key, fills allow-listed variables on the server, and falls back
+> to built-in wording only if no active template exists. No template can
+> include salary, CTC, government ID numbers, or bank account details.
 
 ### The emails that are actually sent today
 

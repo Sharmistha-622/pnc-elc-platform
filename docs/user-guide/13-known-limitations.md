@@ -85,11 +85,7 @@ real work.** Items are grouped by area.
 
 ## Emails
 
-- The **Email Center** templates don't control the emails actually sent. Real
-  emails are built into the platform and sent through Google.
 - **Resend** in the outbox doesn't send anything; it only marks the row.
-- The note about batches "every 30 minutes between 09:00 and 19:00 IST" is
-  wrong. Reminder jobs run once each morning.
 
 ## Data Management
 
