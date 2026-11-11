@@ -41,12 +41,6 @@ Work in the phases below. **Stop after Phase 0 and wait for approval.**
    `rules/disclosure.md`.
 5. `docs/vault-inventory.md`: what is sensitive and where it lives.
 
-**Override:** `.agents/rules/version-and-changelog.md` tells you to edit
-`src/lib/version-config.ts` after every task. It is out of date (issue
-#115). Follow `rules/version-and-changelog.md`: do **not** touch
-`src/lib/version-config.ts` or `src/lib/changelog.json`. The release note
-goes in the PR body under `## Changelog`.
-
 ### Then read the dashboard as it is today
 
 | File | What it does | Keep / change |
