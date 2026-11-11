@@ -59,7 +59,9 @@ reviews**.
 
 **Can the employee see what I wrote in their review?**
 No. They see who has responded, not what anyone wrote, and not the decision.
-Peer feedback is shown to the manager and PnC without names.
+Peer feedback is shown to the manager and PnC without names, question by
+question. Only Super Admin can reveal who wrote which, with a reason that is
+logged.
 
 **I nominated the wrong peer.**
 Once your self-reflection is submitted, nominations lock. Ask PnC to add or

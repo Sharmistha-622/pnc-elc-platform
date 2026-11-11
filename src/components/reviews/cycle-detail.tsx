@@ -18,7 +18,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { CycleDetail } from '@/lib/reviews/queries'
+import { MIN_PEERS_FOR_ANONYMITY, type CycleDetail } from '@/lib/reviews/queries'
+import { PeerReveal } from './peer-reveal'
 import { KIND_LABELS, ROLE_LABELS, STAGE_LABELS, decisionLabel, type ReviewStage } from '@/lib/reviews/types'
 import { StageBadge } from './stage-badge'
 import { SmartReviewAnswerView } from '@/components/shared/field-answer-view'
@@ -527,8 +528,8 @@ export function CycleDetailView({
             </div>
           </CardHeader>
           <CardContent className="space-y-8 pt-6">
-            {[detail.reviews.self, detail.reviews.manager, ...detail.reviews.peers].filter(Boolean)
-              .length === 0 &&
+            {[detail.reviews.self, detail.reviews.manager].filter(Boolean).length === 0 &&
+              detail.reviews.peers.length === 0 &&
               !detail.reviews.peersHidden && (
                 <div className="text-center py-8 text-muted-foreground text-sm">
                   <p className="font-medium">No reviews have been submitted yet.</p>
@@ -538,7 +539,7 @@ export function CycleDetailView({
                 </div>
               )}
 
-            {[detail.reviews.self, detail.reviews.manager, ...detail.reviews.peers]
+            {[detail.reviews.self, detail.reviews.manager]
               .filter((b): b is NonNullable<typeof b> => Boolean(b))
               .map((b) => (
                 <section
@@ -573,12 +574,42 @@ export function CycleDetailView({
                 </section>
               ))}
 
+            {detail.reviews.peers.length > 0 && (
+              <section className="rounded-xl border border-border/70 bg-card p-5 space-y-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-indigo-600" />
+                    <span>Peer reviews</span>
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    {detail.reviews.peerCount} peers, by question. Answers are not grouped by person.
+                  </span>
+                </div>
+                <div className="space-y-6">
+                  {detail.reviews.peers.map((q) => (
+                    <div key={q.label} className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground tracking-tight">{q.label}</label>
+                      <ul className="space-y-2">
+                        {q.answers.map((value, i) => (
+                          <li key={i} className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                            <SmartReviewAnswerView label={q.label} value={value} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {detail.reviews.peersHidden && (
               <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200">
-                Peer reviews are temporarily concealed to preserve author anonymity until at least
-                two peer responses are submitted.
+                Peer reviews are concealed to keep their authors anonymous until at least
+                {` ${MIN_PEERS_FOR_ANONYMITY} `}peers have answered.
               </div>
             )}
+
+            {rel.revealsPeers && detail.reviews.peerCount > 0 && <PeerReveal cycleId={detail.id} />}
           </CardContent>
         </Card>
       )}
