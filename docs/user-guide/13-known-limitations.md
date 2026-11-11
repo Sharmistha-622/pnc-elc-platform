@@ -40,8 +40,6 @@ real work.** Items are grouped by area.
 - The **Letters & Annexure** tab on the review page may show placeholder text
   instead of the real letter. Use **Issued Letters** to read the real one.
 - On the **Final Review** tab, approval doesn't require the checks to pass.
-- Invitation links **don't expire by date**, despite "7-day token link" on
-  the Overview.
 - The candidate list's **team filter** is a fixed list, not the department
   list.
 - The **hardware panel**, and the **manager calendar** used to pick check-in
@@ -53,9 +51,10 @@ real work.** Items are grouped by area.
   screen yet.
 - There's no button to **withdraw** a candidate, or to delete a withdrawn
   candidate's documents.
-- Documents that were sealed into the vault on verification may not be
-  copied into the employee's Drive folder when the account is created. Check
-  the employee's **Documents** page.
+- No document is copied into the employee's Drive folder when the account is
+  created, unless PnC chooses document types in **Settings → DPDP & Privacy →
+  Data collection**. Identity and bank documents are never copied. Check the
+  employee's **Documents** page.
 
 ## Reviews and confirmations
 

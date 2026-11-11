@@ -151,6 +151,7 @@ const CORE_TABLES: InventoryTable[] = [
     log: 'subject, error_message',
   }),
   nonPersonal('core', 'email_provider_config', 'Sending configuration for organisation mailboxes; closed to sessions.', 'id, active_provider, from_name, from_email, reply_to_email, gmail_account, gmail_app_password, gmail_client_id, gmail_client_secret, gmail_auth_status, gmail_scope, gmail_refresh_token_preview, ses_region, ses_access_key_id, ses_secret_access_key, ses_configuration_set, ses_verification_status, ses_endpoint, resend_api_key, smtp_host, smtp_port, smtp_secure, smtp_username, smtp_password, daily_send_limit, daily_sent_count, dkim_verified, spf_verified, dmarc_verified, mx_verified, domain_name, updated_at'),
+  nonPersonal('core', 'mail_account_credentials', 'Client secret and refresh token for each organisation mailbox; service role only.', 'account_id, client_secret, refresh_token, updated_at, updated_by'),
   nonPersonal('core', 'email_templates', 'Message templates.', 'id, key, action_name, category, description, subject, body_text, available_variables, is_active, cadence, updated_at'),
   personal('core', 'employee_account_provisioning', { principals: ['employee'], basis: '7i', retention: 'employment_records', processors: CORE }, {
     meta: `${META}, onboarding_id, employee_id, status, credentials_delivery_status, provisioned_at`,
@@ -260,7 +261,7 @@ const CORE_TABLES: InventoryTable[] = [
     none: 'title, description, content',
   }),
   personal('core', 'onboarding_records', { principals: ['candidate'], basis: '7a', retention: 'rejected_candidates', processors: CORE_MAIL }, {
-    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status, withdrawn_at`,
+    meta: `${META}, employee_id, team_id, manager_id, buddy_id, employee_type_id, status, progress_percentage, invitation_token, invitation_expires_at, invited_at, submitted_at, approved_at, completed_at, created_by, joiner_status, withdrawn_at`,
     general: 'candidate_name, designation, department, location, joining_date, probation_period, notice_period, is_alumni, role_responsibilities, manager_name, buddy_name, guardian_consent_status',
     contact: 'personal_email, phone',
     salary: 'ctc, ctc_amount, ctc_frequency',

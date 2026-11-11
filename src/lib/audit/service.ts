@@ -185,6 +185,23 @@ export async function recordAuditEvent(input: AuditEventInput): Promise<AuditEve
 }
 
 /** Append several events in one round trip. Same no-throw contract as {@link recordAuditEvent}. */
+/**
+ * Like `recordAuditEvent`, but says whether the row was stored. For the few
+ * actions that must not go ahead unlogged, such as revealing peer reviewers.
+ */
+export async function recordAuditEventStrict(input: AuditEventInput): Promise<boolean> {
+  if (!input.subject.employee_id && !input.subject.employee_email) return false;
+  const event = buildEvent(input);
+  rememberInMemory(event);
+  try {
+    const supabase = await auditWriter();
+    const { error } = await supabase.from(AUDIT_TABLE).insert(toRow(event));
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function recordAuditEvents(inputs: AuditEventInput[]): Promise<AuditEvent[]> {
   const valid = inputs.filter((i) => i.subject.employee_id || i.subject.employee_email);
   if (valid.length === 0) return [];

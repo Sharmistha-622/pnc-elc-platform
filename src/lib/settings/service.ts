@@ -3,8 +3,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logWriter } from '@/lib/logs/writer'
 import { revalidatePath } from 'next/cache'
-import { platformConfigRefusal } from './access'
+import { canEditPlatformConfig, platformConfigRefusal } from './access'
 import { guard } from '@/lib/rbac/guard'
+import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { sendEmail, pingEmailProvider as pingGmail, type EmailPingResult } from '@/lib/email/sendEmail'
 import {
   getGoogleWorkspaceAccountsInternal,
@@ -427,15 +428,22 @@ const SECRET_FIELDS = [
   'smtp_password',
 ] as const
 
-function withSecretsMasked(config: EmailProviderConfig): EmailProviderConfig {
+function withSecretsMasked(config: EmailProviderConfig, showLast4 = false): EmailProviderConfig {
   const masked = { ...config }
   for (const field of SECRET_FIELDS) {
     masked[field] = config[field] ? SECRET_MASK : undefined
   }
   if (config.google_accounts) {
-    masked.google_accounts = maskGoogleAccounts(config.google_accounts)
+    masked.google_accounts = maskGoogleAccounts(config.google_accounts, { showLast4 })
   }
+  masked.can_replace_credentials = showLast4
   return masked
+}
+
+/** The signed-in caller's address, for `updated_by`. Never one the browser sent. */
+async function callerAddress(): Promise<string> {
+  const { email } = await getCurrentUserRole()
+  return email || 'unknown'
 }
 
 /**
@@ -471,8 +479,11 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
   // Whether a token is configured, never any part of it.
   const refreshTokenPreview = hasRefreshToken ? SECRET_MASK : undefined
 
+  // Whoever may change the configuration may replace credentials, and sees
+  // their last four characters. Everyone else sees only that one is set.
+  const canReplace = await canEditPlatformConfig()
   const rawGoogleAccounts = await getGoogleWorkspaceAccountsInternal()
-  const maskedGoogleAccounts = maskGoogleAccounts(rawGoogleAccounts)
+  const maskedGoogleAccounts = maskGoogleAccounts(rawGoogleAccounts, { showLast4: canReplace })
   const activeGoogleAcc = rawGoogleAccounts.find((a) => a.is_active) || rawGoogleAccounts[0]
 
   const liveConfig: EmailProviderConfig = {
@@ -513,7 +524,7 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
       .single()
 
     if (error || !data) {
-      return withSecretsMasked(liveConfig)
+      return withSecretsMasked(liveConfig, canReplace)
     }
     return withSecretsMasked({
       ...liveConfig,
@@ -522,9 +533,9 @@ export async function getEmailProviderConfig(): Promise<EmailProviderConfig> {
       ses_enabled: false,
       resend_enabled: false,
       google_accounts: maskedGoogleAccounts,
-    })
+    }, canReplace)
   } catch {
-    return withSecretsMasked(liveConfig)
+    return withSecretsMasked(liveConfig, canReplace)
   }
 }
 
@@ -560,32 +571,53 @@ export async function getGoogleWorkspaceAccounts(): Promise<GoogleWorkspaceAccou
   const allowed = await guard('platformConfig')
   if (!allowed.ok) return maskGoogleAccounts([])
   const accounts = await getGoogleWorkspaceAccountsInternal()
-  return maskGoogleAccounts(accounts)
+  return maskGoogleAccounts(accounts, { showLast4: await canEditPlatformConfig() })
 }
 
+/**
+ * Saves the account list. Only a caller who may change the configuration
+ * (Super Admin, Platform Admin) gets this far, and only they may set
+ * credentials; `canWriteCredentials` says so again where the write happens.
+ */
 export async function saveGoogleWorkspaceAccounts(
   accounts: GoogleWorkspaceAccount[],
-  changedBy: string = 'system'
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
+  return saveAccounts(accounts)
+}
 
-  const res = await saveGoogleWorkspaceAccountsInternal(accounts, changedBy)
+async function saveAccounts(
+  accounts: GoogleWorkspaceAccount[],
+): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
+  const changedBy = await callerAddress()
+  const canWriteCredentials = await canEditPlatformConfig()
+  const res = await saveGoogleWorkspaceAccountsInternal(accounts, { changedBy, canWriteCredentials })
   if (!res.success) {
     return { success: false, error: res.error }
   }
+  for (const id of res.credentialsReplaced) {
+    const acc = res.accounts.find((a) => a.id === id)
+    // Which account, never the value.
+    await logSettingsChange('mail_account_credentials', id, 'credentials', '', `replaced for ${acc?.email ?? id}`, changedBy)
+  }
   revalidatePath('/manage/emails')
-  return { success: true, data: maskGoogleAccounts(res.accounts) }
+  return { success: true, data: maskGoogleAccounts(res.accounts, { showLast4: canWriteCredentials }) }
+}
+
+/** The stored list without credentials: reordering never rewrites them. */
+async function accountsWithoutCredentials(): Promise<GoogleWorkspaceAccount[]> {
+  const accounts = await getGoogleWorkspaceAccountsInternal()
+  return accounts.map((a) => ({ ...a, client_secret: undefined, refresh_token: undefined }))
 }
 
 export async function setActiveGoogleAccount(
   accountId: string,
-  changedBy: string = 'system'
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
 
-  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const accounts = await accountsWithoutCredentials()
   const target = accounts.find((a) => a.id === accountId)
   if (!target) {
     return { success: false, error: `Account with ID ${accountId} not found.` }
@@ -595,17 +627,16 @@ export async function setActiveGoogleAccount(
     a.is_active = a.id === accountId
   })
 
-  return saveGoogleWorkspaceAccounts(accounts, changedBy)
+  return saveAccounts(accounts)
 }
 
 export async function reorderGoogleBackups(
   accountIdsInOrder: string[],
-  changedBy: string = 'system'
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
 
-  const accounts = await getGoogleWorkspaceAccountsInternal()
+  const accounts = await accountsWithoutCredentials()
   accountIdsInOrder.forEach((id, index) => {
     const acc = accounts.find((a) => a.id === id)
     if (acc && !acc.is_active) {
@@ -613,7 +644,7 @@ export async function reorderGoogleBackups(
     }
   })
 
-  return saveGoogleWorkspaceAccounts(accounts, changedBy)
+  return saveAccounts(accounts)
 }
 
 

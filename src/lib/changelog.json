@@ -1,5 +1,105 @@
 [
   {
+    "version": "2.14.04",
+    "date": "2026-11-11",
+    "title": "Record the November decisions on roles, privacy, onboarding and payroll",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "the candidate form offers Transgender as a gender option"
+      },
+      {
+        "category": "Improvements",
+        "description": "documents are no longer copied to Drive at handover unless PnC chooses types in Data collection"
+      }
+    ]
+  },
+  {
+    "version": "2.14.03",
+    "date": "2026-11-11",
+    "title": "Own every server-action file",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "every server-action file needs a code owner's review"
+      }
+    ]
+  },
+  {
+    "version": "2.14.02",
+    "date": "2026-11-11",
+    "title": "PnC Ops reads peer feedback status from the view",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "PnC Ops reads peer feedback status, not text, at the database as well as in the app"
+      }
+    ]
+  },
+  {
+    "version": "2.14.01",
+    "date": "2026-11-11",
+    "title": "Shorten the known gaps table in the October security review",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "the October security review's known-gaps table is shorter"
+      }
+    ]
+  },
+  {
+    "version": "2.14.00",
+    "date": "2026-11-11",
+    "title": "Peer answers by question, a minimum of 3, and a logged reveal",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "peer reviews are shown question by question, so one peer's answers are not kept together, and only once 3 peers have answered"
+      },
+      {
+        "category": "Features",
+        "description": "Super Admin can reveal who wrote which peer review on one review, with a reason that is recorded in the audit log"
+      }
+    ]
+  },
+  {
+    "version": "2.13.00",
+    "date": "2026-11-11",
+    "title": "Candidate portal links carry an end date",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "candidate portal links expire after the period set in DPDP & Privacy (7 days by default), and each resend issues a new link"
+      },
+      {
+        "category": "Improvements",
+        "description": "a candidate with an expired or unknown link is told what to do, instead of the portal never finishing loading"
+      }
+    ]
+  },
+  {
+    "version": "2.12.02",
+    "date": "2026-11-11",
+    "title": "Keep mail account credentials apart from settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "mail account credentials are stored apart from settings and are never shown again once saved"
+      },
+      {
+        "category": "Fixes",
+        "description": "a backup mail account sends with its own credentials"
+      }
+    ]
+  },
+  {
     "version": "2.12.01",
     "date": "2026-11-10",
     "title": "Offboarding: audit events record status, not settlement figures",

@@ -45,9 +45,7 @@ is still what P&C are actually running.
 
 | # | Decision | Options | Owner | Status |
 |---|---|---|---|---|
-| 6 | `ftc` treated as staff for induction | See note below | P&C | Open |
-| 7 | Cutover owner and 30-day rollback window | — | Eng + P&C | Open |
-| 9 | Legacy sources in a public repo | Make the repo private, redact identifiers, or keep them out of git | Nitin | Open — still the live question; the sources remain uncommitted, see `legacy/onboarding-apps-script/README.md` |
+| 6 | `ftc` treated as staff for induction | See note below | P&C | Open. The owner has no preference (2026-11-11); P&C decides, together with payroll O-01 |
 
 ### Note on #6 — `ftc`
 
@@ -89,3 +87,5 @@ than accidental.
 | E | Calendar invites dispatch a day early | Legacy booked on `targetDate = tomorrow`. Invites now go out at DOJ−1 for day-one sessions, matching that, rather than an hour before a 09:00 start. | Eng | 2026-10-15 |
 | C | Onboarding RBAC gate | **Superseded.** Applied to the onboarding page, not the `/onboarding` layout, so `/onboarding/review/[token]` stayed reachable by anyone holding an invitation token. See F. | Eng | 2026-10-14 |
 | F | `/onboarding/review/[token]` requires a session | Reverses C. That route is the P&C audit screen — it approves candidates and provisions accounts — so it was never a candidate-facing page, and the token in its URL is an identifier, not a credential. The public candidate portal remains `/onboarding/<token>`, matched in `middleware.ts` as a single dynamic segment with the dashboard's own `candidate`, `employee` and `review` segments excluded. | Eng | 2026-10-16 |
+| 7 | Cutover owner and rollback | **Nitin owns the cutover from the Apps Script.** The script stays restorable, switched off, for 30 days after the platform takes over the Day-1, Slack and induction messages. | Nitin | 2026-11-11 |
+| 9 | Legacy sources | **Kept in the private security repository**, not this one. It can be cross-referenced from there by people who can open it; nothing in this repository copies it. | Nitin | 2026-11-11 |

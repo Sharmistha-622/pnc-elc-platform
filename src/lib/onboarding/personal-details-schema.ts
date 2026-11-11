@@ -11,7 +11,9 @@ import type { OptionalFieldKey, OptionalFieldSettings } from '@/lib/dpdp/optiona
 // (DPDP Act s. 6(1), s. 8(3)).
 // ============================================================================
 
-export const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say'] as const
+// Transgender is offered in line with the Transgender Persons (Protection of
+// Rights) Act 2019 (decided 2026-11-11).
+export const GENDER_OPTIONS = ['Female', 'Male', 'Transgender', 'Non-binary', 'Prefer not to say'] as const
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Not known'] as const
 export const RELATIONS = ['Parent', 'Spouse or partner', 'Sibling', 'Child', 'Relative', 'Friend', 'Other'] as const
 

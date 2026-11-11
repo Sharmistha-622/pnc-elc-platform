@@ -11,13 +11,9 @@ internal identifiers that would be published permanently in git history:
 They contain **no credentials** — every token is read from `PropertiesService` at
 runtime — so the exposure is identifiers and names, not secrets.
 
-Before adding them, pick one:
-
-1. **Make the repository private**, then commit the scripts unmodified. Best for
-   parity work, since every line stays reviewable.
-2. **Commit them with identifiers redacted** to placeholders. Keeps the control
-   flow reviewable; loses the exact IDs, which are not needed for parity anyway.
-3. **Keep them out of the repository** and share them out of band for review.
+**Decided 2026-11-11:** they are kept in the private security repository,
+not here (`docs/onboarding-decisions.md`, #9). Ask the owner for access to
+read them. Nothing from them is copied into this repository.
 
 **The port that captured this behaviour has since been reverted**, so these
 scripts are once again the only description of it that exists. See

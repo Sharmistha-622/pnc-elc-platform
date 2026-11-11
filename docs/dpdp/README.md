@@ -66,6 +66,19 @@ documents go at the later of 90 days after withdrawal and 1 year after
 upload. POSH case files have no default period and are report-only until
 counsel decides.
 
+The owner confirmed both on 2026-11-11 (#107): the floor stays on every
+delete, and POSH files stay report-only, until counsel says otherwise. The
+periods themselves are still with counsel.
+
+### Decided
+
+| Question | Outcome | Date |
+|---|---|---|
+| Who sees DPDP settings and privacy cases (#108) | As built: see `docs/rbac.md`, "Privacy (DPDP)" | 2026-11-11 |
+| Documents copied to Drive at handover (#109) | **None.** Documents stay on the platform, so erasure and retention reach every copy. PnC can still choose types in Data collection; identity and bank documents can never be chosen (`202611111100_drive_copy_none.sql`) | 2026-11-11 |
+| Gender options on the candidate form (#110) | Female, Male, **Transgender**, Non-binary, Prefer not to say, with no default. Transgender is offered in line with the Transgender Persons (Protection of Rights) Act 2019 (`docs/dpdp/legal-blueprint.md` §9). Whether it is asked or required stays a Data collection setting | 2026-11-11 |
+| Sealing budgets (#111) | **Fixed ceilings** of 14 days (a verified document) and 30 days (written feedback). PnC can lower them, never raise them (`docs/vault-inventory.md`) | 2026-11-11 |
+
 ## The daily job
 
 `/api/cron/dpdp-retention` runs every night at 02:00 IST (`vercel.json`). It

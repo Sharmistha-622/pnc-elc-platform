@@ -45,6 +45,7 @@ insert into public.candidate_letters (candidate_name, template_name, letter_type
   values ('A Candidate', 'Offer', 'offer', 'FTE', 'Your CTC is ₹60,000 per month');
 
 insert into public.email_provider_config (id) values ('probe') on conflict do nothing;
+insert into public.mail_account_credentials (account_id, refresh_token) values ('probe', 'probe-token') on conflict do nothing;
 
 -- A review cycle for R: R reflects, M (R's manager) reviews, X is a peer.
 insert into public.review_cycles (id, kind, employee_id, manager_id, period_key, stage)
@@ -180,7 +181,9 @@ insert into pg_temp.expectations values
   ('confirmations',          '{"employee (R)","peer (X)","manager (M)",pnc_ops,pnc_admin,fin_admin,exec_view,super_admin}'),
   -- Feedback text: never the subject, never Finance or the platform team.
   -- (pnc_ops is a known, documented residual — see the migration.)
-  ('peer_feedback',          '{"peer (X)","manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
+  ('peer_feedback',          '{"peer (X)","manager (M)",pnc_admin,exec_view,super_admin}'),
+  -- Who was asked and who answered, never the text: PnC Ops reads this.
+  ('peer_feedback_status',   '{"manager (M)",pnc_ops,pnc_admin,exec_view,super_admin}'),
   -- Full and final is salary.
   ('offboarding_fnf',        '{pnc_admin,fin_admin,super_admin}'),
   ('offboarding_cases',      '{pnc_ops,pnc_admin,fin_admin,super_admin}'),
@@ -188,6 +191,8 @@ insert into pg_temp.expectations values
   ('candidate_letters',      '{pnc_admin,fin_admin,super_admin}'),
   -- Provider secrets: config editors.
   ('email_provider_config',  '{platform_admin,super_admin}'),
+  -- Mail account credentials: the service role only, no session at all.
+  ('mail_account_credentials', '{}'),
   ('audit_log',              '{pnc_admin,platform_admin,platform_ops,super_admin}'),
   -- Review cycles: the review roles, R's manager and R. Not the peer: a peer
   -- sees only their own form. Not Finance, not the platform team.
@@ -368,6 +373,23 @@ do $$
 begin
   if (select state_code from public.ng_locations where name = 'Navigo Pune') is distinct from 'GA' then
     insert into pg_temp.failures values ('pnc_admin', 'ng_locations', 'can set a location''s state', 0);
+  end if;
+end $$;
+
+-- PnC Ops nominates peers; only the peer and P&C admins change a feedback row.
+do $$ begin perform set_config('request.jwt.claims', pg_temp.claims('ops@navgurukul.org'), false); end $$;
+set role authenticated;
+update public.peer_feedback set feedback_text = 'rewritten';
+insert into public.peer_feedback (id, confirmation_id, peer_name, response_status)
+  values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000c1', 'Nominated', 'pending');
+reset role;
+do $$
+begin
+  if exists (select 1 from public.peer_feedback where feedback_text = 'rewritten') then
+    insert into pg_temp.failures values ('pnc_ops', 'peer_feedback', 'feedback text unchanged', 1);
+  end if;
+  if not exists (select 1 from public.peer_feedback where id = '00000000-0000-0000-0000-0000000000f9') then
+    insert into pg_temp.failures values ('pnc_ops', 'peer_feedback', 'can nominate a peer', 0);
   end if;
 end $$;
 

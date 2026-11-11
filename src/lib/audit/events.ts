@@ -1,4 +1,4 @@
-import { recordAuditEvent } from './service';
+import { recordAuditEvent, recordAuditEventStrict } from './service';
 import type {
   AuditActorType,
   AuditEventInput,
@@ -376,6 +376,23 @@ export const auditPeerFeedback = {
       `Peer feedback submitted${o.reviewer ? ` by ${o.reviewer}` : ''}.`,
       { ...o, entityType: 'peer_feedback' }
     ),
+
+  /**
+   * Super Admin saw who wrote which peer review on one cycle. The reason is
+   * free text, so it goes in metadata, never in the description (DPDP-41).
+   */
+  reviewersRevealed: (o: BaseOptions & { reason: string; peerCount: number }): Promise<boolean> =>
+    recordAuditEventStrict(toInput(
+      'peer_feedback',
+      'peer_feedback.reviewers.revealed',
+      'Peer reviewers revealed for one review.',
+      {
+        ...o,
+        entityType: 'review_cycle',
+        severity: 'warning',
+        metadata: { ...(o.metadata ?? {}), reason: o.reason, peer_count: o.peerCount },
+      }
+    )),
 
   redFlagRaised: (o: BaseOptions & { keyword?: string }) =>
     auditEvent(

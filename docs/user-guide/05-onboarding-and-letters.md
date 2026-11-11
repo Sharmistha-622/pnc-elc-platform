@@ -77,7 +77,9 @@ The list of every candidate.
   - **Review** opens the candidate's review page.
   - **⋮ › Send / Resend Invitation Email**. The portal link is the
     candidate's own: it reaches them by email only, and staff screens don't
-    show it.
+    show it. Each send is a **new link**, valid for 7 days (set in
+    **Settings › DPDP & Privacy › Links & staging**, 1 to 30 days); the
+    previous link stops working.
 
 ## Creating a candidate (`/onboarding/candidate/new`)
 
@@ -145,8 +147,10 @@ They can do the six steps in any order:
 | **5. Offer & Appointment Letter** | View *Annexure A* (salary breakdown), preview each letter, and **Sign**: draw a signature, type their legal name, tick consent, **Confirm & Affix Signature**. |
 | **6. Final Submission** | **Submit Onboarding to P&C**. The button unlocks only when details, required documents, terms, all policies and all letters are done; anything missing is listed. |
 
-The link stops working once onboarding is complete or the candidate is
-withdrawn. It doesn't expire by date.
+The link stops working once onboarding is complete, the candidate is
+withdrawn, or its validity period ends (7 days by default). A candidate with
+an expired link is asked to get a new one from P&C: use **Resend Invitation
+Email**.
 
 > **Heads-up for PnC:** a *Request Correction* from the candidate is only
 > recorded in the audit log; **no email reaches PnC.** Check candidates in

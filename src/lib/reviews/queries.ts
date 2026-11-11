@@ -8,6 +8,9 @@
 //   PnC who read feedback   statuses, every review (peers without names),
 //   (Super Admin, PnC         the decision, the timeline
 //   Admin, Exec View)
+//   Super Admin, in a       who wrote which peer review, after giving a
+//   reveal                  reason; each reveal is audit-logged
+//                           (`revealPeerReviewers` in ./actions)
 //   PnC Ops                 statuses and the timeline. Never what anyone
 //                           wrote: the matrix gives them `status_only`.
 //   The manager             statuses, the self-reflection, the peer reviews
@@ -50,14 +53,21 @@ export const REVIEW_ADMINS = ['super_admin', 'pnc_admin', 'pnc_ops', 'exec_view'
 export const REVIEW_OPERATORS = ['super_admin', 'pnc_admin', 'pnc_ops'] as const
 /** Roles that close a cycle: PnC's own decision. */
 export const REVIEW_CLOSERS = ['super_admin', 'pnc_admin'] as const
+/**
+ * Who may see which peer wrote which review, one cycle at a time, with a
+ * reason, for suspected tampering or misconduct. Never on their own review,
+ * nor on one they manage. Decided 2026-11-11.
+ */
+export const REVIEW_REVEALERS = ['super_admin'] as const
 
 /**
  * Peer answers are shown only once this many peers have answered, so that
  * a manager cannot tell who wrote what from who has submitted. Added: the
  * request asked for peer reviews to reach the manager and PnC; this keeps the
- * "without your name" promise the peer form makes.
+ * "without your name" promise the peer form makes. Raised from 2 to 3 on
+ * 2026-11-11.
  */
-export const MIN_PEERS_FOR_ANONYMITY = 2
+export const MIN_PEERS_FOR_ANONYMITY = 3
 
 export type Relationship = {
   /** Runs cycles org-wide (see REVIEW_ADMINS). */
@@ -68,6 +78,8 @@ export type Relationship = {
   operator: boolean
   /** May close a cycle: PnC's own call. */
   closer: boolean
+  /** May reveal who wrote which peer review (REVIEW_REVEALERS), with a reason. */
+  revealsPeers: boolean
   isManager: boolean
   isSubject: boolean
 }
@@ -87,6 +99,7 @@ export function relationship(
     readsText: (admin && mayReadFeedbackText(caller)) || isManager,
     operator: passes({ ...caller, userId: 'x' } as Guarded, REVIEW_OPERATORS),
     closer: passes({ ...caller, userId: 'x' } as Guarded, REVIEW_CLOSERS) && !isSubject,
+    revealsPeers: passes({ ...caller, userId: 'x' } as Guarded, REVIEW_REVEALERS) && !isSubject && !isManager,
     isManager,
     isSubject,
   }
@@ -125,6 +138,8 @@ export type CycleSummary = {
 
 export type ReviewAnswer = { label: string; value: string }
 export type ReviewBlock = { title: string; submittedAt: string | null; answers: ReviewAnswer[] }
+/** One question of the peer form, with every peer's answer to it. */
+export type PeerQuestion = { label: string; answers: string[] }
 
 export type CycleDetail = CycleSummary & {
   rel: Relationship
@@ -133,7 +148,13 @@ export type CycleDetail = CycleSummary & {
   reviews: {
     self: ReviewBlock | null
     manager: ReviewBlock | null
-    peers: ReviewBlock[]
+    /**
+     * Peer answers by question. Each question's answers are sorted by their
+     * own text, so nothing lines one peer's answers up across questions.
+     */
+    peers: PeerQuestion[]
+    /** How many peers' answers are in `peers`. */
+    peerCount: number
     peersHidden: boolean
   } | null
   decision: (Pick<DecisionRow, 'decision' | 'extend_until' | 'note' | 'decided_at' | 'pnc_outcome' | 'pnc_note' | 'pnc_reviewed_at' | 'pnc_reviewed_by'> & { decidedByName: string | null }) | null
@@ -332,14 +353,25 @@ export async function getMyReviews(): Promise<{ mine: CycleSummary[]; team: Cycl
 // One cycle
 // ----------------------------------------------------------------------------
 
-async function readReviews(cycle: CycleRow, participants: ParticipantRow[], rel: Relationship): Promise<CycleDetail['reviews']> {
-  if (!rel.readsText) return null
+export type SubmittedReviews = {
+  self: ReviewBlock | null
+  manager: ReviewBlock | null
+  /** Each peer's answers with who wrote them. Never leaves the server as is. */
+  peers: { employeeId: string; block: ReviewBlock }[]
+}
+
+/**
+ * Every submitted review of a cycle, peers with their authors. Service role:
+ * callers decide what of it the viewer may have (`readReviews` drops the
+ * authors; `revealPeerReviewers` keeps them for Super Admin).
+ */
+export async function loadSubmittedReviews(participants: ParticipantRow[]): Promise<SubmittedReviews | null> {
   const db = createAdminSupabaseClient()
   if (!db) return null
 
   const submitted = participants.filter((p) => p.status === 'submitted' && p.form_request_id)
   const requestIds = submitted.map((p) => p.form_request_id as string)
-  if (requestIds.length === 0) return { self: null, manager: null, peers: [], peersHidden: false }
+  if (requestIds.length === 0) return { self: null, manager: null, peers: [] }
 
   const { data: subs } = await db
     .from('form_submissions')
@@ -382,22 +414,54 @@ async function readReviews(cycle: CycleRow, participants: ParticipantRow[], rel:
   const selfSub = selfP && subFor(selfP)
   const managerSub = managerP && subFor(managerP)
 
-  const peerSubs = submitted
+  const peers = submitted
     .filter((p) => p.role === 'peer')
-    .map(subFor)
-    .filter((s): s is (typeof submissions)[number] => Boolean(s))
-    // Ordered by submission id, which says nothing about who wrote it.
-    .sort((a, b) => a.id.localeCompare(b.id))
-  const peersHidden = peerSubs.length > 0 && peerSubs.length < MIN_PEERS_FOR_ANONYMITY
+    .map((p) => ({ p, s: subFor(p) }))
+    .filter((x): x is { p: ParticipantRow; s: (typeof submissions)[number] } => Boolean(x.s))
+    .map(({ p, s }) => ({ employeeId: p.employee_id, block: block('Peer review', s) }))
 
   return {
     self: selfSub ? block('Self-reflection', selfSub) : null,
     manager: managerSub ? block('Manager review', managerSub) : null,
-    // Submission times are dropped from peer blocks: next to the status
-    // list, a timestamp would name the writer.
-    peers: peersHidden ? [] : peerSubs.map((s, i) => ({ ...block(`Peer review ${i + 1}`, s), submittedAt: null })),
-    peersHidden,
+    peers,
   }
+}
+
+/**
+ * Peer answers by question, with nothing that ties one answer to another or
+ * to its writer: no name, no time, no per-person grouping. Each question's
+ * answers are sorted by their own text. Empty answers are left out. Pure.
+ */
+export function groupPeerAnswers(blocks: ReviewBlock[]): PeerQuestion[] {
+  const order: string[] = []
+  const byLabel = new Map<string, string[]>()
+  for (const b of blocks) {
+    for (const a of b.answers) {
+      if (!byLabel.has(a.label)) {
+        byLabel.set(a.label, [])
+        order.push(a.label)
+      }
+      if (a.value && a.value.trim() !== '') byLabel.get(a.label)!.push(a.value)
+    }
+  }
+  return order
+    .map((label) => ({ label, answers: [...byLabel.get(label)!].sort((x, y) => x.localeCompare(y)) }))
+    .filter((q) => q.answers.length > 0)
+}
+
+/** What a reader of the reviews gets of the peers: nothing below the minimum. Pure. */
+export function anonymousPeers(blocks: ReviewBlock[]): { peers: PeerQuestion[]; peerCount: number; peersHidden: boolean } {
+  const peersHidden = blocks.length > 0 && blocks.length < MIN_PEERS_FOR_ANONYMITY
+  return peersHidden
+    ? { peers: [], peerCount: 0, peersHidden }
+    : { peers: groupPeerAnswers(blocks), peerCount: blocks.length, peersHidden }
+}
+
+async function readReviews(participants: ParticipantRow[], rel: Relationship): Promise<CycleDetail['reviews']> {
+  if (!rel.readsText) return null
+  const loaded = await loadSubmittedReviews(participants)
+  if (!loaded) return null
+  return { self: loaded.self, manager: loaded.manager, ...anonymousPeers(loaded.peers.map((x) => x.block)) }
 }
 
 export async function getCycleDetail(cycleId: string): Promise<CycleDetail | null> {
@@ -486,7 +550,7 @@ export async function getCycleDetail(cycleId: string): Promise<CycleDetail | nul
     ...summarise(cycle, participants, names, settings.meeting_ready_peer_ratio),
     rel,
     participants: views,
-    reviews: await readReviews(cycle, participants, rel),
+    reviews: await readReviews(participants, rel),
     decision,
     events,
     settings: { reminder_interval_hours: settings.reminder_interval_hours, meeting_duration_minutes: settings.meeting_duration_minutes },

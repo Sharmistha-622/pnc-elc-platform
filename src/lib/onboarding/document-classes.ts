@@ -26,8 +26,12 @@ export function isIdentityOrBankDocument(type: string | null | undefined): boole
   return !!type && NEVER_TO_DRIVE.has(type.trim().toLowerCase())
 }
 
-/** The seeded Drive allow-list: every candidate type that is neither. */
-export const DEFAULT_DRIVE_COPY_TYPES = [
+/**
+ * The types PnC may choose to copy to Drive: every candidate type that is
+ * neither identity nor bank. None is chosen by default (decided 2026-11-11):
+ * documents stay on the platform, so erasure and retention reach every copy.
+ */
+export const DRIVE_COPYABLE_TYPES = [
   'resume',
   'photo',
   'education_certificate',

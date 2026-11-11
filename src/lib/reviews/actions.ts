@@ -34,7 +34,18 @@ import {
   type AutomationSummary,
   type Ctx,
 } from './service'
-import { relationship, REVIEW_CLOSERS, REVIEW_OPERATORS, type Relationship } from './queries'
+import {
+  loadSubmittedReviews,
+  relationship,
+  REVIEW_CLOSERS,
+  REVIEW_OPERATORS,
+  REVIEW_REVEALERS,
+  type Relationship,
+  type ReviewAnswer,
+} from './queries'
+import { auditPeerFeedback } from '@/lib/audit/events'
+import { resolveEmployeeSubject } from '@/lib/audit/subject'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { DEFAULT_REVIEW_CYCLE_SETTINGS, type CycleRow, type ReviewCycleSettings, type ReviewDecision, type ReviewKind } from './types'
 import { isoDate } from './engine'
 
@@ -419,4 +430,65 @@ export async function reviewToday(): Promise<string> {
   const allowed = await guard('self')
   if (!allowed.ok) return ''
   return isoDate(new Date())
+}
+
+// ----------------------------------------------------------------------------
+// Revealing peer reviewers
+// ----------------------------------------------------------------------------
+
+/** A reason long enough to mean something, short enough to be one. */
+const REVEAL_REASON = { min: 10, max: 500 }
+
+export type RevealedPeerReview = { reviewer: string; answers: ReviewAnswer[] }
+
+/**
+ * Who wrote which peer review on one cycle: Super Admin only, for suspected
+ * tampering or misconduct, never on their own review or one they manage.
+ * A reason is required, and every reveal is audit-logged (who, when, which
+ * review, why). Nothing is stored for the browser to show again: the answer
+ * goes to this caller, this once. The cycle's timeline, which the manager
+ * reads, records nothing.
+ */
+export async function revealPeerReviewers(
+  cycleId: string,
+  reason: string,
+): Promise<{ ok: true; reviews: RevealedPeerReview[] } | { ok: false; error: string }> {
+  const allowed = await guard(REVIEW_REVEALERS)
+  if (!allowed.ok) return { ok: false, error: allowed.error }
+  const why = typeof reason === 'string' ? reason.trim() : ''
+  if (why.length < REVEAL_REASON.min || why.length > REVEAL_REASON.max) {
+    return { ok: false, error: `Give a reason of ${REVEAL_REASON.min} to ${REVEAL_REASON.max} characters.` }
+  }
+
+  const s = await standing(allowed.caller, cycleId)
+  if (!s || !s.rel.revealsPeers) return { ok: false, error: NOT_ALLOWED }
+
+  const db = createAdminSupabaseClient()
+  if (!db) return { ok: false, error: NO_SERVICE }
+  const { data: partRows } = await db.from('review_participants').select('*').eq('cycle_id', cycleId)
+  const loaded = await loadSubmittedReviews((partRows ?? []) as Parameters<typeof loadSubmittedReviews>[0])
+  if (!loaded) return { ok: false, error: NO_SERVICE }
+
+  const ids = [...new Set(loaded.peers.map((p) => p.employeeId))]
+  const { data: people } = ids.length ? await db.from('employees').select('id, name').in('id', ids) : { data: [] }
+  const names = new Map(((people ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]))
+
+  // Logged before the answer goes back, and refused if the log cannot be
+  // written: a reveal nobody can see later is the thing this guards against.
+  const logged = await auditPeerFeedback.reviewersRevealed({
+    subject: await resolveEmployeeSubject(s.cycle.employee_id),
+    actorEmail: allowed.caller.email,
+    actorType: 'pnc',
+    entityId: cycleId,
+    reason: why,
+    peerCount: loaded.peers.length,
+  })
+  if (!logged) return { ok: false, error: 'The reveal could not be logged, so it was not shown.' }
+
+  return {
+    ok: true,
+    reviews: loaded.peers
+      .map((p) => ({ reviewer: names.get(p.employeeId) ?? 'Unknown', answers: p.block.answers }))
+      .sort((a, b) => a.reviewer.localeCompare(b.reviewer)),
+  }
 }
