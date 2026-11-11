@@ -24,7 +24,7 @@ function sourceFiles(dir = SRC): string[] {
 }
 
 const files = sourceFiles().map((file) => ({
-  file: path.relative(process.cwd(), file),
+  file: path.relative(process.cwd(), file).split(path.sep).join('/'),
   text: fs.readFileSync(file, 'utf8'),
 }))
 
