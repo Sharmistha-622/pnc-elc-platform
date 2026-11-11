@@ -51,9 +51,10 @@ real work.** Items are grouped by area.
   screen yet.
 - There's no button to **withdraw** a candidate, or to delete a withdrawn
   candidate's documents.
-- Documents that were sealed into the vault on verification may not be
-  copied into the employee's Drive folder when the account is created. Check
-  the employee's **Documents** page.
+- No document is copied into the employee's Drive folder when the account is
+  created, unless PnC chooses document types in **Settings → DPDP & Privacy →
+  Data collection**. Identity and bank documents are never copied. Check the
+  employee's **Documents** page.
 
 ## Reviews and confirmations
 

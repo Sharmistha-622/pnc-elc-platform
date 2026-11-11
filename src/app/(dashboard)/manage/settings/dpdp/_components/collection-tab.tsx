@@ -5,7 +5,7 @@ import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OPTIONAL_FIELD_KEYS, OPTIONAL_FIELD_LABELS, type OptionalFieldSettings } from '@/lib/dpdp/optional-fields'
-import { BANK_DOCUMENT_TYPES, DEFAULT_DRIVE_COPY_TYPES, IDENTITY_DOCUMENT_TYPES } from '@/lib/onboarding/document-classes'
+import { BANK_DOCUMENT_TYPES, DRIVE_COPYABLE_TYPES, IDENTITY_DOCUMENT_TYPES } from '@/lib/onboarding/document-classes'
 import { dataCollectionSchema } from '@/lib/dpdp/settings/schemas'
 import { updateDataCollection } from '@/lib/dpdp/settings/actions'
 import type { DpdpSettings } from '@/lib/dpdp/settings/types'
@@ -70,7 +70,7 @@ export const CollectionTab = ({ settings, canEdit }: { settings: DpdpSettings; c
         description="When an account is created, verified documents of these types may be copied to the employee's Drive folder. Identity and bank documents never are."
       >
         <fieldset disabled={!canEdit || pending} className="grid gap-2 sm:grid-cols-2">
-          {DEFAULT_DRIVE_COPY_TYPES.map((t) => (
+          {DRIVE_COPYABLE_TYPES.map((t) => (
             <label key={t} className="flex items-center gap-2 text-xs">
               <Checkbox checked={drive.includes(t)} onCheckedChange={(c) => setDrive((prev) => (c ? [...new Set([...prev, t])] : prev.filter((x) => x !== t)))} />
               {t.replace(/_/g, ' ')}

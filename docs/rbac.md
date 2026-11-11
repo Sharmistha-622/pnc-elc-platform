@@ -112,6 +112,9 @@ rights requests, incidents and legal holds. It maps to four features in
 | `privacyCases` | Super Admin, PnC Admin | Rights requests, incidents and legal holds (`/manage/privacy`), which hold people's personal data |
 | `myPrivacy` | every staff role | **My Privacy** (`/my-privacy`): their own data, consents and requests |
 
+These lists were confirmed as built on 2026-11-11 (#108): no Privacy Officer
+role for now, and Exec View keeps read access to the settings.
+
 Candidates and pre-joiners reach their notice, consents and requests through
 the token portal, never a feature.
 
@@ -211,6 +214,9 @@ Admin.
 | 3 | Candidate access | **A link emailed each time.** A candidate holds no account and is not a Supabase user: every visit to the offer page or the portal starts from a fresh link sent to their email. `sync-person` copies them into the vault from core's record, not from an account. | 2026-11-04 |
 | 6 | Withdrawn joiners' documents | **Deleted after a hold period: 90 days after withdrawal, for now.** PnC can change the period in Settings. `purgeWithdrawnDocuments` runs on a schedule, using that setting. | 2026-11-04 |
 | 9 | Full document numbers | **Aadhaar is collected. Everyone sees the last four digits only, the rest masked (`XXXX XXXX 1234`).** Only Super Admin, PnC Admin, Fin Admin and Fin Ops can see a full number, and never without a reason: the eye icon shows a notice that the view is logged under the DPDP Act, and asks for one. Super Admin, PnC Admin and Fin Admin then see the number straight away. Fin Ops sends a request instead, which PnC Admin or Fin Admin approves or refuses, with a reason; an approval is good for one view. Every view, request, approval and refusal is logged: who, when and why. Until that is built, the full number is readable only through `read_identity_number` (Super Admin, PnC Admin, Fin Admin, Fin Ops; Exec View refused). | 2026-11-04 |
+| 4 | Signing | **Signed on the platform; Form 11 uploaded.** The offer and the agreement are signed in the candidate portal: the candidate draws a signature or uploads an image of one, and the server records the time, network address and user agent. EPF Form 11 is signed on paper and uploaded. | 2026-11-11 |
+| 5 | Account creation | **ELC creates the Google Workspace account; Slack is recorded.** The platform creates the Workspace account and sends the login details (#152), with a manual path for when that fails. Slack accounts stay manual, and the platform records who made them. Every step is audit-logged with who did it (the system, or a person by name and email) and when. How the login details are sent still has to be squared with onboarding decisions B and D, which keep credential emails manual (`docs/onboarding-decisions.md`). | 2026-11-11 |
+| 8 | Group count | **Seven:** Owner, PnC, Finance, Leadership, Platform, Line, Lifecycle, as the matrix and the code already have. The source document's "six" was a miscount. | 2026-11-11 |
 
 #1 and #2 were answered the same way, and became one mechanism — see
 `src/lib/vault/sealing.ts`.
@@ -222,10 +228,7 @@ these blocks the role model or the vault build.
 
 | # | Question | Why it matters |
 |---|---|---|
-| 4 | **Signing** — e-sign or upload, for the offer, agreement and Form 11. | |
-| 5 | **Account creation** — whether ELC creates Workspace and Slack accounts or only records who did. | |
-| 7 | **Per-type rules** — document checklist, PF/EPF applicability and confirmation offset per employee type. | |
-| 8 | **Group count.** The summary says six groups; the matrix lists seven (Owner, PnC, Finance, Leadership, Platform, Line, Lifecycle). The code encodes seven. | cosmetic, but the two should agree |
+| 7 | **Per-type rules** — document checklist, PF/EPF applicability and confirmation offset per employee type. | P&C to answer |
 
 ## Migration from the previous roles
 
@@ -236,7 +239,7 @@ and Super Admin promotes the few who need more.
 | Was | Becomes | Why |
 |---|---|---|
 | Super Admin | `super_admin` | |
-| Admin | `platform_admin` | closest match: core accounts, templates, automation. **Needs confirmation** — it removes their PnC powers. |
+| Admin | `platform_admin` | closest match: core accounts, templates, automation. **Confirmed 2026-11-11.** It removes their PnC powers; anyone who still needs them is granted a PnC role one by one in Users & Roles. |
 | PnC | `pnc_ops` | not `pnc_admin`: that would hand salary sight to everyone who had PnC |
 | Finance | `fin_ops` | not `fin_admin`: view before edit |
 | Manager | `manager` | then re-derived from the reporting line |
