@@ -61,10 +61,6 @@ real work.** Items are grouped by area.
 - **Meeting slots are picked without reading real calendars.** Check the
   booked time and move it if needed.
 - The daily job runs **once a morning**, so reminders aren't to the minute.
-- The **older Confirmations screens** use different decision options (Yes /
-  No-reschedule) from the new flow (Confirm / Extend / Do not confirm). Some
-  text there (e.g. "15 Days Before Due", "Min. 3 Responses") is fixed and
-  doesn't follow Settings.
 - Accepting **Do not confirm** only closes the review. Nothing changes on the
   employee record, and the next step is up to PnC.
 - The **Appraisals** page is read-only, its *Cycle Status* card always reads

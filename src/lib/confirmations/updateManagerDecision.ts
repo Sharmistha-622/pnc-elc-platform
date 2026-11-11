@@ -4,11 +4,13 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { auditConfirmation } from '@/lib/audit/events'
 import { resolveEmployeeSubject } from '@/lib/audit/subject'
 import { guard } from '@/lib/rbac/guard'
+import { type ConfirmationDecision } from '@/lib/reviews/types'
 import { confirmationEmployeeId, mayActOnConfirmationOf } from './access'
+import { normalizeConfirmationDecision } from './guidelines'
 
 export async function updateManagerDecision(
   confirmationId: string,
-  decision: 'yes' | 'no',
+  decision: ConfirmationDecision | 'yes' | 'no',
   rescheduleDate?: string
 ) {
   // The decision is the reporting manager's — whatever role they hold — or
@@ -16,7 +18,8 @@ export async function updateManagerDecision(
   // PnC Ops) holds no write on someone else's report's performance.
   const allowed = await guard('dashboard')
   if (!allowed.ok) return null
-  if (decision !== 'yes' && decision !== 'no') return null
+  const canonical = normalizeConfirmationDecision(decision)
+  if (!canonical) return null
 
   const supabase = await createServerSupabaseClient()
   const subjectId = await confirmationEmployeeId(supabase, confirmationId)
@@ -24,16 +27,22 @@ export async function updateManagerDecision(
     return null
   }
 
+  const statusByDecision: Record<ConfirmationDecision, string> = {
+    confirm: 'approved',
+    extend_probation: 'rescheduled',
+    not_confirmed: 'rejected',
+  }
+
   const updateData: {
-    manager_decision: string
+    manager_decision: ConfirmationDecision
     status: string
     reschedule_date?: string
   } = {
-    manager_decision: decision,
-    status: decision === 'yes' ? 'approved' : 'rescheduled',
+    manager_decision: canonical,
+    status: statusByDecision[canonical],
   }
 
-  if (decision === 'no' && rescheduleDate) {
+  if (canonical === 'extend_probation' && rescheduleDate) {
     updateData.reschedule_date = rescheduleDate
   }
 
@@ -50,20 +59,27 @@ export async function updateManagerDecision(
   }
 
   const subject = await resolveEmployeeSubject(data.employee_id)
-  if (decision === 'yes') {
+  if (canonical === 'confirm') {
     await auditConfirmation.managerDecision({
       subject,
       entityId: confirmationId,
       entityType: 'confirmation',
-      decision: 'Confirm employment',
+      decision: 'Confirm',
     })
-  } else {
+  } else if (canonical === 'extend_probation') {
     await auditConfirmation.extended({
       subject,
       entityId: confirmationId,
       entityType: 'confirmation',
       until: rescheduleDate,
-      reason: 'Manager deferred confirmation',
+      reason: 'Manager extended probation',
+    })
+  } else {
+    await auditConfirmation.managerDecision({
+      subject,
+      entityId: confirmationId,
+      entityType: 'confirmation',
+      decision: 'Do not confirm',
     })
   }
 
