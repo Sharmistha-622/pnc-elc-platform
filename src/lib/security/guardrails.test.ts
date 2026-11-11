@@ -128,6 +128,64 @@ describe('server actions', () => {
   })
 })
 
+/**
+ * A CODEOWNERS pattern as a regular expression over repository paths: a
+ * leading `/` anchors it to the root, a trailing `/` owns everything below,
+ * `**\/` stands for any number of directories and `*` for part of one name.
+ */
+function codeownersPattern(pattern: string): RegExp {
+  const anchored = pattern.startsWith('/')
+  let p = anchored ? pattern.slice(1) : pattern
+  const isDir = p.endsWith('/')
+  if (isDir) p = p.slice(0, -1)
+  let re = ''
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i]
+    if (c === '*' && p[i + 1] === '*') {
+      if (p[i + 2] === '/') {
+        re += '(?:.*/)?'
+        i += 2
+      } else {
+        re += '.*'
+        i += 1
+      }
+    } else if (c === '*') re += '[^/]*'
+    else re += c.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+  }
+  return new RegExp(`^${anchored ? '' : '(?:.*/)?'}${re}${isDir ? '/.*' : '(?:/.*)?'}$`)
+}
+
+const codeowners = fs
+  .readFileSync(path.join(process.cwd(), '.github/CODEOWNERS'), 'utf8')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith('#'))
+  .map((line) => codeownersPattern(line.split(/\s+/)[0]))
+
+const isCodeOwned = (file: string) => codeowners.some((re) => re.test(file.split(path.sep).join('/')))
+
+describe('code owners', () => {
+  // A server action is as reachable as a route handler, so a change to one
+  // gets a code owner's review too (REVIEW.md §1).
+  const serverActionFiles = files.filter((f) => directive(f.text) === 'use server').map((f) => f.file)
+
+  it('finds the server-action files', () => {
+    expect(serverActionFiles.length).toBeGreaterThan(30)
+  })
+
+  it('owns every server-action file', () => {
+    expect(serverActionFiles.filter((f) => !isCodeOwned(f))).toEqual([])
+  })
+
+  it('reads the patterns the way GitHub does, so a new file outside them fails', () => {
+    expect(isCodeOwned('src/lib/settings/access.ts')).toBe(true)
+    expect(isCodeOwned('src/lib/access.ts')).toBe(true)
+    expect(isCodeOwned('src/lib/rbac/setUserRole.ts')).toBe(true)
+    expect(isCodeOwned('src/lib/new-area/actions.ts')).toBe(false)
+    expect(isCodeOwned('src/lib/forms/getMyForms.ts')).toBe(false)
+  })
+})
+
 describe('client components', () => {
   const client = files.filter((f) => directive(f.text) === 'use client')
 
