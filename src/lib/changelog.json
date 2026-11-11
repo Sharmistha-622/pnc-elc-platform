@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.14.05",
+    "date": "2026-11-11",
+    "title": "A directory view for colleagues' names; employee records per the matrix",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "employee records are read by the roles the matrix allows; colleagues' names come from a directory view"
+      },
+      {
+        "category": "Improvements",
+        "description": "a peer picked from the directory is emailed at the address on their record"
+      }
+    ]
+  },
+  {
     "version": "2.14.04",
     "date": "2026-11-11",
     "title": "Record the November decisions on roles, privacy, onboarding and payroll",
