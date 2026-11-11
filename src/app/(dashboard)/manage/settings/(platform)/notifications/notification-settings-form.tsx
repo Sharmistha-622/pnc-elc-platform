@@ -1005,7 +1005,7 @@ export function NotificationSettingsForm({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground font-semibold">Sender:</span>
-                <span className="font-medium text-foreground">NavGurukul People & Culture &lt;pnc@navgurukul.org&gt;</span>
+                <span className="font-medium text-foreground">NavGurukul People &amp; Culture &lt;pnc@example.org&gt;</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground font-semibold">Sent Timestamp:</span>

@@ -657,7 +657,7 @@ export function SignatoriesTable({
               </Label>
               <Input
                 type="email"
-                placeholder="e.g. nitin@navgurukul.org"
+                placeholder="e.g. signatory@example.org"
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
                 className="text-xs h-9"

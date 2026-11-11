@@ -750,7 +750,7 @@ export async function scheduleMeeting(ctx: Ctx, cycleId: string, start: Date): P
     end,
     summary: `${kindTitle} review: ${subject.name}`,
     description: `${kindTitle} review meeting for ${subject.name}${manager ? ` with ${manager.name}` : ''} and PnC.\n${myReviewUrl(ctx, cycle.id)}`,
-    organizer: { name: 'NavGurukul ELC', email: process.env.GOOGLE_SENDER_EMAIL || 'elc@navgurukul.org' },
+    organizer: { name: 'NavGurukul ELC', email: process.env.GOOGLE_SENDER_EMAIL || 'noreply@example.org' },
     attendees,
     now: ctx.now,
   })

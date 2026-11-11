@@ -55,9 +55,9 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess, callerRole = n
     // Role codes, not display names: these are what the app stores.
     const csvContent =
       "email,full_name,role,team\n" +
-      "rahul.sharma@navgurukul.org,Rahul Sharma,employee,Engineering\n" +
-      "priya.singh@navgurukul.org,Priya Singh,pnc_ops,PnC\n" +
-      "amit.kumar@navgurukul.org,Amit Kumar,fin_ops,Finance\n";
+      "rahul.sharma@example.org,Rahul Sharma,employee,Engineering\n" +
+      "priya.singh@example.org,Priya Singh,pnc_ops,PnC\n" +
+      "amit.kumar@example.org,Amit Kumar,fin_ops,Finance\n";
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

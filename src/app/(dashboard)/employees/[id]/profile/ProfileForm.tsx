@@ -300,7 +300,7 @@ export function ProfileForm({
                     value={officialEmail}
                     onChange={(e) => setOfficialEmail(e.target.value)}
                     className="rounded-lg font-mono text-xs bg-background"
-                    placeholder="name@navgurukul.org"
+                    placeholder="name@example.org"
                   />
                 </div>
 

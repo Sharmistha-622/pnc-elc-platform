@@ -1143,7 +1143,7 @@ export async function closeOffboardingCase(
           job_title: existing.caseRecord.employee_designation,
           last_working_day: finalLwd,
           document_download_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/offboarding/${caseId}?tab=documents`,
-          finance_poc_email: 'finance@navgurukul.org',
+          finance_poc_email: process.env.FINANCE_POC_EMAIL || 'finance@example.org',
         },
         existing.caseRecord.employee_email
       );

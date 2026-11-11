@@ -125,10 +125,9 @@ import {
 import { toast } from 'sonner'
 
 const QUICK_SELECT_TEST_EMAILS = [
-  'nitin@navgurukul.org',
-  'kartik.t@navgurukul.org',
-  'sharmisthamazumdar24@navgurukul.org',
-  'pnc@navgurukul.org',
+  'admin@example.org',
+  'pnc@example.org',
+  'finance@example.org',
 ]
 
 export function EmailsView({
@@ -740,7 +739,7 @@ export function EmailsView({
   // Quick Test Send Dialog
   const [testSendTemplate, setTestSendTemplate] = useState<EmailTemplate | null>(null)
   const [testSendRecipient, setTestSendRecipient] = useState(
-    initialProviderConfig?.from_email || 'sharmisthamazumdar24@navgurukul.org'
+    initialProviderConfig?.from_email || 'noreply@example.org'
   )
   const [isTestSending, setIsTestSending] = useState(false)
 
@@ -759,7 +758,7 @@ export function EmailsView({
   // 3. PROVIDER SETUP STATE
   // =========================================================================
   const [setupTestEmail, setSetupTestEmail] = useState(
-    initialProviderConfig?.from_email || 'sharmisthamazumdar24@navgurukul.org'
+    initialProviderConfig?.from_email || 'noreply@example.org'
   )
   const [isSetupTesting, setIsSetupTesting] = useState(false)
   const [providerSaved, setProviderSaved] = useState(false)
@@ -943,7 +942,7 @@ export function EmailsView({
       interview_time: '03:00 PM IST',
       hr_interviewer_name: 'Pooja Iyer (Head of People)',
       hr_poc_name: 'Pooja Iyer',
-      assigned_email: 'kavita.rao@navgurukul.org',
+      assigned_email: 'kavita.rao@example.org',
       hardware_required: '1x ThinkPad T14, Charger, Mouse, Welcome Kit',
       portal_temporary_pin: '849201',
       portal_link: 'https://elc.navgurukul.org/onboarding/k8m2q7x1-kavita-rao',
@@ -957,7 +956,7 @@ export function EmailsView({
       clearance_link: 'https://elc.navgurukul.org/offboarding/clearance',
       exit_survey_link: 'https://elc.navgurukul.org/offboarding/exit-survey',
       document_download_link: 'https://elc.navgurukul.org/documents/relieving-kavita-rao.pdf',
-      finance_poc_email: 'finance@navgurukul.org',
+      finance_poc_email: 'finance@example.org',
       missing_docs_list: 'Aadhaar Card, PAN Card, Previous Relieving Letter',
       offer_expiry_date: '28 Sep 2026',
       orientation_time: '10:00 AM IST',
@@ -1423,7 +1422,7 @@ export function EmailsView({
                         variant="ghost"
                         onClick={() => {
                           setTestSendTemplate(tmpl)
-                          setTestSendRecipient('pnc@navgurukul.org')
+                          setTestSendRecipient(providerConfig.from_email || 'pnc@example.org')
                         }}
                         className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
                         title="Send test email"
@@ -2144,7 +2143,7 @@ export function EmailsView({
                                 type="email"
                                 value={accountForm.email}
                                 onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
-                                placeholder="sharmisthamazumdar24@navgurukul.org"
+                                placeholder="sender@example.org"
                                 className="text-xs h-8.5 font-mono"
                                 required
                               />
@@ -2375,10 +2374,10 @@ export function EmailsView({
                       <div className="space-y-1">
                         <Label className="text-xs font-semibold">SMTP Username</Label>
                         <Input
-                          value={providerConfig.smtp_username || 'sharmisthamazumdar24@navgurukul.org'}
+                          value={providerConfig.smtp_username || 'sender@example.org'}
                           onChange={(e) => setProviderConfig({ ...providerConfig, smtp_username: e.target.value })}
                           className="text-xs h-8.5 font-mono"
-                          placeholder="sharmisthamazumdar24@navgurukul.org"
+                          placeholder="sender@example.org"
                         />
                       </div>
                       <div className="space-y-1">
@@ -2419,7 +2418,7 @@ export function EmailsView({
                         value={providerConfig.from_email}
                         onChange={(e) => setProviderConfig({ ...providerConfig, from_email: e.target.value })}
                         className="text-xs h-8.5 font-mono"
-                        placeholder="sharmisthamazumdar24@navgurukul.org"
+                        placeholder="sender@example.org"
                       />
                     </div>
                     <div className="space-y-1">
@@ -2428,7 +2427,7 @@ export function EmailsView({
                         value={providerConfig.reply_to_email}
                         onChange={(e) => setProviderConfig({ ...providerConfig, reply_to_email: e.target.value })}
                         className="text-xs h-8.5 font-mono"
-                        placeholder="sharmisthamazumdar24@navgurukul.org"
+                        placeholder="sender@example.org"
                       />
                     </div>
                   </div>
@@ -2515,7 +2514,7 @@ export function EmailsView({
                       </span>
                     </div>
                     <code className="text-[10px] text-muted-foreground font-mono block truncate">
-                      v=DMARC1; p=reject; rua=mailto:pnc@navgurukul.org
+                      v=DMARC1; p=reject; rua=mailto:postmaster@example.org
                     </code>
                   </div>
 
@@ -2555,7 +2554,7 @@ export function EmailsView({
                       value={setupTestEmail}
                       onChange={(e) => setSetupTestEmail(e.target.value)}
                       className="text-xs h-8.5 font-mono"
-                      placeholder="sharmisthamazumdar24@navgurukul.org"
+                      placeholder="recipient@example.org"
                     />
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       {QUICK_SELECT_TEST_EMAILS.map((email) => (
@@ -3273,7 +3272,7 @@ export function EmailsView({
                   Automated Quota Alerts &amp; Failover Protection
                 </h4>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Advisory alerts are automatically dispatched to <strong className="text-foreground font-mono">nitin@navgurukul.org</strong> and <strong className="text-foreground font-mono">sharmisthamazumdar24@navgurukul.org</strong> at 80% (1,600 sends). If usage reaches 95% (1,900 sends), traffic automatically diverts to Amazon SES with zero dropped emails.
+                  Advisory alerts are automatically dispatched to <strong className="text-foreground font-mono">admin@example.org</strong> at 80% (1,600 sends). If usage reaches 95% (1,900 sends), traffic automatically diverts to Amazon SES with zero dropped emails.
                 </p>
               </div>
             </div>
@@ -3282,13 +3281,13 @@ export function EmailsView({
               size="sm"
               variant="outline"
               onClick={() => {
-                setTestSendRecipient('nitin@navgurukul.org')
+                setTestSendRecipient(providerConfig.from_email || 'admin@example.org')
                 setTestSendTemplate(templates[0])
               }}
               className="shrink-0 gap-1.5 text-xs font-semibold rounded-lg bg-indigo-50/50 hover:bg-indigo-100/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
             >
               <Send className="size-3" />
-              <span>Test Send to Nitin</span>
+              <span>Test Send Alert</span>
             </Button>
           </div>
         </div>
@@ -3858,7 +3857,7 @@ export function EmailsView({
                       <div className="flex justify-between items-center text-[11px]">
                         <span className="text-muted-foreground font-semibold">To:</span>
                         <span className="font-medium text-foreground">
-                          Kavita Rao &lt;kavita.rao@navgurukul.org&gt;
+                          Kavita Rao &lt;kavita.rao@example.org&gt;
                         </span>
                       </div>
                       <div className="flex justify-between items-start pt-1 border-t border-border/50 text-[11px]">
@@ -3968,7 +3967,7 @@ export function EmailsView({
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground font-semibold">To:</span>
                     <span className="font-medium text-foreground">
-                      Kavita Rao &lt;kavita.rao@navgurukul.org&gt;
+                      Kavita Rao &lt;kavita.rao@example.org&gt;
                     </span>
                   </div>
                   <div className="flex justify-between items-start pt-2 border-t border-border/50">
@@ -4060,7 +4059,7 @@ export function EmailsView({
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground font-semibold">To:</span>
                     <span className="font-medium text-foreground">
-                      Kavita Rao &lt;kavita.rao@navgurukul.org&gt;
+                      Kavita Rao &lt;kavita.rao@example.org&gt;
                     </span>
                   </div>
                   <div className="flex justify-between items-start pt-2 border-t border-border/50">
@@ -4160,7 +4159,7 @@ export function EmailsView({
                     value={testSendRecipient}
                     onChange={(e) => setTestSendRecipient(e.target.value)}
                     className="text-xs h-9 font-mono"
-                    placeholder="sharmisthamazumdar24@navgurukul.org"
+                    placeholder="recipient@example.org"
                   />
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <span className="text-[10px] text-muted-foreground font-medium">Quick select:</span>

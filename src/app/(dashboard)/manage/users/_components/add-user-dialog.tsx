@@ -149,7 +149,7 @@ export function AddUserDialog({
               <Input
                 id="user-email"
                 type="email"
-                placeholder="e.g. user@navgurukul.org"
+                placeholder="e.g. user@example.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}

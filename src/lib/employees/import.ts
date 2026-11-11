@@ -11,6 +11,8 @@
 // leaves the value as it is. A new email creates a person.
 // ============================================================================
 
+import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/auth/allowedEmail'
+
 export const IMPORT_COLUMNS = [
   { key: 'email', required: 'always', help: 'Official email. Matches the Google sign-in; one row per email.' },
   { key: 'employee_code', required: null, help: 'Employee ID, e.g. NG-0669. Unique; capitals, digits and hyphens.' },
@@ -42,8 +44,8 @@ export const MAX_IMPORT_ROWS = 2000
 export const IMPORT_TEMPLATE_CSV =
   IMPORT_COLUMNS.map((c) => c.key).join(',') +
   '\n' +
-  'manager.one@navgurukul.org,NG-0101,Manager One,fte,2024-04-01,no,,CEO Office,active,2024-07-01,\n' +
-  'new.joiner@navgurukul.org,NG-0669,New Joiner,fte,2026-08-05,yes,manager.one@navgurukul.org,CEO Office,active,,\n'
+  `manager.one@${DEFAULT_ALLOWED_DOMAINS[0]},NG-0101,Manager One,fte,2024-04-01,no,,CEO Office,active,2024-07-01,\n` +
+  `new.joiner@${DEFAULT_ALLOWED_DOMAINS[0]},NG-0669,New Joiner,fte,2026-08-05,yes,manager.one@${DEFAULT_ALLOWED_DOMAINS[0]},CEO Office,active,,\n`
 
 // ----------------------------------------------------------------------------
 // CSV

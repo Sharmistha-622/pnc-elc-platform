@@ -47,7 +47,7 @@ function createEmailBody(
   cc?: string,
   senderEmail?: string
 ) {
-  const from = senderEmail || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+  const from = senderEmail || process.env.GOOGLE_SENDER_EMAIL || 'noreply@example.org'
   const messageParts = [
     `From: ${from}`,
     `To: ${to}`,
@@ -234,7 +234,7 @@ export async function sendCalendarInvite(opts: {
 
   for (let i = 0; i < attemptChain.length; i++) {
     const acc = attemptChain[i]
-    const senderEmail = acc.email || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+    const senderEmail = acc.email || process.env.GOOGLE_SENDER_EMAIL || 'noreply@example.org'
     const boundary = `elc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
     const message = [
       `From: ${senderEmail}`,
@@ -332,7 +332,7 @@ export async function pingEmailProvider(accountId?: string): Promise<EmailPingRe
   const clientId = target.client_id
   const clientSecret = target.client_secret
   const refreshToken = target.refresh_token
-  const senderEmail = target.email || process.env.GOOGLE_SENDER_EMAIL || 'sharmisthamazumdar24@navgurukul.org'
+  const senderEmail = target.email || process.env.GOOGLE_SENDER_EMAIL || 'noreply@example.org'
 
   if (!clientId || !clientSecret || !refreshToken) {
     return {

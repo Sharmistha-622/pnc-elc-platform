@@ -1214,7 +1214,7 @@ export function OffboardingView({
                   <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-foreground">Sender Email Address</Label>
                     <Input
-                      placeholder="e.g. employee@navgurukul.org"
+                      placeholder="e.g. employee@example.org"
                       value={newResForm.email_sender}
                       onChange={(e) => setNewResForm((prev) => ({ ...prev, email_sender: e.target.value }))}
                       className="h-8 text-xs bg-background"

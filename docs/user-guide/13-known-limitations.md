@@ -95,9 +95,8 @@ real work.** Items are grouped by area.
 
 - **Import Employee Data** accepts **CSV only** (not XLSX), has **no undo**,
   and isn't listed in *Import History*.
-- **Import History**, **Record History** and the **Rollback Center** show
-  **sample data only**.
-- **System Audit Logs** may show sample rows when the real log is empty.
+- **Import History**, **Record History** and the **Rollback Center** are not
+  available yet and show a *"Not available yet"* empty state.
 - **Bulk Upload Users** isn't available.
 - **Form Builder** *Send this form* doesn't email the person yet. It only
   appears in their My Forms.
