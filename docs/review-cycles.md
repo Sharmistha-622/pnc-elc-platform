@@ -46,8 +46,20 @@ It is enforced twice:
 - **In the app.** `src/lib/reviews/queries.ts` decides, per person, what leaves
   the server. Text the person may not read is never sent to their browser.
 
-Peer reviews are shown as *Peer review 1, 2, …*, ordered by nothing that
-identifies the writer. Submission times are dropped from them.
+Peer reviews are shown **by question**: under each question, every peer's
+answer, sorted by the answer's own text. One peer's answers are not kept
+together, and no name or submission time is shown, so the nominee list and a
+writer's style cannot be matched up (`groupPeerAnswers` in
+`src/lib/reviews/queries.ts`).
+
+**Revealing who wrote what.** The link from each answer to its author is
+kept. Super Admin alone can see it, one review at a time, for suspected
+tampering or misconduct, and never on their own review or one they manage
+(`REVIEW_REVEALERS`, `revealPeerReviewers`). A reason of 10 to 500 characters
+is required. The reveal is written to the audit log first, with who, when,
+which review and the reason in metadata; if that write fails, nothing is
+shown. The cycle's timeline records nothing, so the manager and the employee
+are not told. Decided 2026-11-11.
 
 ## Where things are
 
@@ -71,8 +83,9 @@ friction, and each can be reversed.
   never recorded.
 - **Nobody without a manager.** A review cannot open for someone with no manager
   on record. The dashboard says so next to their name.
-- **Peer anonymity floor.** Peer reviews are shown once at least two are in, so
-  a single answer cannot be traced to the one peer who has submitted.
+- **Peer anonymity floor.** Peer reviews are shown once at least three are in
+  (two until 2026-11-11), so an answer cannot be traced to the one or two
+  peers who have submitted.
 - **The manager sees the self-reflection.** The request listed peer reviews and
   the manager's own review for the manager. The self-reflection is shown to them
   too, as the input to the meeting.

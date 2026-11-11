@@ -133,7 +133,8 @@ If people report to you, a second list shows their reviews. For each one you:
 
 1. **Fill in the manager review** (the form is in My Forms).
 2. Read their self-reflection and peer feedback. Peer feedback appears
-   **without names**, and only once at least two peers have answered.
+   **without names**, question by question (one peer's answers are not kept
+   together), and only once at least three peers have answered.
 3. Hold the review meeting. The platform books it automatically, and you can
    move it.
 4. **Record the decision** after the meeting, with a note on what was

@@ -87,7 +87,13 @@ then tells the employee.**
 
 **Who reads what:** the self-reflection, manager review and peer reviews are
 visible to the **manager and PnC only**. Peer reviews show **without names**,
-and only once **at least 2** peers have answered.
+listed **question by question** so one peer's answers are not kept together,
+and only once **at least 3** peers have answered.
+
+Who wrote which peer review is kept, but hidden. **Super Admin** alone can
+reveal it, one review at a time, for suspected tampering or misconduct: they
+enter a reason, and the reveal (who, when, which review, why) goes into the
+audit log. The manager and the employee are not shown a reveal.
 
 > ⚠️ The meeting slot is chosen without reading anyone's real calendar yet.
 > **Check that the booked time actually works**, and move it if not.
