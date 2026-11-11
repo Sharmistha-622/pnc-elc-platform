@@ -18,6 +18,22 @@ export function portalUrl(token: string): string {
   return `${appUrl()}/onboarding/${token}`;
 }
 
+export function reviewPageUrl(id: string): string {
+  return `${appUrl()}/onboarding/review/${id}`;
+}
+
+function formatJoiningDate(joiningDate?: string | null): { joining: string; joiningClause: string } {
+  const joining = joiningDate
+    ? new Date(joiningDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
+  const joiningClause = joining ? ` from <strong>${escapeHtml(joining)}</strong>` : '';
+  return { joining, joiningClause };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -107,6 +123,150 @@ export async function sendInvitationEmail(record: OnboardingRecord): Promise<Inv
       recipient_role: record.designation,
     },
     record.personal_email
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingSubmittedCandidateEmail(
+  record: OnboardingRecord
+): Promise<InvitationResult> {
+  const firstName = record.candidate_name.split(' ')[0] || record.candidate_name;
+  const { joining, joiningClause } = formatJoiningDate(record.joining_date);
+
+  const result = await sendEmail(
+    'onboarding_submitted_candidate',
+    {
+      candidate_name: record.candidate_name,
+      first_name: firstName,
+      job_title: record.designation,
+      joining_date: joining,
+      joining_clause: joiningClause,
+      recipient_name: record.candidate_name,
+      recipient_role: record.designation,
+    },
+    record.personal_email
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingSubmittedPncEmail(
+  record: OnboardingRecord,
+  pncEmail: string
+): Promise<InvitationResult> {
+  const { joining } = formatJoiningDate(record.joining_date);
+  const reviewUrl = reviewPageUrl(record.id);
+
+  const result = await sendEmail(
+    'onboarding_submitted_pnc',
+    {
+      candidate_name: record.candidate_name,
+      job_title: record.designation,
+      joining_date: joining,
+      review_url: reviewUrl,
+      recipient_name: 'People & Culture',
+      recipient_role: 'PnC',
+    },
+    pncEmail
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingDocumentRejectedEmail(
+  record: OnboardingRecord,
+  documentType: string,
+  rejectionReason: string
+): Promise<InvitationResult> {
+  const firstName = record.candidate_name.split(' ')[0] || record.candidate_name;
+  const link = portalUrl(record.invitation_token);
+
+  const result = await sendEmail(
+    'onboarding_document_rejected',
+    {
+      candidate_name: record.candidate_name,
+      first_name: firstName,
+      document_type: documentType,
+      rejection_reason: rejectionReason || 'Please upload a clearer or updated copy.',
+      portal_link: link,
+      recipient_name: record.candidate_name,
+      recipient_role: record.designation,
+    },
+    record.personal_email
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingChangesRequestedEmail(
+  record: OnboardingRecord,
+  reviewerNote: string
+): Promise<InvitationResult> {
+  const firstName = record.candidate_name.split(' ')[0] || record.candidate_name;
+  const link = portalUrl(record.invitation_token);
+
+  const result = await sendEmail(
+    'onboarding_changes_requested',
+    {
+      candidate_name: record.candidate_name,
+      first_name: firstName,
+      job_title: record.designation,
+      reviewer_note: reviewerNote || 'Please review your portal steps and update the requested items.',
+      portal_link: link,
+      recipient_name: record.candidate_name,
+      recipient_role: record.designation,
+    },
+    record.personal_email
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingApprovedEmail(
+  record: OnboardingRecord
+): Promise<InvitationResult> {
+  const firstName = record.candidate_name.split(' ')[0] || record.candidate_name;
+  const { joining, joiningClause } = formatJoiningDate(record.joining_date);
+
+  const result = await sendEmail(
+    'onboarding_approved',
+    {
+      candidate_name: record.candidate_name,
+      first_name: firstName,
+      job_title: record.designation,
+      joining_date: joining,
+      joining_clause: joiningClause,
+      manager_name: record.manager_name || 'your reporting manager',
+      buddy_name: record.buddy_name || 'your onboarding buddy',
+      location: record.location || 'NavGurukul',
+      recipient_name: record.candidate_name,
+      recipient_role: record.designation,
+    },
+    record.personal_email
+  );
+
+  return result.success ? { sent: true } : { sent: false, error: result.error };
+}
+
+export async function sendOnboardingCorrectionRequestedPncEmail(
+  record: OnboardingRecord,
+  correctionNotes: string,
+  pncEmail: string
+): Promise<InvitationResult> {
+  const reviewUrl = reviewPageUrl(record.id);
+
+  const result = await sendEmail(
+    'onboarding_correction_requested',
+    {
+      candidate_name: record.candidate_name,
+      job_title: record.designation,
+      correction_notes: correctionNotes || 'Candidate requested a correction on employment terms.',
+      review_url: reviewUrl,
+      recipient_name: 'People & Culture',
+      recipient_role: 'PnC',
+    },
+    pncEmail
   );
 
   return result.success ? { sent: true } : { sent: false, error: result.error };

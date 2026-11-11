@@ -152,9 +152,11 @@ withdrawn, or its validity period ends (7 days by default). A candidate with
 an expired link is asked to get a new one from P&C: use **Resend Invitation
 Email**.
 
-> **Heads-up for PnC:** a *Request Correction* from the candidate is only
-> recorded in the audit log; **no email reaches PnC.** Check candidates in
-> *In Progress* now and then.
+> **Note for PnC:** when a candidate uses *Request Correction* on the terms
+> step, or submits their onboarding, an email is sent to the PnC mailbox set
+> in **Settings › Reviews** (skipped if no mailbox is set). Rejecting a
+> document or requesting changes emails the candidate a fresh portal link,
+> and approving their dossier emails them what to expect on Day 1.
 
 ---
 

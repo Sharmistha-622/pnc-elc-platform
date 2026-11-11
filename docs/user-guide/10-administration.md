@@ -120,6 +120,10 @@ Super Admin and PnC Admin only: these hold personal data.
 | When | Email |
 |---|---|
 | Candidate created or invited | *"Welcome to NavGurukul — complete your onboarding"*, with the portal link |
+| Candidate requests correction on terms | To PnC mailbox (from Settings › Reviews), linking to the review page |
+| Candidate submits onboarding | Confirmation to candidate; alert to PnC mailbox linking to the review page |
+| Document rejected / changes requested | To candidate, with the reason and a fresh portal link |
+| Onboarding approved / set up | To candidate, with Day-1 expectations (no login credentials) |
 | Review opens | Self-review due (employee); manager review form (manager) |
 | Employee nominates peers | Peer feedback request (each peer) |
 | Every morning | Reminders; *"Needs PnC"* escalation; *"Ready for meeting"* (PnC) |

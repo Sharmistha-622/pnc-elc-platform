@@ -26,12 +26,6 @@ real work.** Items are grouped by area.
 
 ## Onboarding
 
-- **Only one onboarding email is sent: the invitation.** Nothing is emailed
-  when a candidate submits, when a document is rejected, when changes are
-  requested, or when they're approved or set up. **Contact the candidate
-  yourself.**
-- A candidate's **Request Correction** on the terms step is only recorded in
-  the audit log; PnC isn't notified.
 - **Create Official Account doesn't create the Google Workspace account or
   send login details.** Do this by hand. The email shown in the confirmation
   dialog may differ from the one actually assigned.
