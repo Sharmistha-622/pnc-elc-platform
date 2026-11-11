@@ -180,7 +180,7 @@ and last active.
 | **Verification (x/y)** | For each document: **Open** (a secure link, valid 10 minutes), then **Verify** or **Reject**. |
 | **Pre-Joining Policies** | See which policies are read. |
 | **Letters & Annexure** | Annexure A and the letters, with signed time and signer. |
-| **Final Review** | A checklist before approving. |
+| **Final Review** | A checklist before approving. Approval is disabled until every check passes, and the footer lists any failing checks. |
 | **Audit & Visits** | Timeline of everything the candidate, PnC and the system did. |
 
 ### Verifying a document
@@ -199,8 +199,7 @@ and last active.
 
 ### Approving and creating the account
 
-1. When everything is verified, click **Approve Dossier** (or **Approve
-   Onboarding Dossier** on the *Final Review* tab).
+1. When all six Final Review checks pass (personal details, employment terms, required documents verified, policies read, and offer and appointment letters signed), click **Approve Dossier** (or **Approve Onboarding Dossier** on the *Final Review* tab). If any check is still failing, the button is disabled and shows which checks need attention.
 2. Click **Create Official Account** → **Confirm & Provision Account**. The
    platform:
    - refuses if any **required** document isn't verified;

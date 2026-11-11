@@ -43,6 +43,10 @@ import {
   MILESTONE_DEFINITIONS,
   type MilestoneKey,
 } from './probation-scheduling';
+import {
+  evaluateOnboardingApprovalChecks,
+  formatApprovalRefusal,
+} from './approval-checks';
 
 /**
  * Audit subject for an onboarding record.
@@ -1042,6 +1046,13 @@ export async function updateOnboardingStatus(
 ): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
+
+  if (status === 'approved') {
+    const readiness = evaluateOnboardingApprovalChecks(data);
+    if (!readiness.canApprove) {
+      throw new Error(formatApprovalRefusal(readiness.failingChecks));
+    }
+  }
 
   const previousStatus = data.record.status;
   const now = new Date().toISOString();
