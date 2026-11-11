@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getOnboardingByToken,
+  portalLink,
   recordPortalVisit,
   updatePersonalDetails,
   confirmEmploymentDetails,
@@ -20,6 +21,9 @@ import { guardianBlocks, guardianStatusFor } from '@/lib/dpdp/children';
 import { GUARDIAN_HOLD_MESSAGE, guardianStatusOf, setGuardianStatus } from '@/lib/dpdp/guardian';
 import { buildSignatureMetadata } from '@/lib/onboarding/signature-metadata';
 
+const LINK_EXPIRED =
+  'This link has expired. Ask the People & Culture team to send you a new one; it will arrive by email.';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -30,6 +34,9 @@ export async function GET(
     const userAgent = req.headers.get('user-agent') || 'Browser';
     const visited = await recordPortalVisit(token, { userAgent });
     if (!visited) {
+      if ((await portalLink(token)).state === 'expired') {
+        return NextResponse.json({ success: false, error: LINK_EXPIRED, expired: true }, { status: 410 });
+      }
       return NextResponse.json({ success: false, error: 'Invalid invitation link' }, { status: 404 });
     }
     const settings = await getPortalPrivacySettings();
@@ -49,6 +56,9 @@ export async function POST(
     const { token } = await params;
     const existing = await getOnboardingByToken(token);
     if (!existing) {
+      if ((await portalLink(token)).state === 'expired') {
+        return NextResponse.json({ success: false, error: LINK_EXPIRED, expired: true }, { status: 410 });
+      }
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 404 });
     }
 

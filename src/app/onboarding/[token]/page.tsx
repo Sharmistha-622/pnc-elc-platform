@@ -77,6 +77,8 @@ export default function CandidateOnboardingPortalPage({
 
   const [data, setData] = useState<FullOnboardingData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Set when the link cannot be used: expired, or not recognised.
+  const [linkProblem, setLinkProblem] = useState<string | null>(null);
   // Step 0 is the privacy notice: nothing else opens until it is acknowledged.
   const [currentStep, setCurrentStep] = useState(0);
   const [privacy, setPrivacy] = useState<PortalPrivacySettings | null>(null);
@@ -129,7 +131,11 @@ export default function CandidateOnboardingPortalPage({
         }
         setSignerFullName(p?.full_name || r.candidate_name || '');
       } else {
-        toast.error('Invalid or expired onboarding link');
+        setLinkProblem(
+          json.expired
+            ? json.error
+            : 'This link is not valid. Use the latest invitation email from the People & Culture team, or ask them for a new one.'
+        );
       }
     } catch (err) {
       toast.error('Network error loading candidate portal');
@@ -353,6 +359,17 @@ export default function CandidateOnboardingPortalPage({
       setSaving(false);
     }
   };
+
+  if (linkProblem) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <div className="max-w-md rounded-lg border bg-card p-6 text-center space-y-2">
+          <h1 className="text-base font-semibold">This link can no longer be used</h1>
+          <p className="text-sm text-muted-foreground">{linkProblem}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (

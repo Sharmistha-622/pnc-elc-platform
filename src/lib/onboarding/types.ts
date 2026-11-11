@@ -72,6 +72,8 @@ export interface OnboardingRecord {
   joiner_status?: string;
   progress_percentage: number;
   invitation_token: string;
+  /** When the portal link stops working. Set each time the invitation is sent. */
+  invitation_expires_at?: string | null;
   invited_at?: string | null;
   first_visited_at?: string | null;
   last_visited_at?: string | null;
