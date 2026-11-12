@@ -12,12 +12,56 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Eye, HelpCircle } from "lucide-react";
-import { getHelpEntry, getHelpIdForRoute } from "@/lib/help-registry";
+import { getHelpEntry, getHelpIdForRoute, type HelpEntry, type HelpSection } from "@/lib/help-registry";
 import { useUserContext } from "@/contexts/user-context";
 import { HelpSectionRenderer } from "@/components/shared/help-section-renderer";
 
 const LS_KEY_GLOBAL = "ng_help_hidden";
 const LS_KEY_MEMBERS = "ng_help_hidden_members";
+const LIFECYCLE_ROLES = ["employee", "pre_joiner", "candidate"];
+
+export function resolveHelpPanelForRoute(
+  pathname: string,
+  role?: string | null,
+  searchParams?: URLSearchParams | null
+): { helpId: string; entry: HelpEntry; visibleSections: HelpSection[] } | null {
+  const helpId = getHelpIdForRoute(pathname, searchParams);
+  if (!helpId) return null;
+  const entry = getHelpEntry(helpId);
+  if (!entry) return null;
+  const isMember = !role || LIFECYCLE_ROLES.includes(role);
+  const visibleSections = isMember
+    ? entry.sections.filter((s) => !s.staffOnly)
+    : entry.sections;
+  return { helpId, entry, visibleSections };
+}
+
+export function HelpPanelView({
+  entry,
+  visibleSections,
+}: {
+  entry: HelpEntry;
+  visibleSections: HelpSection[];
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="p-6 pb-4 border-b border-border/40 bg-muted/20">
+        <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+          <HelpCircle className="w-5 h-5 text-amber-500" />
+          {entry.title}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>
+      </div>
+      <div className="p-6">
+        <div className="space-y-8 text-sm max-w-5xl mx-auto">
+          {visibleSections.map((s, i) => (
+            <HelpSectionRenderer key={i} section={s} index={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function getSetFromLS(key: string): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -29,20 +73,23 @@ function getSetFromLS(key: string): Set<string> {
   }
 }
 
-export function HeaderHelpTrigger() {
+export function HeaderHelpTrigger({
+  defaultOpen = false,
+}: {
+  defaultOpen?: boolean;
+} = {}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const user = useUserContext();
-  const [isOpen, setIsOpen] = useState(false);
-  const [hiddenGlobal, setHiddenGlobal] = useState<Set<string>>(new Set());
-  const [hiddenMembers, setHiddenMembers] = useState<Set<string>>(new Set());
-  const [mounted, setMounted] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [hiddenGlobal, setHiddenGlobal] = useState<Set<string>>(() =>
+    getSetFromLS(LS_KEY_GLOBAL)
+  );
+  const [hiddenMembers, setHiddenMembers] = useState<Set<string>>(() =>
+    getSetFromLS(LS_KEY_MEMBERS)
+  );
 
   useEffect(() => {
-    setHiddenGlobal(getSetFromLS(LS_KEY_GLOBAL));
-    setHiddenMembers(getSetFromLS(LS_KEY_MEMBERS));
-    setMounted(true);
-
     const handleUpdate = () => {
       setHiddenGlobal(getSetFromLS(LS_KEY_GLOBAL));
       setHiddenMembers(getSetFromLS(LS_KEY_MEMBERS));
@@ -56,8 +103,6 @@ export function HeaderHelpTrigger() {
       window.removeEventListener("storage", handleUpdate);
     };
   }, []);
-
-  if (!mounted) return null;
 
   const helpId = getHelpIdForRoute(pathname, searchParams);
   if (!helpId) return null;

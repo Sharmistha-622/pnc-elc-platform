@@ -353,6 +353,42 @@ async function loadTeamDecisions(db: Db, me: { id: string } | null): Promise<Tas
   return group;
 }
 
+async function loadWaitingTasksForRole(
+  role: UserRole | null,
+  options: { hasReports?: boolean },
+  db: Db,
+  me: { id: string } | null,
+  email: string | null
+): Promise<TaskGroup[]> {
+  const dashboard = dashboardFor(role, options);
+  if (!dashboard || !role) return [];
+
+  const taskLoaders: Record<TaskWidgetId, () => Promise<TaskGroup>> = {
+    myForms: loadMyForms,
+    myPeerFeedback: () => loadMyPeerFeedback(db, me, email),
+    teamDecisions: () => loadTeamDecisions(db, me),
+  };
+
+  const tasks = await Promise.all(dashboard.tasks.map((id) => taskLoaders[id]()));
+  return tasks.map((t) => ({ ...t, items: t.items.slice(0, TASK_LIMIT) }));
+}
+
+/**
+ * The "Waiting on you" tasks for this caller, using the same role rules and
+ * loaders as the dashboard. Shared with the header Notifications menu.
+ */
+export async function getWaitingTasks(
+  role: UserRole | null,
+  options: { hasReports?: boolean } = {}
+): Promise<TaskGroup[]> {
+  const dashboard = dashboardFor(role, options);
+  if (!dashboard || !role) return [];
+
+  const db = await createServerSupabaseClient();
+  const { employee: me, email } = await getCurrentEmployee(db);
+  return loadWaitingTasksForRole(role, options, db, me, email);
+}
+
 /**
  * Everything the dashboard shows this person, or null for a role that has no
  * dashboard (the portal-only roles, which middleware never lets this far).
@@ -369,21 +405,15 @@ export async function getDashboardData(
   const today = istToday();
   const panelCtx: PanelLoaderContext = { db, me, today };
 
-  const taskLoaders: Record<TaskWidgetId, () => Promise<TaskGroup>> = {
-    myForms: loadMyForms,
-    myPeerFeedback: () => loadMyPeerFeedback(db, me, email),
-    teamDecisions: () => loadTeamDecisions(db, me),
-  };
-
   const [tasks, values, panelResults] = await Promise.all([
-    Promise.all(dashboard.tasks.map((id) => taskLoaders[id]())),
+    loadWaitingTasksForRole(role, options, db, me, email),
     Promise.all(dashboard.stats.map((id) => loadStat(db, id, me, today))),
     Promise.all(dashboard.panels.map(async (id) => ({ id, result: await PANEL_LOADERS[id](panelCtx) }))),
   ]);
 
   return {
     focus: dashboard.focus,
-    tasks: tasks.map((t) => ({ ...t, items: t.items.slice(0, TASK_LIMIT) })),
+    tasks,
     stats: dashboard.stats.map((id, i) => ({ ...STAT_WIDGETS[id], value: values[i] })),
     panels: panelResults,
     quickLinks: dashboard.quickLinks,
