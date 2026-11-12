@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.16.00",
+    "date": "2026-11-12",
+    "title": "Add candidate withdraw action and department-backed team filter",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Add candidate withdraw action and department-backed team filter"
+      }
+    ]
+  },
+  {
     "version": "2.15.02",
     "date": "2026-11-12",
     "title": "Remove non-sending Resend action from Email Center outbox",
