@@ -66,8 +66,8 @@ real work.** Items are grouped by area.
 
 ## Data Management
 
-- **Import Employee Data** accepts **CSV only** (not XLSX), has **no undo**,
-  and isn't listed in *Import History*.
+- **Import Employee Data** has **no undo** (each import accepts CSV or XLSX and
+  is listed in *Import History*).
 - **Import History**, **Record History** and the **Rollback Center** show
   **sample data only**.
 - **System Audit Logs** may show sample rows when the real log is empty.

@@ -39,6 +39,9 @@ const FLAGGED_IF_EMPTY = ['employee_code', 'team'] as const
 /** A sheet larger than this is split: one request carries the whole file twice. */
 export const MAX_IMPORT_ROWS = 2000
 
+/** Maximum file size accepted before parsing (5 MB). */
+export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
+
 export const IMPORT_TEMPLATE_CSV =
   IMPORT_COLUMNS.map((c) => c.key).join(',') +
   '\n' +
@@ -247,8 +250,11 @@ export function accessChangesFor(
   }
 }
 
-export function planEmployeeImport(csvText: string, ctx: ImportContext): ImportPlan {
-  const table = parseCsv(csvText)
+export function planEmployeeImport(input: string | string[][], ctx: ImportContext): ImportPlan {
+  const table =
+    typeof input === 'string'
+      ? parseCsv(input)
+      : input.filter((r) => r.some((c) => String(c ?? '').trim() !== ''))
   if (table.length < 2) return emptyPlan(['The file needs a header row and at least one person.'])
   if (table.length - 1 > MAX_IMPORT_ROWS) {
     return emptyPlan([`The file has ${table.length - 1} rows; import at most ${MAX_IMPORT_ROWS} at a time.`])
