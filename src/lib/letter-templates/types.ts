@@ -79,6 +79,7 @@ export interface CreateCandidateLetterInput {
   addendum_type?: AddendumType | null;
   employee_type_name: string;
   content: string;
+  created_by?: string;
 }
 
 export const STANDARD_PLACEHOLDERS = [

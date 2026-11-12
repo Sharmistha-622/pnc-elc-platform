@@ -97,7 +97,7 @@ export async function PATCH(
       // documents is a decision.
       result = await purgeWithdrawnDocuments(id, body.reason, actor);
     } else if (action === 'update_status') {
-      result = await updateOnboardingStatus(id, body.status, body.note);
+      result = await updateOnboardingStatus(id, body.status, body.note, actor);
     } else if (action === 'provision_account') {
       result = await provisionOfficialAccount(id);
     } else if (action === 'update_orientation_checklist') {

@@ -42,7 +42,11 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const letter = await createCandidateLetter(body);
+    const actor = allowed.caller.email ?? allowed.caller.userId;
+    const letter = await createCandidateLetter({
+      ...body,
+      created_by: body.created_by || actor,
+    });
 
     await auditLetters.generated({
       subject: {
