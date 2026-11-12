@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.20.02",
+    "date": "2026-11-12",
+    "title": "Enforce shared maker-checker separation across approvals",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Enforce shared maker-checker separation across approvals"
+      }
+    ]
+  },
+  {
     "version": "2.20.01",
     "date": "2026-11-12",
     "title": "Drive Appraisals cycle status and footer text from review cycles and Settings",
