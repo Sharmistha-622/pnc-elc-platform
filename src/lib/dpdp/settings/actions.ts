@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { checkDifferentPeople } from '@/lib/rbac/makerChecker'
 import { privacyEditor, retentionModeRefusal } from '../access'
 import { checklistPasses, isPrivacyNotice, nextVersion, noticeChecklist, type NoticeType } from '../notices'
 import { addDays, isoDate } from '../dates'
@@ -179,7 +180,7 @@ export async function saveNoticeDraft(input: unknown): Promise<ActionResult> {
   const draft = (versions ?? []).find((v) => v.status === 'draft')
 
   const { error } = draft
-    ? await supabase.from('dpdp_notices').update({ title, sections }).eq('id', draft.id)
+    ? await supabase.from('dpdp_notices').update({ title, sections, created_by: actor }).eq('id', draft.id)
     : await supabase.from('dpdp_notices').insert({
         notice_type,
         language,
@@ -207,6 +208,13 @@ export async function publishNotice(input: unknown): Promise<ActionResult> {
   const supabase = await createServerSupabaseClient()
   const { data: draft } = await supabase.from('dpdp_notices').select('*').eq('id', parsed.data.id).maybeSingle()
   if (!draft || draft.status !== 'draft') return { success: false, error: 'Only a draft can be published.' }
+
+  const sod = checkDifferentPeople(
+    (draft as { created_by?: string | null }).created_by,
+    actor,
+    'The person who drafted the notice cannot also publish it.',
+  )
+  if (!sod.ok) return { success: false, error: sod.error }
 
   const { data: settingsRow } = await supabase.from('dpdp_settings').select('*').eq('id', 'default').maybeSingle()
   const type = draft.notice_type as NoticeType

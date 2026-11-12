@@ -20,9 +20,14 @@ import {
   Sparkles,
   ArrowRight,
   FileText,
+  Phone,
+  MapPin,
+  HeartHandshake,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -32,7 +37,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { updateReportingManager, type EmployeeProfileData } from '@/lib/profile/profileActions'
+import {
+  updateReportingManager,
+  updateMyContactDetails,
+  type EmployeeProfileData,
+} from '@/lib/profile/profileActions'
 import { formatDate } from '@/lib/employees/tenure'
 import { toast } from 'sonner'
 import { useUserContext } from '@/contexts/user-context'
@@ -59,7 +68,47 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
   const [selectedManagerId, setSelectedManagerId] = useState<string>(
     profile?.manager?.id || ''
   )
+  const [isEditingContact, setIsEditingContact] = useState(false)
+  const [phone, setPhone] = useState<string>(profile?.contactDetails?.phone || '')
+  const [currentAddress, setCurrentAddress] = useState<string>(
+    profile?.contactDetails?.currentAddress || ''
+  )
+  const [emergencyContactName, setEmergencyContactName] = useState<string>(
+    profile?.contactDetails?.emergencyContactName || ''
+  )
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState<string>(
+    profile?.contactDetails?.emergencyContactPhone || ''
+  )
+  const [emergencyContactRelation, setEmergencyContactRelation] = useState<string>(
+    profile?.contactDetails?.emergencyContactRelation || ''
+  )
   const [isPending, startTransition] = useTransition()
+
+  const handleSaveContactDetails = () => {
+    if (!profile) return
+    startTransition(async () => {
+      const res = await updateMyContactDetails({
+        phone,
+        currentAddress,
+        emergencyContactName,
+        emergencyContactPhone,
+        emergencyContactRelation,
+      })
+      if (res.success) {
+        if (res.contactDetails) {
+          setPhone(res.contactDetails.phone || '')
+          setCurrentAddress(res.contactDetails.currentAddress || '')
+          setEmergencyContactName(res.contactDetails.emergencyContactName || '')
+          setEmergencyContactPhone(res.contactDetails.emergencyContactPhone || '')
+          setEmergencyContactRelation(res.contactDetails.emergencyContactRelation || '')
+        }
+        toast.success('Contact details updated successfully!')
+        setIsEditingContact(false)
+      } else {
+        toast.error(res.error || 'Failed to update contact details')
+      }
+    })
+  }
 
   const handleSaveManager = () => {
     if (!profile) return
@@ -385,6 +434,170 @@ export function ProfileClient({ userEmail, profile, allEmployees }: ProfileClien
           </CardContent>
         </Card>
       </div>
+
+      {/* 3. Self-Service Contact & Emergency Details */}
+      <Card className="border-border bg-card/60 backdrop-blur-md shadow-xs">
+        <CardHeader className="pb-3 border-b border-border/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                <Phone className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold text-foreground">
+                  Contact & Emergency Details
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Keep your own phone number, current address, and emergency contact up to date
+                </CardDescription>
+              </div>
+            </div>
+
+            {!isEditingContact && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditingContact(true)}
+                className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400 gap-1 font-semibold"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit Details
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-5">
+          {!isEditingContact ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
+                <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider flex items-center gap-1.5">
+                  <Phone className="h-3 w-3" />
+                  Phone Number
+                </span>
+                <p className="font-semibold text-foreground">{phone || '—'}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
+                <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider flex items-center gap-1.5">
+                  <MapPin className="h-3 w-3" />
+                  Current Address
+                </span>
+                <p className="font-semibold text-foreground whitespace-pre-wrap">
+                  {currentAddress || '—'}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
+                <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider flex items-center gap-1.5">
+                  <HeartHandshake className="h-3 w-3" />
+                  Emergency Contact
+                </span>
+                <p className="font-semibold text-foreground">
+                  {emergencyContactName
+                    ? `${emergencyContactName}${emergencyContactRelation ? ` (${emergencyContactRelation})` : ''}`
+                    : '—'}
+                </p>
+                {emergencyContactPhone && (
+                  <p className="text-[11px] text-muted-foreground">{emergencyContactPhone}</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Phone Number</label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    className="h-9 text-xs rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Current Address</label>
+                  <Textarea
+                    rows={2}
+                    value={currentAddress}
+                    onChange={(e) => setCurrentAddress(e.target.value)}
+                    placeholder="Current residential or mailing address"
+                    className="text-xs rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border/50">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Emergency Contact Name
+                  </label>
+                  <Input
+                    value={emergencyContactName}
+                    onChange={(e) => setEmergencyContactName(e.target.value)}
+                    placeholder="Full name"
+                    className="h-9 text-xs rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Emergency Contact Relationship
+                  </label>
+                  <Input
+                    value={emergencyContactRelation}
+                    onChange={(e) => setEmergencyContactRelation(e.target.value)}
+                    placeholder="e.g. Parent, Spouse, Sibling"
+                    className="h-9 text-xs rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Emergency Contact Phone
+                  </label>
+                  <Input
+                    value={emergencyContactPhone}
+                    onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                    placeholder="e.g. +91 94140 12345"
+                    className="h-9 text-xs rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPhone(profile.contactDetails?.phone || '')
+                    setCurrentAddress(profile.contactDetails?.currentAddress || '')
+                    setEmergencyContactName(profile.contactDetails?.emergencyContactName || '')
+                    setEmergencyContactPhone(profile.contactDetails?.emergencyContactPhone || '')
+                    setEmergencyContactRelation(
+                      profile.contactDetails?.emergencyContactRelation || ''
+                    )
+                    setIsEditingContact(false)
+                  }}
+                  disabled={isPending}
+                  className="h-8 text-xs rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveContactDetails}
+                  disabled={isPending}
+                  className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-xs"
+                >
+                  {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save Contact Details'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -307,37 +307,6 @@ export async function pingEmailProvider(accountId?: string): Promise<EmailPingRe
   return pingGmail(accountId)
 }
 
-
-export async function resendEmailDeliveryLog(
-  id: string
-): Promise<{ success: boolean; error?: string }> {
-  const refused = await platformConfigRefusal()
-  if (refused) return refused
-  try {
-    // Sessions cannot write email logs; the server does, after the check above.
-    const supabase = logWriter()
-    if (!supabase) return { success: false, error: 'The server is missing its service key.' }
-    const { error } = await supabase
-      .from('email_delivery_logs')
-      .update({
-        status: 'delivered',
-        error_message: null,
-        sent_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-
-    if (error && !isTableMissingError(error)) {
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath('/manage/settings/notifications')
-    revalidatePath('/manage/emails')
-    return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Failed to resend notification' }
-  }
-}
-
 export async function getEmailTemplates(): Promise<EmailTemplate[]> {
   try {
     const supabase = await createServerSupabaseClient()

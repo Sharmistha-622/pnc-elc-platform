@@ -9,7 +9,7 @@ import {
   Star,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { asArray, asObject, asString, formatAnswer } from '@/lib/forms/answers'
+import { asArray, asObject, asString, formatAnswer, parseRatingGrid } from '@/lib/forms/answers'
 import { formatDate } from '@/lib/employees/tenure'
 
 interface FieldAnswerViewProps {
@@ -214,16 +214,8 @@ export function SmartReviewAnswerView({ label, value }: { label?: string; value:
     return <span className="text-muted-foreground italic text-xs">No response provided</span>
   }
 
-  const lines = value.split('\n').map((l) => l.trim()).filter(Boolean)
-  const isRatingGrid =
-    lines.length > 0 &&
-    lines.every((line) => /^(.+):\s*([0-5](?:\.\d+)?)\s*\/\s*5$/.test(line))
-
-  if (isRatingGrid) {
-    const entries = lines.map((line) => {
-      const match = line.match(/^(.+):\s*([0-5](?:\.\d+)?)\s*\/\s*5$/)!
-      return [match[1].trim(), Number(match[2])] as [string, number]
-    })
+  const entries = parseRatingGrid(value)
+  if (entries) {
     return <RatingGridVisual entries={entries} />
   }
 

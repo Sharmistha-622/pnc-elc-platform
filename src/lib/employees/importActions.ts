@@ -3,19 +3,22 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { guardResource } from '@/lib/rbac/guard'
+import { guard, guardResource } from '@/lib/rbac/guard'
 import { allowedEmailDomains } from '@/lib/auth/allowedEmail'
-import { recordAuditEvents } from '@/lib/audit/service'
+import { getAuditTrail, recordAuditEvent, recordAuditEvents } from '@/lib/audit/service'
 import type { AuditEventInput } from '@/lib/audit/types'
 import { endPlatformAccess } from '@/lib/rbac/endPlatformAccess'
 import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
 import {
+  MAX_IMPORT_FILE_BYTES,
   accessChangesFor,
+  parseCsv,
   planEmployeeImport,
   type ExistingEmployee,
   type ImportContext,
   type ImportPlan,
 } from '@/lib/employees/import'
+import { parseXlsx } from '@/lib/employees/xlsx'
 
 // Importing changes the directory, which the matrix makes `general: edit`:
 // Super Admin, PnC Admin and PnC Ops. The writes go through the caller's own
@@ -23,6 +26,101 @@ import {
 // check the same thing a second time.
 
 const PAGE = 1000
+
+export type ImportFileInput =
+  | string
+  | {
+      fileName?: string
+      csvText?: string
+      xlsxBase64?: string
+      xlsxBytes?: Uint8Array | ArrayBuffer
+      byteLength?: number
+    }
+
+export interface ImportHistoryBatch {
+  id: string
+  file_name: string
+  file_type: 'csv' | 'xlsx'
+  uploaded_by: string
+  uploaded_at: string
+  processed: number
+  created: number
+  updated: number
+  unchanged: number
+  failed: number
+  status: 'completed' | 'failed'
+}
+
+async function extractTableFromInput(
+  input: ImportFileInput,
+): Promise<
+  | { ok: true; rows: string[][]; fileName: string; fileType: 'csv' | 'xlsx' }
+  | { ok: false; error: string }
+> {
+  if (typeof input === 'string') {
+    if (Buffer.byteLength(input, 'utf8') > MAX_IMPORT_FILE_BYTES) {
+      return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+    }
+    return {
+      ok: true,
+      rows: parseCsv(input),
+      fileName: 'employees.csv',
+      fileType: 'csv',
+    }
+  }
+
+  if (!input || typeof input !== 'object') {
+    return { ok: false, error: 'No file.' }
+  }
+
+  if (typeof input.byteLength === 'number' && input.byteLength > MAX_IMPORT_FILE_BYTES) {
+    return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+  }
+
+  const hasXlsx = Boolean(
+    input.xlsxBase64 !== undefined ||
+      input.xlsxBytes !== undefined ||
+      (input.fileName && /\.xlsx$/i.test(input.fileName)),
+  )
+  const fileName =
+    input.fileName?.trim() || (hasXlsx ? 'employees.xlsx' : 'employees.csv')
+
+  if (hasXlsx) {
+    if (typeof input.xlsxBase64 === 'string') {
+      const estimatedBytes = Math.floor((input.xlsxBase64.length * 3) / 4)
+      if (estimatedBytes > MAX_IMPORT_FILE_BYTES) {
+        return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+      }
+      const buf = Buffer.from(input.xlsxBase64, 'base64')
+      if (buf.byteLength > MAX_IMPORT_FILE_BYTES) {
+        return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+      }
+      const rows = await parseXlsx(buf)
+      return { ok: true, rows, fileName, fileType: 'xlsx' }
+    }
+    if (input.xlsxBytes) {
+      if (input.xlsxBytes.byteLength > MAX_IMPORT_FILE_BYTES) {
+        return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+      }
+      const rows = await parseXlsx(input.xlsxBytes)
+      return { ok: true, rows, fileName, fileType: 'xlsx' }
+    }
+    return { ok: false, error: 'No file.' }
+  }
+
+  if (typeof input.csvText !== 'string') {
+    return { ok: false, error: 'No file.' }
+  }
+  if (Buffer.byteLength(input.csvText, 'utf8') > MAX_IMPORT_FILE_BYTES) {
+    return { ok: false, error: 'The file is too large (maximum 5 MB).' }
+  }
+  return {
+    ok: true,
+    rows: parseCsv(input.csvText),
+    fileName,
+    fileType: 'csv',
+  }
+}
 
 async function loadDirectory(db: SupabaseClient): Promise<ExistingEmployee[]> {
   const out: ExistingEmployee[] = []
@@ -64,15 +162,16 @@ async function loadContext(db: SupabaseClient): Promise<ImportContext & { teamId
 export type PreviewResult = { ok: true; plan: ImportPlan } | { ok: false; error: string }
 
 /** Checks the file against the directory as it stands. Writes nothing. */
-export async function previewEmployeeImport(csvText: string): Promise<PreviewResult> {
+export async function previewEmployeeImport(input: ImportFileInput): Promise<PreviewResult> {
   const allowed = await guardResource('general', 'edit')
   if (!allowed.ok) return { ok: false, error: allowed.error }
-  if (typeof csvText !== 'string') return { ok: false, error: 'No file.' }
 
   try {
+    const extracted = await extractTableFromInput(input)
+    if (!extracted.ok) return { ok: false, error: extracted.error }
     const db = await createServerSupabaseClient()
     const ctx = await loadContext(db)
-    return { ok: true, plan: planEmployeeImport(csvText, ctx) }
+    return { ok: true, plan: planEmployeeImport(extracted.rows, ctx) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not check the file.' }
   }
@@ -86,11 +185,19 @@ export type RunResult =
  * Writes the file. The plan is worked out again here from the file and the
  * directory as they are now, and nothing is written unless every row passes.
  */
-export async function runEmployeeImport(csvText: string): Promise<RunResult> {
+export async function runEmployeeImport(input: ImportFileInput): Promise<RunResult> {
   const allowed = await guardResource('general', 'edit')
   if (!allowed.ok) return { ok: false, error: allowed.error }
   const caller = allowed.caller
-  if (typeof csvText !== 'string') return { ok: false, error: 'No file.' }
+
+  let extracted: Extract<Awaited<ReturnType<typeof extractTableFromInput>>, { ok: true }>
+  try {
+    const parsed = await extractTableFromInput(input)
+    if (!parsed.ok) return { ok: false, error: parsed.error }
+    extracted = parsed
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not read the file.' }
+  }
 
   let db: SupabaseClient
   let ctx: Awaited<ReturnType<typeof loadContext>>
@@ -101,7 +208,7 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not read the directory.' }
   }
 
-  const plan = planEmployeeImport(csvText, ctx)
+  const plan = planEmployeeImport(extracted.rows, ctx)
   if (!plan.canImport) {
     return {
       ok: false,
@@ -189,7 +296,7 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
     if ((data?.length ?? 0) !== ids.length) return fail(null, 'Setting managers was refused for some people')
   }
 
-  // 4. One audit event per person changed.
+  // 4. One audit event per person changed, plus one batch record for Import History.
   const actor = {
     actor_id: caller.userId,
     actor_email: caller.email,
@@ -208,9 +315,38 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
           ? `Added ${r.name} to the directory by import.`
           : `Updated ${r.name} by import: ${r.changes.map((c) => c.field).join(', ')}.`,
       changes: r.action === 'update' ? r.changes : null,
-      metadata: { source: 'employee_import', line: r.line, actor_role: caller.role },
+      metadata: {
+        source: 'employee_import',
+        file_name: extracted.fileName,
+        file_type: extracted.fileType,
+        line: r.line,
+        actor_role: caller.role,
+      },
     }))
   await recordAuditEvents(events)
+
+  await recordAuditEvent({
+    subject: {
+      employee_email: caller.email ?? 'pnc@navgurukul.org',
+      employee_name: caller.email ? caller.email.split('@')[0] : 'PnC',
+    },
+    actor,
+    module: 'data_management',
+    action: 'employee.import.completed',
+    description: `Imported ${extracted.fileName} (${extracted.fileType.toUpperCase()}): ${created} added, ${updated} updated, ${plan.counts.unchanged} unchanged.`,
+    metadata: {
+      source: 'employee_import_batch',
+      file_name: extracted.fileName,
+      file_type: extracted.fileType,
+      processed: plan.rows.length,
+      created,
+      updated,
+      unchanged: plan.counts.unchanged,
+      failed: plan.counts.error,
+      status: 'completed',
+      actor_role: caller.role,
+    },
+  })
 
   // 5. Someone the file marks exited leaves the platform as closing an exit
   //    does: their stored role goes and their account is closed. The daily
@@ -239,6 +375,7 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
   revalidatePath('/employees')
   revalidatePath('/manage/users')
   revalidatePath('/reviews')
+  revalidatePath('/data-management/import-history')
 
   const warnings = [
     ...(accessNotEnded
@@ -256,4 +393,45 @@ export async function runEmployeeImport(csvText: string): Promise<RunResult> {
     unchanged: plan.counts.unchanged,
     ...(warnings.length ? { warning: warnings.join(' ') } : {}),
   }
+}
+
+/** Lists recorded employee imports for `/data-management/import-history`. */
+export async function getEmployeeImportHistory(): Promise<ImportHistoryBatch[]> {
+  const allowed = await guard('dataManagement')
+  if (!allowed.ok) return []
+
+  const events = await getAuditTrail({ module: 'data_management', limit: 200 })
+  return events
+    .filter(
+      (e) =>
+        e.action === 'employee.import.completed' ||
+        (e.metadata && (e.metadata as Record<string, unknown>).source === 'employee_import_batch'),
+    )
+    .map((e) => {
+      const meta = (e.metadata ?? {}) as Record<string, unknown>
+      const fileName =
+        typeof meta.file_name === 'string' && meta.file_name.trim()
+          ? meta.file_name.trim()
+          : 'employees.csv'
+      const fileType: 'csv' | 'xlsx' =
+        meta.file_type === 'xlsx' || /\.xlsx$/i.test(fileName) ? 'xlsx' : 'csv'
+      const created = Number(meta.created ?? 0)
+      const updated = Number(meta.updated ?? 0)
+      const unchanged = Number(meta.unchanged ?? 0)
+      const failed = Number(meta.failed ?? 0)
+      const processed = Number(meta.processed ?? created + updated + unchanged + failed)
+      return {
+        id: e.id,
+        file_name: fileName,
+        file_type: fileType,
+        uploaded_by: e.actor_email || e.actor_name || 'PnC',
+        uploaded_at: e.occurred_at,
+        processed,
+        created,
+        updated,
+        unchanged,
+        failed,
+        status: meta.status === 'failed' ? 'failed' : 'completed',
+      }
+    })
 }

@@ -38,6 +38,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { createConfirmation } from '@/lib/confirmations/createConfirmation'
 import { nominatePeers } from '@/lib/confirmations/nominatePeers'
 import { notifyEmployee } from '@/lib/confirmations/notifyEmployee'
+import {
+  CONFIRMATION_DECISION_OPTIONS,
+  resolveConfirmationGuidelines,
+  type ConfirmationGuidelineSettings,
+} from '@/lib/confirmations/guidelines'
 import { startReviewCycle } from '@/lib/reviews/actions'
 import { toast } from 'sonner'
 
@@ -102,10 +107,13 @@ function formatDate(iso: string | null | undefined): string {
 export function NewConfirmationClient({
   employees,
   directoryEmployees = [],
+  guidelines,
 }: {
   employees: EmployeeOption[]
   directoryEmployees?: DirectoryOption[]
+  guidelines?: ConfirmationGuidelineSettings
 }) {
+  const resolvedGuidelines = guidelines ?? resolveConfirmationGuidelines()
   const [employeeId, setEmployeeId] = useState('')
   const [timelineType, setTimelineType] = useState('')
   const [showTimelineOverride, setShowTimelineOverride] = useState(false)
@@ -158,8 +166,8 @@ export function NewConfirmationClient({
   }
 
   const handleAddPeer = () => {
-    if (peers.length >= 6) {
-      toast.warning('Maximum 6 suggested peers recommended')
+    if (peers.length >= resolvedGuidelines.maximumPeers) {
+      toast.warning(`Maximum ${resolvedGuidelines.maximumPeers} suggested peers recommended`)
       return
     }
     setPeers([...peers, { name: '', email: '' }])
@@ -475,7 +483,7 @@ export function NewConfirmationClient({
                     <div>
                       <p className="font-semibold text-foreground">Employee-Driven Nominations</p>
                       <p className="text-[11px] mt-0.5">
-                        When this review launches, the employee is emailed their self-reflection link where they nominate 4–5 peers. Any reviewers you add below will appear as pre-filled recommendations for them.
+                        When this review launches, the employee is emailed their self-reflection link where they nominate {resolvedGuidelines.minimumResponses}–{resolvedGuidelines.maximumPeers} peers. Any reviewers you add below will appear as pre-filled recommendations for them.
                       </p>
                     </div>
                   </div>
@@ -583,7 +591,7 @@ export function NewConfirmationClient({
               <div>
                 <p className="font-semibold text-foreground">Self-Review & Peer Nominations</p>
                 <p className="mt-0.5">
-                  The employee is emailed to write their self-reflection and nominate 4–5 peers on My Reviews.
+                  The employee is emailed to write their self-reflection and nominate {resolvedGuidelines.minimumResponses}–{resolvedGuidelines.maximumPeers} peers on My Reviews.
                 </p>
               </div>
             </div>
@@ -607,7 +615,7 @@ export function NewConfirmationClient({
               <div>
                 <p className="font-semibold text-foreground">Review Meeting & Manager Decision</p>
                 <p className="mt-0.5">
-                  Once 60% of peers respond, meeting is scheduled. Manager records: Confirm, Extend, or Do not confirm.
+                  Once {resolvedGuidelines.meetingReadyPeerPercent}% of peers respond, meeting is scheduled. Manager records: {CONFIRMATION_DECISION_OPTIONS.map((d) => d.label).join(', ')}.
                 </p>
               </div>
             </div>
@@ -619,7 +627,7 @@ export function NewConfirmationClient({
               <div>
                 <p className="font-semibold text-foreground">PnC Sign-Off & Closure</p>
                 <p className="mt-0.5">
-                  PnC Admin accepts the decision, which permanently stamps the employee's confirmation date.
+                  PnC Admin accepts the decision, which permanently stamps the employee&apos;s confirmation date.
                 </p>
               </div>
             </div>
@@ -646,11 +654,11 @@ export function NewConfirmationClient({
             </div>
             <div className="flex justify-between py-1 border-b border-border/50">
               <span>Auto-Open Window</span>
-              <span className="font-medium text-foreground">7 Days Before Due</span>
+              <span className="font-medium text-foreground">{resolvedGuidelines.daysBeforeDue} Days Before Due</span>
             </div>
             <div className="flex justify-between py-1">
               <span>Required Peer Quorum</span>
-              <span className="font-medium text-foreground">Min. 60% Responses</span>
+              <span className="font-medium text-foreground">Min. {resolvedGuidelines.minimumResponses} Responses</span>
             </div>
           </CardContent>
         </Card>

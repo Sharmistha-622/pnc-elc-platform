@@ -42,6 +42,8 @@ import {
 } from "lucide-react";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import type { ConfirmationListItem } from "@/lib/confirmations/getConfirmationsList";
+import { decisionLabel } from "@/lib/reviews/types";
+import { normalizeConfirmationDecision } from "@/lib/confirmations/guidelines";
 
 interface ConfirmationsTableProps {
   initialConfirmations: ConfirmationListItem[];
@@ -143,23 +145,31 @@ export function ConfirmationsTable({ initialConfirmations }: ConfirmationsTableP
         </Badge>
       );
     }
-    if (d === "yes" || d === "confirm" || d === "approved") {
+    const canonical = normalizeConfirmationDecision(d);
+    if (canonical === "confirm" || d === "approved") {
       return (
         <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-none font-semibold text-[11px] rounded-lg">
-          Confirmed
+          {decisionLabel("confirm")}
         </Badge>
       );
     }
-    if (d === "no" || d === "reject") {
+    if (canonical === "extend_probation") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-none font-semibold text-[11px] rounded-lg">
+          {decisionLabel("extend_probation")}
+        </Badge>
+      );
+    }
+    if (canonical === "not_confirmed" || d === "reject") {
       return (
         <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-none font-semibold text-[11px] rounded-lg">
-          Not Confirmed
+          {decisionLabel("not_confirmed")}
         </Badge>
       );
     }
     return (
       <Badge variant="secondary" className="text-[11px] rounded-lg font-medium">
-        {decision}
+        {decisionLabel(decision)}
       </Badge>
     );
   };
