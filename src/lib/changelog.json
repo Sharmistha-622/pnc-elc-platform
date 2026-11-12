@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.15.01",
+    "date": "2026-11-12",
+    "title": "Point IDE changelog rule at rules/version-and-changelog.md",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "IDE agent changelog rule now points to `rules/version-and-changelog.md` instead of instructing manual version edits."
+      }
+    ]
+  },
+  {
     "version": "2.15.00",
     "date": "2026-11-12",
     "title": "Team lanes chart with nested sub-teams and an org chart",
