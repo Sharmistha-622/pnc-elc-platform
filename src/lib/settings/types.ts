@@ -668,6 +668,7 @@ export const DEFAULT_DOCUMENT_TYPES: DocumentType[] = [
   { id: '6', name: 'signed_offer_letter', display_name: 'Signed Offer Letter', destination: 'team_member', is_required: true, is_active: true, sort_order: 6, updated_at: new Date().toISOString() },
   { id: '7', name: 'signed_appointment_letter', display_name: 'Signed Appointment Letter', destination: 'team_member', is_required: false, is_active: true, sort_order: 7, updated_at: new Date().toISOString() },
   { id: '8', name: 'confirmation_letter', display_name: 'Confirmation Letter', destination: 'team_member', is_required: false, is_active: true, sort_order: 8, updated_at: new Date().toISOString() },
+  { id: '9', name: 'epf_form_11', display_name: 'EPF Form 11 (Signed)', destination: 'verification_docs', is_required: false, is_active: true, sort_order: 20, updated_at: new Date().toISOString() },
 ]
 
 export const DEFAULT_EMAIL_TEMPLATES: EmailTemplate[] = [

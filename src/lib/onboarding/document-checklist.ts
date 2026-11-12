@@ -28,6 +28,7 @@ export const FALLBACK_REQUIREMENTS: CandidateDocumentRequirement[] = [
   { key: 'prev_experience_letter', label: 'Previous Experience Letter', required: false, sortOrder: 17 },
   { key: 'prev_relieving_letter', label: 'Previous Relieving Letter', required: false, sortOrder: 18 },
   { key: 'reference_details', label: 'Professional References', required: false, sortOrder: 19 },
+  { key: 'epf_form_11', label: 'EPF Form 11 (Signed)', required: false, sortOrder: 20 },
 ];
 
 export async function getCandidateDocumentRequirements(): Promise<CandidateDocumentRequirement[]> {
