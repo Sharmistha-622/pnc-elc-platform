@@ -35,6 +35,7 @@ import { CANDIDATE_BUCKET } from './candidate-storage';
 import { carryDocumentsToEmployee } from './document-handover';
 import { sealIdentityDocument, purgeStagedDocuments } from '@/lib/vault/seal-service';
 import { roleForStatus, canTransition, type JoinerStatus } from '@/lib/rbac/lifecycle';
+import { assertDifferentPeople } from '@/lib/rbac/makerChecker';
 import { DEFAULT_PREJOINING_POLICIES } from './default-policies';
 import { getCandidateDocumentRequirements } from './document-checklist';
 import { auditOnboarding, auditLetters } from '@/lib/audit/events';
@@ -1043,10 +1044,30 @@ export async function retrySealDocument(
 export async function updateOnboardingStatus(
   id: string,
   status: OnboardingStatus,
-  reviewerNote?: string
+  reviewerNote?: string,
+  actor?: string
 ): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
+
+  if (status === 'approved' && actor) {
+    assertDifferentPeople(
+      data.record.created_by,
+      actor,
+      'The person who issued the offer or letters cannot also approve the onboarding.'
+    );
+    const { data: letters } = await onboardingDb()
+      .from('candidate_letters')
+      .select('created_by')
+      .eq('onboarding_id', id);
+    for (const letter of (letters ?? []) as Array<{ created_by?: string | null }>) {
+      assertDifferentPeople(
+        letter.created_by,
+        actor,
+        'The person who issued the offer or letters cannot also approve the onboarding.'
+      );
+    }
+  }
 
   const previousStatus = data.record.status;
   const now = new Date().toISOString();
@@ -1066,6 +1087,7 @@ export async function updateOnboardingStatus(
 
   await auditOnboarding.statusChanged({
     subject: auditSubject(data.record),
+    actorName: actor,
     entityId: id,
     from: previousStatus,
     to: status,

@@ -19,6 +19,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { sendCalendarInvite, sendEmail } from '@/lib/email/sendEmail'
 import { calendarAvailabilityService } from '@/lib/integrations/calendar-availability.server'
 import { auditEvent } from '@/lib/audit/events'
+import { checkDifferentPeople } from '@/lib/rbac/makerChecker'
 import { sealFeedbackForConfirmation } from '@/lib/vault/seal-service'
 import {
   DEFAULT_APPRAISAL_CYCLES,
@@ -860,7 +861,11 @@ export async function recordDecision(
  * the employee's confirmation date, an extension reschedules it. Returning
  * sends it back to the manager with PnC's note.
  */
-export async function closeCycle(ctx: Ctx, cycleId: string, input: { outcome: 'accepted' | 'returned'; note: string }): Promise<Result> {
+export async function closeCycle(
+  ctx: Ctx,
+  cycleId: string,
+  input: { outcome: 'accepted' | 'returned'; note: string; checkerEmployeeId?: string | null }
+): Promise<Result> {
   const cycle = await cycleById(ctx.db, cycleId)
   if (!cycle) return fail('Review not found')
   if (cycle.stage !== 'decision_recorded') return fail('There is no decision waiting for PnC.')
@@ -869,6 +874,18 @@ export async function closeCycle(ctx: Ctx, cycleId: string, input: { outcome: 'a
   if (!decision) return fail('There is no decision waiting for PnC.')
   const note = input.note.trim()
   if (input.outcome === 'returned' && note.length < 5) return fail('Say what the manager should look at again.')
+
+  if (input.outcome === 'accepted') {
+    const makerId = decision.decided_by ?? cycle.manager_id
+    const makerPerson = makerId ? await person(ctx.db, makerId) : null
+    const makerEmail = makerPerson && makerPerson.id === makerId ? makerPerson.email : null
+    const sod = checkDifferentPeople(
+      { id: makerId, email: makerEmail },
+      { id: input.checkerEmployeeId ?? null, email: ctx.actor },
+      'The person who recorded the review decision cannot also accept it.'
+    )
+    if (!sod.ok) return fail(sod.error)
+  }
 
   await ctx.db
     .from('review_decisions')
