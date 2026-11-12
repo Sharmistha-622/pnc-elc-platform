@@ -42,18 +42,19 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
-import { OrgChart, type OrgEmployee } from '@/components/shared/org-chart'
+import { TeamChart } from '@/components/shared/team-chart/TeamChart'
+import { TeamChartError } from '@/components/shared/team-chart/TeamChartError'
+import type { TeamChartResult } from '@/lib/org/teamChartTypes'
 import type { EmployeeProfileData } from '@/lib/profile/profileActions'
 import { formatDate, formatEmploymentType } from '@/lib/employees/tenure'
 
 interface MyTeamClientProps {
-  currentManagerName: string
   reportees: EmployeeProfileData['reportees']
-  allManagers: { id: string; name: string }[]
-  managerProfile?: EmployeeProfileData | null
+  /** The viewer's whole reporting line, by team (`getMyTeamChart`). */
+  teamChart: TeamChartResult
 }
 
-export function MyTeamClient({ currentManagerName, reportees, allManagers, managerProfile }: MyTeamClientProps) {
+export function MyTeamClient({ reportees, teamChart }: MyTeamClientProps) {
   const user = useUserContext()
   const canOpenProfiles = canAccessRoute(user?.role, '/employees/x/profile')
   const canOpenDocuments = canOpenProfiles && canHandleDocuments(user?.role ?? null)
@@ -93,47 +94,6 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers, manag
     const start = (currentPage - 1) * itemsPerPage
     return filteredReportees.slice(start, start + itemsPerPage)
   }, [filteredReportees, currentPage, itemsPerPage])
-
-  // Prepare data for Team Chart
-  const teamChartEmployees = useMemo((): OrgEmployee[] => {
-    const managerNode: OrgEmployee = managerProfile
-      ? {
-          id: managerProfile.id,
-          name: managerProfile.name,
-          email: managerProfile.email,
-          team: managerProfile.team,
-          employee_type: managerProfile.employeeType || 'Manager',
-          status: managerProfile.status,
-          confirmation_date: managerProfile.confirmationDate,
-          manager_id: null,
-          user_id: managerProfile.userId,
-          avatar_url: managerProfile.avatarUrl,
-          user_role: managerProfile.role,
-        }
-      : {
-          id: 'current-manager',
-          name: currentManagerName,
-          employee_type: 'Manager',
-          status: 'active',
-          manager_id: null,
-        }
-
-    const reporteeNodes: OrgEmployee[] = reportees.map((r) => ({
-      id: r.id,
-      name: r.name,
-      email: r.email,
-      team: r.team,
-      employee_type: r.employeeType,
-      status: r.status,
-      confirmation_date: r.confirmationDate,
-      manager_id: r.managerId || managerNode.id,
-      user_id: r.userId,
-      avatar_url: r.avatarUrl,
-      user_role: r.userRole,
-    }))
-
-    return [managerNode, ...reporteeNodes]
-  }, [managerProfile, currentManagerName, reportees])
 
   // Badges for employment type (matching /employees directory)
   const renderTypeBadge = (type?: string | null) => {
@@ -437,13 +397,11 @@ export function MyTeamClient({ currentManagerName, reportees, allManagers, manag
 
         {/* Tab 2: Team Chart */}
         <TabsContent value="chart" className="m-0">
-          <OrgChart
-            employees={teamChartEmployees}
-            rootEmployeeId={managerProfile?.id || null}
-            title="Team Hierarchy"
-            subtitle={`Direct and indirect reportees under ${currentManagerName}`}
-            showDepartmentFilter={false}
-          />
+          {teamChart.ok ? (
+            <TeamChart chart={teamChart.chart} title="My team" emptyText="Nobody reports to you yet." />
+          ) : (
+            <TeamChartError message={teamChart.error} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

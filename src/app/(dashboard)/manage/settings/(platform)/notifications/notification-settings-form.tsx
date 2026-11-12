@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateNotificationSettings, resendEmailDeliveryLog } from '@/lib/settings/service'
+import { updateNotificationSettings } from '@/lib/settings/service'
 import type { NotificationSettings, EmailDeliveryLog } from '@/lib/settings/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +41,6 @@ import {
   Send,
   Search,
   Eye,
-  RotateCcw,
   Sparkles,
   Inbox,
   CheckCheck,
@@ -59,7 +58,7 @@ export function NotificationSettingsForm({
 }) {
   const [activeTab, setActiveTab] = useState<'rules' | 'monitor'>('rules')
   const [settings, setSettings] = useState<NotificationSettings>(initialSettings)
-  const [logs, setLogs] = useState<EmailDeliveryLog[]>(initialDeliveryLogs)
+  const logs = initialDeliveryLogs
   const [isPending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +68,6 @@ export function NotificationSettingsForm({
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedLog, setSelectedLog] = useState<EmailDeliveryLog | null>(null)
-  const [resendingId, setResendingId] = useState<string | null>(null)
 
   function handleSaveRules() {
     setError(null)
@@ -86,27 +84,6 @@ export function NotificationSettingsForm({
 
       setSaved(true)
       toast.success('Notification settings saved successfully')
-    })
-  }
-
-  function handleResend(log: EmailDeliveryLog) {
-    setResendingId(log.id)
-    startTransition(async () => {
-      const res = await resendEmailDeliveryLog(log.id)
-      setResendingId(null)
-      if (!res.success) {
-        toast.error(res.error || 'Failed to resend notification')
-        return
-      }
-
-      setLogs((prev) =>
-        prev.map((item) =>
-          item.id === log.id
-            ? { ...item, status: 'delivered', error_message: null, sent_at: new Date().toISOString() }
-            : item
-        )
-      )
-      toast.success(`Resent notification to ${log.recipient_email}`)
     })
   }
 
@@ -948,18 +925,6 @@ export function NotificationSettingsForm({
                               <Eye className="w-3.5 h-3.5" />
                               <span>View</span>
                             </Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={resendingId === log.id}
-                              onClick={() => handleResend(log)}
-                              className="h-7 text-xs px-2 gap-1 rounded-md"
-                              title="Resend email"
-                            >
-                              <RotateCcw className={`w-3 h-3 ${resendingId === log.id ? 'animate-spin' : ''}`} />
-                              <span>Resend</span>
-                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1050,20 +1015,6 @@ export function NotificationSettingsForm({
             >
               Close
             </Button>
-            {selectedLog && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  handleResend(selectedLog)
-                  setSelectedLog(null)
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold gap-1.5"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Resend Notification</span>
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

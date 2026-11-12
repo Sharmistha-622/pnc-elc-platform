@@ -1,17 +1,10 @@
-# Versioning and Changelog Maintenance
+---
+trigger: always_on
+description: How versioning and the changelog are maintained. Read rules/version-and-changelog.md.
+---
 
-All development tasks on the PnC ELC Platform must maintain the centralized versioning configuration and changelog registry in `src/lib/version-config.ts`.
+# Versioning and Changelog
 
-## Mandatory Requirement
+See [`rules/version-and-changelog.md`](../../rules/version-and-changelog.md).
 
-After every successful task execution (and before any push/commit), you **must**:
-
-1. Read `src/lib/version-config.ts` and inspect the latest version entry in `VERSION_HISTORY`.
-2. Determine the appropriate version increment based on the work completed:
-   - **Patch (`x.xx.xx + 1`)**: Bug fixes, minor improvements, refactoring, patch features.
-   - **Minor (`x.xx+1.00`)**: New module additions, major features, schema additions.
-   - **Major (`x+1.00.00`)**: System overhauls, major releases.
-3. Update `CURRENT_VERSION` in `src/lib/version-config.ts`.
-4. Prepend a new `VersionEntry` to `VERSION_HISTORY` in `src/lib/version-config.ts` summarizing the work done.
-5. **Verification**: Check every change-item description against the actual `git diff` (or file changes) of the commit/task it describes before finalizing the entry to ensure absolute accuracy.
-
+Do not hand-edit the changelog or version files on a feature branch. Write the release note in the pull request body under `## Changelog`, and `.github/workflows/changelog.yml` records it on `main` after merge.

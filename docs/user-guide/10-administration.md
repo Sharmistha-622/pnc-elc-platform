@@ -113,7 +113,10 @@ Super Admin and PnC Admin only: these hold personal data.
 > **Note:** each outbound email reads its active template from **Templates &
 > Cadence** by key, fills allow-listed variables on the server, and falls back
 > to built-in wording only if no active template exists. No template can
-> include salary, CTC, government ID numbers, or bank account details.
+> include salary, CTC, government ID numbers, or bank account details. Because
+> email logs keep no message bodies, failed messages are re-sent from the
+> screen that sent them (for example, *Resend Invitation Email* on the
+> candidate).
 
 ### The emails that are actually sent today
 

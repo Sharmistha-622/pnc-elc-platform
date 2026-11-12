@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/chart'
 import {
   updateEmailTemplate,
-  resendEmailDeliveryLog,
   updateEmailProviderConfig,
   sendTestEmailVerification,
   pingEmailProvider,
@@ -87,7 +86,6 @@ import {
   Layers,
   Search,
   Eye,
-  RotateCcw,
   Sparkles,
   Inbox,
   Radio,
@@ -143,7 +141,7 @@ export function EmailsView({
   initialProviderConfig?: EmailProviderConfig
 }) {
   const [activeTab, setActiveTab] = useState<'templates' | 'monitor' | 'setup' | 'usage'>('templates')
-  const [logs, setLogs] = useState<EmailDeliveryLog[]>(initialDeliveryLogs)
+  const logs = initialDeliveryLogs
   const [templates, setTemplates] = useState<EmailTemplate[]>(initialEmailTemplates)
   const [providerConfig, setProviderConfig] = useState<EmailProviderConfig>(initialProviderConfig)
   const [isPending, startTransition] = useTransition()
@@ -751,7 +749,6 @@ export function EmailsView({
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedLog, setSelectedLog] = useState<EmailDeliveryLog | null>(null)
-  const [resendingId, setResendingId] = useState<string | null>(null)
   const [logPageIndex, setLogPageIndex] = useState(1)
   const [logPageSize, setLogPageSize] = useState(10)
 
@@ -763,28 +760,6 @@ export function EmailsView({
   )
   const [isSetupTesting, setIsSetupTesting] = useState(false)
   const [providerSaved, setProviderSaved] = useState(false)
-
-  // Resend Outbox Notification
-  function handleResend(log: EmailDeliveryLog) {
-    setResendingId(log.id)
-    startTransition(async () => {
-      const res = await resendEmailDeliveryLog(log.id)
-      setResendingId(null)
-      if (!res.success) {
-        toast.error(res.error || 'Failed to resend notification')
-        return
-      }
-
-      setLogs((prev) =>
-        prev.map((item) =>
-          item.id === log.id
-            ? { ...item, status: 'delivered', error_message: null, sent_at: new Date().toISOString() }
-            : item
-        )
-      )
-      toast.success(`Resent notification to ${log.recipient_email}`)
-    })
-  }
 
   // Open Template & Cadence Editor
   function openEditModal(tmpl: EmailTemplate) {
@@ -1652,14 +1627,6 @@ export function EmailsView({
                                     >
                                       <Eye className="w-3.5 h-3.5 text-muted-foreground" />
                                       <span>View</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      disabled={resendingId === log.id}
-                                      onClick={() => handleResend(log)}
-                                      className="cursor-pointer gap-2 text-xs"
-                                    >
-                                      <RotateCcw className={`w-3.5 h-3.5 text-muted-foreground ${resendingId === log.id ? 'animate-spin' : ''}`} />
-                                      <span>Resend</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -4362,7 +4329,7 @@ export function EmailsView({
             </div>
           </div>
 
-          <DialogFooter className="p-3 px-6 border-t border-border/60 bg-muted/20 flex items-center justify-between sm:justify-between shrink-0">
+          <DialogFooter className="p-3 px-6 border-t border-border/60 bg-muted/20 flex items-center justify-end shrink-0">
             <Button
               type="button"
               variant="outline"
@@ -4372,22 +4339,6 @@ export function EmailsView({
             >
               Close
             </Button>
-
-            {selectedLog && (
-              <Button
-                type="button"
-                size="sm"
-                disabled={resendingId === selectedLog.id}
-                onClick={() => {
-                  handleResend(selectedLog)
-                  setSelectedLog(null)
-                }}
-                className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs"
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${resendingId === selectedLog.id ? 'animate-spin' : ''}`} />
-                <span>Resend Notification</span>
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
