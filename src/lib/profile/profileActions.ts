@@ -4,11 +4,28 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/rbac/getCurrentUserRole'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
-import { guardResource } from '@/lib/rbac/guard'
+import { guard, guardResource } from '@/lib/rbac/guard'
 import { accessFor } from '@/lib/rbac/roles'
 import { departmentOf } from '@/lib/employees/department'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { getSafeAvatarUrl } from '@/lib/avatar'
+import { auditEmployee } from '@/lib/audit/events'
+
+export interface SelfContactDetails {
+  phone: string | null
+  currentAddress: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+  emergencyContactRelation: string | null
+}
+
+export interface UpdateMyContactDetailsInput {
+  phone?: string | null
+  currentAddress?: string | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
+  emergencyContactRelation?: string | null
+}
 
 export interface EmployeeProfileData {
   id: string
@@ -22,6 +39,7 @@ export interface EmployeeProfileData {
   role: string
   avatarUrl?: string | null
   userId?: string | null
+  contactDetails?: SelfContactDetails
   manager: {
     id: string
     name: string
@@ -195,6 +213,24 @@ export async function getMyProfileData(): Promise<{
     userRole: r.email ? userMap.get(r.email.toLowerCase())?.role || null : null,
   }))
 
+  const { data: contactRow } = await supabase
+    .from('employee_profiles')
+    .select(
+      'contact_number, permanent_address, mailing_address, mailing_address_same, emergency_contact_name, emergency_contact_number, emergency_contact_relation'
+    )
+    .eq('employee_id', empRecord.id)
+    .maybeSingle()
+
+  const contactDetails: SelfContactDetails = {
+    phone: contactRow?.contact_number ?? null,
+    currentAddress:
+      contactRow?.mailing_address ??
+      (contactRow?.mailing_address_same ? contactRow?.permanent_address ?? null : null),
+    emergencyContactName: contactRow?.emergency_contact_name ?? null,
+    emergencyContactPhone: contactRow?.emergency_contact_number ?? null,
+    emergencyContactRelation: contactRow?.emergency_contact_relation ?? null,
+  }
+
   const profile: EmployeeProfileData = {
     id: empRecord.id,
     name: empRecord.name,
@@ -207,6 +243,7 @@ export async function getMyProfileData(): Promise<{
     role: userRole.role || 'Member',
     avatarUrl: (empRecord.email ? userMap.get(empRecord.email.toLowerCase())?.avatarUrl : null) || (user.email ? userMap.get(user.email.toLowerCase())?.avatarUrl : null) || null,
     userId: (empRecord.email ? userMap.get(empRecord.email.toLowerCase())?.id : null) || user.id,
+    contactDetails,
     manager: managerInfo,
     reportees,
   }
@@ -217,6 +254,145 @@ export async function getMyProfileData(): Promise<{
     profile,
     allEmployees: allEmployees.filter((e) => e.id !== empRecord.id),
   }
+}
+
+function cleanContactField(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+export async function updateMyContactDetails(
+  input: UpdateMyContactDetailsInput & Record<string, unknown>
+): Promise<{
+  success: boolean
+  error?: string
+  contactDetails?: SelfContactDetails
+}> {
+  const allowed = await guard('self')
+  if (!allowed.ok) {
+    return { success: false, error: allowed.error }
+  }
+
+  const supabase = await createServerSupabaseClient()
+  const { employee } = await getCurrentEmployee(supabase)
+  if (!employee?.id) {
+    return { success: false, error: 'Employee record not found for current session.' }
+  }
+
+  // Always resolve the caller's own employee id on the server; ignore any
+  // employeeId, id, ID-number or bank field sent by the browser.
+  const ownEmployeeId = employee.id
+
+  const { data: existing } = await supabase
+    .from('employee_profiles')
+    .select(
+      'first_name, last_name, contact_number, permanent_address, mailing_address, mailing_address_same, emergency_contact_name, emergency_contact_number, emergency_contact_relation'
+    )
+    .eq('employee_id', ownEmployeeId)
+    .maybeSingle()
+
+  const previous: SelfContactDetails = {
+    phone: existing?.contact_number ?? null,
+    currentAddress:
+      existing?.mailing_address ??
+      (existing?.mailing_address_same ? existing?.permanent_address ?? null : null),
+    emergencyContactName: existing?.emergency_contact_name ?? null,
+    emergencyContactPhone: existing?.emergency_contact_number ?? null,
+    emergencyContactRelation: existing?.emergency_contact_relation ?? null,
+  }
+
+  const next: SelfContactDetails = {
+    phone: input && 'phone' in input ? cleanContactField(input.phone) : previous.phone,
+    currentAddress:
+      input && 'currentAddress' in input
+        ? cleanContactField(input.currentAddress)
+        : previous.currentAddress,
+    emergencyContactName:
+      input && 'emergencyContactName' in input
+        ? cleanContactField(input.emergencyContactName)
+        : previous.emergencyContactName,
+    emergencyContactPhone:
+      input && 'emergencyContactPhone' in input
+        ? cleanContactField(input.emergencyContactPhone)
+        : previous.emergencyContactPhone,
+    emergencyContactRelation:
+      input && 'emergencyContactRelation' in input
+        ? cleanContactField(input.emergencyContactRelation)
+        : previous.emergencyContactRelation,
+  }
+
+  const nameParts = (employee.name || '').trim().split(/\s+/)
+  const firstName = existing?.first_name ?? nameParts[0] ?? ''
+  const lastName = existing?.last_name ?? nameParts.slice(1).join(' ')
+  const permanentAddress = existing?.permanent_address ?? null
+  const mailingAddressSame = Boolean(
+    permanentAddress && next.currentAddress === permanentAddress
+  )
+
+  const payload = {
+    employee_id: ownEmployeeId,
+    first_name: firstName,
+    last_name: lastName,
+    contact_number: next.phone,
+    mailing_address: next.currentAddress,
+    mailing_address_same: mailingAddressSame,
+    emergency_contact_name: next.emergencyContactName,
+    emergency_contact_number: next.emergencyContactPhone,
+    emergency_contact_relation: next.emergencyContactRelation,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error } = await supabase
+    .from('employee_profiles')
+    .upsert(payload, { onConflict: 'employee_id' })
+
+  if (error) {
+    console.error('Error updating own contact details:', error.message)
+    return { success: false, error: 'Failed to update contact details.' }
+  }
+
+  const fieldPairs: Array<[keyof SelfContactDetails, string]> = [
+    ['phone', 'contact_number'],
+    ['currentAddress', 'mailing_address'],
+    ['emergencyContactName', 'emergency_contact_name'],
+    ['emergencyContactPhone', 'emergency_contact_number'],
+    ['emergencyContactRelation', 'emergency_contact_relation'],
+  ]
+
+  const changedFields: Record<string, { old: string | null; new: string | null }> = {}
+  for (const [propKey, columnKey] of fieldPairs) {
+    if (previous[propKey] !== next[propKey]) {
+      changedFields[columnKey] = {
+        old: previous[propKey],
+        new: next[propKey],
+      }
+    }
+  }
+
+  if (Object.keys(changedFields).length > 0) {
+    const callerEmail =
+      (employee as { email?: string | null }).email ?? allowed.caller.email ?? null
+    await auditEmployee.profileUpdated({
+      subject: {
+        employee_id: ownEmployeeId,
+        employee_email: callerEmail,
+        employee_name: employee.name ?? null,
+      },
+      actorName: employee.name ?? null,
+      actorEmail: callerEmail,
+      actorType: 'employee',
+      entityId: ownEmployeeId,
+      summary: 'Employee updated their own contact details.',
+      metadata: {
+        fields: changedFields,
+      },
+    })
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/my-privacy')
+  return { success: true, contactDetails: next }
 }
 
 export async function updateReportingManager(employeeId: string, managerId: string | null) {
