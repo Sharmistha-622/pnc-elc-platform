@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.21.02",
+    "date": "2026-11-12",
+    "title": "Add XLSX employee import and list imports in Import History",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Add XLSX employee import and list imports in Import History"
+      }
+    ]
+  },
+  {
     "version": "2.21.01",
     "date": "2026-11-12",
     "title": "Align Confirmations screens with review flow decisions and Settings",
