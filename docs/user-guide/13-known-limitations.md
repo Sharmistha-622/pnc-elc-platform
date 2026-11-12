@@ -95,8 +95,6 @@ real work.** Items are grouped by area.
   **sample data only**.
 - **System Audit Logs** may show sample rows when the real log is empty.
 - **Bulk Upload Users** isn't available.
-- **Form Builder** *Send this form* doesn't email the person yet. It only
-  appears in their My Forms.
 
 ## Payroll and vault
 

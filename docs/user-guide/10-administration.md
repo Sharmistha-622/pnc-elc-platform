@@ -129,6 +129,7 @@ Super Admin and PnC Admin only: these hold personal data.
 | Resignation recorded | Resignation acknowledgement |
 | *Send Reminders* on an exit | Clearance reminder |
 | Exit closed | Relieving documents |
+| Form sent in Form Builder | *"New form assigned to you"*, linking to the form in My Forms |
 
 ---
 
@@ -211,7 +212,7 @@ In the builder:
    already filled in keep the version they were answered on.
 4. **Send this form**: choose who fills it in, optionally who it's about,
    and how many days until it expires. It appears in that person's **My
-   Forms** (no email is sent for this yet). Submitted answers are listed
+   Forms** and emails them a link to open it. Submitted answers are listed
    below.
 
 ## Good practice for administrators

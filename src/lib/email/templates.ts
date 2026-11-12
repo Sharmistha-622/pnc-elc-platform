@@ -341,6 +341,14 @@ export const EMAIL_TEMPLATE_ALLOWLIST: Record<string, readonly string[]> = {
     'due_date',
     'request_url',
   ],
+
+  // Form Builder
+  form_assigned: [
+    'recipient_name',
+    'form_name',
+    'due_clause',
+    'form_url',
+  ],
 }
 
 const SEEDED_AT = '2026-11-12T00:00:00.000Z'
@@ -877,6 +885,23 @@ NavGurukul Foundation for Social Welfare`,
     cadence: {
       trigger_event: 'Privacy request past 80% of statutory window',
       cadence_summary: 'Once each morning',
+      is_automated: true,
+    },
+    updated_at: SEEDED_AT,
+  },
+  {
+    id: 'tmpl-form-assigned',
+    key: 'form_assigned',
+    action_name: 'Form Builder: Form Assigned',
+    category: 'system',
+    description: 'Sent to a person when a published form is assigned to them from Form Builder.',
+    subject: 'New form assigned to you: {{form_name}}',
+    body_text: `<p>Hi {{recipient_name}},</p><p>You have been asked to fill in <strong>{{form_name}}</strong>.{{due_clause}}</p><p><a href="{{form_url}}">Open the form in My Forms</a></p><p style="color:#6b7280;font-size:12px">Sent by the NavGurukul Employee Lifecycle platform.</p>`,
+    available_variables: [...EMAIL_TEMPLATE_ALLOWLIST.form_assigned],
+    is_active: true,
+    cadence: {
+      trigger_event: 'Form sent from Form Builder',
+      cadence_summary: 'Immediate dispatch',
       is_automated: true,
     },
     updated_at: SEEDED_AT,
