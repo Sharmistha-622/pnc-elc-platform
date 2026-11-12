@@ -944,6 +944,11 @@ export async function withdrawJoiner(
   reason: string,
   actorName: string = 'P&C'
 ): Promise<FullOnboardingData | null> {
+  const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+  if (!trimmedReason) {
+    throw new Error('A withdrawal reason is required.');
+  }
+
   const data = await getOnboardingById(id);
   if (!data) return null;
 
@@ -960,8 +965,8 @@ export async function withdrawJoiner(
     id,
     'pnc',
     'Joiner Withdrawn',
-    `${data.record.candidate_name} was withdrawn: ${reason}. Scheduled steps stop and access is off.`,
-    { from_status: current, reason }
+    `${data.record.candidate_name} was withdrawn: ${trimmedReason}. Scheduled steps stop and access is off.`,
+    { from_status: current, reason: trimmedReason }
   );
 
   const stillStaged = data.documents.filter(
@@ -982,7 +987,7 @@ export async function withdrawJoiner(
     entityId: id,
     from: current,
     to: 'withdrawn',
-    note: reason,
+    note: trimmedReason,
     severity: 'notice',
   });
 
@@ -1203,6 +1208,9 @@ async function linkEmployeeRecord(
     joining_date: record.joining_date,
     team: record.team_name ?? record.department ?? null,
     team_id: record.team_id ?? null,
+    // The title the candidate confirmed, else the one PnC entered. The team
+    // chart shows it under the person's name.
+    designation: data.employmentDetails?.designation?.trim() || record.designation?.trim() || null,
     manager_id: record.manager_id ?? null,
     status: 'active',
     // Mandatory on every employee (the database refuses a new one without it).

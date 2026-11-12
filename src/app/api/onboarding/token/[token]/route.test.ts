@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   guardian: 'not_checked' as string,
   setStatus: [] as string[],
   saved: [] as unknown[],
+  signed: [] as Array<{ docType: unknown; signer: unknown; dataUrl: unknown; meta: unknown }>,
 }))
 
 vi.mock('@/lib/onboarding/service', () => ({
@@ -20,7 +21,10 @@ vi.mock('@/lib/onboarding/service', () => ({
   }),
   confirmEmploymentDetails: vi.fn(async () => ({ record: { id: 'c1' }, documents: [] })),
   togglePolicyStatus: vi.fn(),
-  signGeneratedDocument: vi.fn(),
+  signGeneratedDocument: vi.fn(async (_id: string, docType: unknown, signer: unknown, dataUrl: unknown, meta: unknown) => {
+    state.signed.push({ docType, signer, dataUrl, meta })
+    return { record: { id: 'c1' }, documents: [] }
+  }),
   submitCandidateOnboarding: vi.fn(),
   toPortalView: vi.fn((d: unknown) => d),
 }))
@@ -59,6 +63,7 @@ beforeEach(() => {
   state.guardian = 'not_checked'
   state.setStatus = []
   state.saved = []
+  state.signed = []
 })
 
 describe('portal token route: age check', () => {
@@ -98,5 +103,30 @@ describe('portal token route: age check', () => {
     const res = await post({ action: 'update_personal', personal_details: { date_of_birth: '1995-01-01' } })
     expect(res.status).toBe(409)
     expect(state.setStatus).toHaveLength(0)
+  })
+
+  it('stores an uploaded signature with method upload and ignores unknown methods (#192)', async () => {
+    const uploadRes = await post({
+      action: 'sign_document',
+      document_type: 'offer_letter',
+      signer_name: 'Asha Example',
+      signature_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      method: 'upload',
+    })
+    expect(uploadRes.status).toBe(200)
+    expect(state.signed).toHaveLength(1)
+    expect(state.signed[0].dataUrl).toMatch(/^data:image\/png;base64,/)
+    expect((state.signed[0].meta as { method: string }).method).toBe('upload')
+
+    const forgedMethodRes = await post({
+      action: 'sign_document',
+      document_type: 'appointment_letter',
+      signer_name: 'Asha Example',
+      signature_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      method: 'forged_method',
+    })
+    expect(forgedMethodRes.status).toBe(200)
+    expect(state.signed).toHaveLength(2)
+    expect((state.signed[1].meta as { method: string }).method).toBe('draw')
   })
 })

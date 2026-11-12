@@ -97,6 +97,11 @@ do $$ begin
 exception when check_violation then null; end $$;
 
 do $$ begin
+  update public.dpdp_settings set drive_copy_document_types = array['epf_form_11'] where id = 'default';
+  insert into pg_temp.failures values ('identity and bank documents are never copied to Drive', 'epf_form_11 accepted');
+exception when check_violation then null; end $$;
+
+do $$ begin
   update public.dpdp_settings set drive_copy_document_types = array['bank_proof'] where id = 'default';
   insert into pg_temp.failures values ('identity and bank documents are never copied to Drive', 'bank_proof accepted');
 exception when check_violation then null; end $$;

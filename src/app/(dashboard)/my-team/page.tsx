@@ -4,11 +4,12 @@ import { PageBanner } from '@/components/shared/page-banner'
 import { Users2, PlusCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { getMyTeamChart } from '@/lib/org/getTeamChart'
 import { getMyProfileData } from '@/lib/profile/profileActions'
 import { MyTeamClient } from './my-team-client'
 
 export default async function MyTeamPage() {
-  const { signedIn, profile, allEmployees } = await getMyProfileData()
+  const [{ signedIn, profile }, teamChart] = await Promise.all([getMyProfileData(), getMyTeamChart()])
 
   if (!signedIn) {
     redirect('/login')
@@ -39,12 +40,7 @@ export default async function MyTeamPage() {
         }
       />
 
-      <MyTeamClient
-        currentManagerName={profile?.name || 'Manager'}
-        reportees={reportees}
-        allManagers={allEmployees}
-        managerProfile={profile}
-      />
+      <MyTeamClient reportees={reportees} teamChart={teamChart} />
     </div>
   )
 }
