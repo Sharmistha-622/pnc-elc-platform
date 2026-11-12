@@ -134,7 +134,7 @@ const CORE_TABLES: InventoryTable[] = [
     performance: 'status, manager_decision, reschedule_date, timeline_type',
   }),
   personal('core', 'departments', { principals: ['employee'], basis: '7i', retention: 'employment_records', processors: CORE, note: 'Department master; names its head.' }, {
-    meta: `${META}, head_of_department_id`,
+    meta: `${META}, head_of_department_id, parent_id`,
     none: 'name, description, is_archived',
     general: 'head_of_department_name',
   }),
@@ -174,8 +174,8 @@ const CORE_TABLES: InventoryTable[] = [
   }),
   nonPersonal('core', 'employee_types', 'Lookup values.', 'id, name, description, created_at, code, status, updated_at'),
   personal('core', 'employees', { principals: ['employee', 'contractor'], basis: '7i', retention: 'statutory_registers', processors: CORE }, {
-    meta: `${META}, manager_id, employee_type_id, appraisal_eligibility_id, pf_eligibility_id, team_id, appraisal_eligible, status`,
-    general: 'name, employee_type, joining_date, confirmation_date, conversion_date, contractor_duration_months, team, exit_date, employee_code, is_alumni, pf_epf_applicable, pf_epf_opted_out',
+    meta: `${META}, manager_id, employee_type_id, appraisal_eligibility_id, pf_eligibility_id, team_id, department_id, appraisal_eligible, status`,
+    general: 'name, employee_type, joining_date, confirmation_date, conversion_date, contractor_duration_months, team, designation, exit_date, employee_code, is_alumni, pf_epf_applicable, pf_epf_opted_out',
     contact: 'email',
   }),
   personal('core', 'form_answers', { principals: ['employee'], basis: '7i', retention: 'feedback_text', processors: CORE }, {

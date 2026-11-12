@@ -54,6 +54,8 @@ interface OrgChartProps {
   title?: string
   subtitle?: string
   showDepartmentFilter?: boolean
+  /** Shows the Documents link; off for roles the documents page refuses. */
+  canOpenDocuments?: boolean
 }
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
@@ -86,6 +88,7 @@ export function OrgChart({
   employees,
   rootEmployeeId = null,
   showDepartmentFilter = true,
+  canOpenDocuments = false,
 }: OrgChartProps) {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -369,16 +372,18 @@ export function OrgChart({
 
             {/* Quick Action Links */}
             <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-              <Link href={`/employees/${node.id}/documents`} className="flex-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-7 text-xs rounded-md gap-1.5 font-medium"
-                >
-                  <FolderOpen className="size-3" />
-                  <span>Documents</span>
-                </Button>
-              </Link>
+              {canOpenDocuments && (
+                <Link href={`/employees/${node.id}/documents`} className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-7 text-xs rounded-md gap-1.5 font-medium"
+                  >
+                    <FolderOpen className="size-3" />
+                    <span>Documents</span>
+                  </Button>
+                </Link>
+              )}
               <Link href={`/employees/${node.id}/profile`} className="flex-1">
                 <Button
                   variant="default"

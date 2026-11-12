@@ -1192,6 +1192,9 @@ async function linkEmployeeRecord(
     joining_date: record.joining_date,
     team: record.team_name ?? record.department ?? null,
     team_id: record.team_id ?? null,
+    // The title the candidate confirmed, else the one PnC entered. The team
+    // chart shows it under the person's name.
+    designation: data.employmentDetails?.designation?.trim() || record.designation?.trim() || null,
     manager_id: record.manager_id ?? null,
     status: 'active',
     // Mandatory on every employee (the database refuses a new one without it).

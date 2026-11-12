@@ -99,6 +99,7 @@ export type Feature =
   | "dashboard"
   | "self"
   | "myTeam"
+  | "orgChart"
   | "employees"
   | "onboarding"
   | "offers"
@@ -163,6 +164,11 @@ export const FEATURE_ACCESS: Record<Feature, UserRole[]> = {
   // viewer's own reportees (`getMyProfileData`), and the sidebar drops the
   // link for someone with none (`visibleSections`' `hasReports`).
   myTeam: STAFF,
+  // The whole organisation's team chart: everyone's name, designation, team
+  // and work email. Org-wide general access, so only the two roles who run
+  // the people side of the organisation; My Team covers a line manager's own
+  // reporting line.
+  orgChart: ["super_admin", "pnc_admin"],
   // The org-wide directory. `manager` is NOT here: the matrix scopes their
   // general access to their own team, and that is what My Team shows. The
   // directory loads everyone, and links on to profiles and ID documents.
@@ -278,6 +284,7 @@ const ROUTE_FEATURE: [string, Feature][] = [
   ["/feedback", "self"],
 
   ["/my-team", "myTeam"],
+  ["/org-chart", "orgChart"],
 
   ["/employees", "employees"],
   // API routes carry the same feature gate as the screens they serve. Without
