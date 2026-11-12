@@ -1,5 +1,29 @@
 [
   {
+    "version": "2.15.00",
+    "date": "2026-11-12",
+    "title": "Team lanes chart with nested sub-teams and an org chart",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "My Team's chart groups your whole reporting line into team lanes, with nested sub-teams, rolled-up headcounts, search, a team filter, fit to screen and a list view on phones."
+      },
+      {
+        "category": "Features",
+        "description": "Org Chart shows everyone in the organisation by team, for Super Admin and PnC Admin."
+      },
+      {
+        "category": "Improvements",
+        "description": "Employee records carry a designation, filled from onboarding and shown on the team charts."
+      },
+      {
+        "category": "Fixes",
+        "description": "The Employees directory no longer shows Documents links to roles that cannot open documents."
+      }
+    ]
+  },
+  {
     "version": "2.14.06",
     "date": "2026-11-11",
     "title": "Drop missing designation and location columns from reports selects",
