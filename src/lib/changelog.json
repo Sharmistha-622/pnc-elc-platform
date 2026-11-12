@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.19.00",
+    "date": "2026-11-12",
+    "title": "Wire Notifications menu to dashboard tasks and add Help button",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Wire Notifications menu to dashboard tasks and add Help button"
+      }
+    ]
+  },
+  {
     "version": "2.18.00",
     "date": "2026-11-12",
     "title": "Average peer ratings per criterion",
