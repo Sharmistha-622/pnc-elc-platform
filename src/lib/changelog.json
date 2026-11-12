@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.17.00",
+    "date": "2026-11-12",
+    "title": "Add portal signature upload and EPF Form 11 document type",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Add portal signature upload and EPF Form 11 document type"
+      }
+    ]
+  },
+  {
     "version": "2.16.00",
     "date": "2026-11-12",
     "title": "Add candidate withdraw action and department-backed team filter",
