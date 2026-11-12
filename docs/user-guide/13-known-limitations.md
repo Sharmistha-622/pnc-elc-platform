@@ -60,9 +60,7 @@ real work.** Items are grouped by area.
   doesn't follow Settings.
 - Accepting **Do not confirm** only closes the review. Nothing changes on the
   employee record, and the next step is up to PnC.
-- The **Appraisals** page is read-only, its *Cycle Status* card always reads
-  "Active Planning", and its footer text about which joiners fall in July
-  doesn't match the actual settings.
+- The **Appraisals** page is read-only.
 - Written feedback from the new review flow is **not yet sealed** into the
   vault after closing.
 
