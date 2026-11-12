@@ -30,7 +30,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { guard, passes, type Guarded } from '@/lib/rbac/guard'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
-import { formatAnswer } from '@/lib/forms/answers'
+import { formatAnswer, parseRatingGrid } from '@/lib/forms/answers'
 import { mayReadFeedbackText } from '@/lib/confirmations/access'
 import { readiness, reminderState, waitLabel } from './engine'
 import { loadSettings, whoIsDue, type DueEntry } from './service'
@@ -138,8 +138,16 @@ export type CycleSummary = {
 
 export type ReviewAnswer = { label: string; value: string }
 export type ReviewBlock = { title: string; submittedAt: string | null; answers: ReviewAnswer[] }
-/** One question of the peer form, with every peer's answer to it. */
-export type PeerQuestion = { label: string; answers: string[] }
+/** One criterion of a peer rating grid, summed up across every peer who rated it. */
+export type PeerRating = { criterion: string; average: number; lowest: number; highest: number; count: number }
+/**
+ * One question of the peer form. A written question carries every peer's
+ * answer; a rating grid carries only each criterion's average, lowest and
+ * highest, so no one peer's set of ratings leaves the server.
+ */
+export type PeerQuestion =
+  | { kind: 'text'; label: string; answers: string[] }
+  | { kind: 'ratings'; label: string; criteria: PeerRating[] }
 
 export type CycleDetail = CycleSummary & {
   rel: Relationship
@@ -428,9 +436,37 @@ export async function loadSubmittedReviews(participants: ParticipantRow[]): Prom
 }
 
 /**
+ * Each criterion of a rating grid question across every peer's answer, in the
+ * order the criteria first appear. Null unless every answer is a rating grid.
+ * The average is to one decimal. Pure.
+ */
+export function summarisePeerRatings(answers: string[]): PeerRating[] | null {
+  const given = answers.filter((a) => a.trim() !== '—')
+  if (given.length === 0) return null
+  const scores = new Map<string, number[]>()
+  for (const answer of given) {
+    const grid = parseRatingGrid(answer)
+    if (!grid) return null
+    for (const [criterion, score] of grid) {
+      if (!scores.has(criterion)) scores.set(criterion, [])
+      scores.get(criterion)!.push(score)
+    }
+  }
+  return Array.from(scores, ([criterion, s]) => ({
+    criterion,
+    average: Math.round((s.reduce((sum, n) => sum + n, 0) / s.length) * 10) / 10,
+    lowest: Math.min(...s),
+    highest: Math.max(...s),
+    count: s.length,
+  }))
+}
+
+/**
  * Peer answers by question, with nothing that ties one answer to another or
  * to its writer: no name, no time, no per-person grouping. Each question's
- * answers are sorted by their own text. Empty answers are left out. Pure.
+ * answers are sorted by their own text. Empty answers are left out. A rating
+ * grid question is summed up per criterion instead (`summarisePeerRatings`).
+ * Pure.
  */
 export function groupPeerAnswers(blocks: ReviewBlock[]): PeerQuestion[] {
   const order: string[] = []
@@ -445,8 +481,14 @@ export function groupPeerAnswers(blocks: ReviewBlock[]): PeerQuestion[] {
     }
   }
   return order
-    .map((label) => ({ label, answers: [...byLabel.get(label)!].sort((x, y) => x.localeCompare(y)) }))
-    .filter((q) => q.answers.length > 0)
+    .filter((label) => byLabel.get(label)!.length > 0)
+    .map((label): PeerQuestion => {
+      const answers = byLabel.get(label)!
+      const criteria = summarisePeerRatings(answers)
+      return criteria
+        ? { kind: 'ratings', label, criteria }
+        : { kind: 'text', label, answers: [...answers].sort((x, y) => x.localeCompare(y)) }
+    })
 }
 
 /** What a reader of the reviews gets of the peers: nothing below the minimum. Pure. */
