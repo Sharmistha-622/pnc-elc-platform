@@ -112,8 +112,9 @@ Super Admin and PnC Admin only: these hold personal data.
 
 > ⚠️ **Important:** the templates on this screen **don't yet control the
 > emails that actually go out**. The real emails are built into the platform
-> and are always sent through Google. *Resend* in the outbox marks the row as
-> delivered but **doesn't actually send again**. See
+> and are always sent through Google. Because email logs keep no message bodies,
+> failed messages are re-sent from the screen that sent them (for example,
+> *Resend Invitation Email* on the candidate). See
 > [Known limitations](13-known-limitations.md#emails).
 
 ### The emails that are actually sent today
