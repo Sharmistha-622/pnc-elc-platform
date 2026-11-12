@@ -80,6 +80,9 @@ The list of every candidate.
     show it. Each send is a **new link**, valid for 7 days (set in
     **Settings › DPDP & Privacy › Links & staging**, 1 to 30 days); the
     previous link stops working.
+  - **⋮ › Withdraw Candidate** (also on the review page). Asks for a reason,
+    marks the joiner withdrawn, closes their portal link immediately, and starts
+    the hold period for purging any unsealed documents.
 
 ## Creating a candidate (`/onboarding/candidate/new`)
 
@@ -170,6 +173,8 @@ and last active.
 - **Send Invitation / Resend Link**.
 - **Request Changes** and **Approve Dossier**, when the dossier is submitted.
 - **Create Official Account**, when it's approved.
+- **Withdraw Candidate**, with a required reason, when the joiner can still be
+  withdrawn.
 
 **Tabs:**
 

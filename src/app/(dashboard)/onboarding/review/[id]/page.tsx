@@ -32,6 +32,7 @@ import {
   Radio,
   Loader2,
   IndianRupee,
+  UserX,
 } from 'lucide-react';
 import { AnnexureTable } from '@/components/onboarding/annexure-table';
 import { PageBanner } from '@/components/shared/page-banner';
@@ -48,6 +49,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { displayMaskedNumber } from '@/lib/vault/sealing';
+import { canWithdrawRecord } from '@/lib/onboarding/candidate-list';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -96,6 +98,10 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
 
   // Provisioning Dialog State
   const [provisionDialogOpen, setProvisionDialogOpen] = useState(false);
+
+  // Withdraw Candidate Dialog State
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState('');
 
   const fetchData = async () => {
     try {
@@ -293,6 +299,37 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const handleWithdrawCandidate = async () => {
+    if (!data) return;
+    const reason = withdrawReason.trim();
+    if (!reason) {
+      toast.error('Please enter a withdrawal reason');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const res = await fetch(`/api/onboarding/${data.record.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', reason }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`${data.record.candidate_name} marked as withdrawn`);
+        setWithdrawDialogOpen(false);
+        setWithdrawReason('');
+        fetchData();
+      } else {
+        toast.error(json.error || 'Failed to withdraw candidate');
+      }
+    } catch {
+      toast.error('Failed to withdraw candidate');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className="flex flex-1 items-center justify-center p-12 text-muted-foreground text-sm font-medium">
@@ -416,6 +453,27 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
                 <span>Official Account Active ({provisioning?.official_email || 'Provisioned'})</span>
               </div>
             )}
+
+            {record.joiner_status === 'withdrawn' ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+                <UserX className="size-3.5" />
+                <span>Withdrawn</span>
+              </div>
+            ) : canWithdrawRecord(record.joiner_status) ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setWithdrawReason('');
+                  setWithdrawDialogOpen(true);
+                }}
+                disabled={actionLoading}
+                className="gap-1.5 text-xs text-rose-700 dark:text-rose-300 border-rose-500/30 hover:bg-rose-500/10 rounded-lg font-semibold"
+              >
+                <UserX className="size-3.5" />
+                <span>Withdraw Candidate</span>
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -1445,6 +1503,64 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg"
             >
               Confirm & Provision Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Candidate Confirmation Dialog */}
+      <Dialog
+        open={withdrawDialogOpen}
+        onOpenChange={(open) => {
+          setWithdrawDialogOpen(open);
+          if (!open) setWithdrawReason('');
+        }}
+      >
+        <DialogContent className="sm:max-w-md rounded-2xl border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-700 dark:text-rose-300">
+              <UserX className="size-4" />
+              Withdraw Candidate
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Withdraw <strong>{record.candidate_name}</strong> from the onboarding pipeline. Their portal link stops working immediately and the hold period for purging unsealed documents starts.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="review_withdraw_reason" className="text-xs font-semibold">
+              Reason for withdrawal <span className="text-rose-700 dark:text-rose-300">*</span>
+            </Label>
+            <Textarea
+              id="review_withdraw_reason"
+              rows={4}
+              placeholder="e.g. Candidate declined the offer or did not join on the agreed date."
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+              className="text-xs rounded-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setWithdrawDialogOpen(false);
+                setWithdrawReason('');
+              }}
+              className="text-xs rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={actionLoading || !withdrawReason.trim()}
+              onClick={handleWithdrawCandidate}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg gap-1.5"
+            >
+              {actionLoading ? <Loader2 className="size-3.5 animate-spin" /> : <UserX className="size-3.5" />}
+              <span>Confirm Withdrawal</span>
             </Button>
           </DialogFooter>
         </DialogContent>
