@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.21.01",
+    "date": "2026-11-12",
+    "title": "Align Confirmations screens with review flow decisions and Settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Align Confirmations screens with review flow decisions and Settings"
+      }
+    ]
+  },
+  {
     "version": "2.21.00",
     "date": "2026-11-12",
     "title": "Drive outbound emails from Email Center templates (#161)",
