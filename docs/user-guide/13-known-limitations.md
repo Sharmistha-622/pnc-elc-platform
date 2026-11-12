@@ -18,8 +18,6 @@ real work.** Items are grouped by area.
   managers are *Employee* and work from **My Team** and **My Reviews**.
   Buttons on My Team that lead to *Confirmations* send them back to the
   Dashboard.
-- **Employees can't edit their own details** (phone, address, emergency
-  contact). PnC edits them on the employee's profile.
 - Some links lead to screens a role can't open (e.g. *Create Candidate* for
   PnC Ops, *Audit Logs* for Fin Admin, *Inspect* in Reports for Exec View).
   Clicking them sends you back to the Dashboard.
