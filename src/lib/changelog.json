@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.21.00",
+    "date": "2026-11-12",
+    "title": "Drive outbound emails from Email Center templates (#161)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Drive outbound emails from Email Center templates (#161)"
+      }
+    ]
+  },
+  {
     "version": "2.20.02",
     "date": "2026-11-12",
     "title": "Enforce shared maker-checker separation across approvals",
