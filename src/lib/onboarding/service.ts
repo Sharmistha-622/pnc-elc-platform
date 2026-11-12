@@ -1184,7 +1184,7 @@ async function linkEmployeeRecord(
     .eq('email', officialEmail)
     .maybeSingle();
 
-  const payload = {
+  const payloadWithoutDesignation = {
     name: record.candidate_name,
     email: officialEmail,
     employee_type: employeeTypeCode,
@@ -1192,9 +1192,6 @@ async function linkEmployeeRecord(
     joining_date: record.joining_date,
     team: record.team_name ?? record.department ?? null,
     team_id: record.team_id ?? null,
-    // The title the candidate confirmed, else the one PnC entered. The team
-    // chart shows it under the person's name.
-    designation: data.employmentDetails?.designation?.trim() || record.designation?.trim() || null,
     manager_id: record.manager_id ?? null,
     status: 'active',
     // Mandatory on every employee (the database refuses a new one without it).
@@ -1205,11 +1202,28 @@ async function linkEmployeeRecord(
 
   let employeeId = (existing as { id: string } | null)?.id ?? null;
 
+  // The title the candidate confirmed, else the one PnC entered; the team
+  // chart shows it under the person's name. `employees.designation` arrives
+  // with migration 202611111500_team_tree: on a database that does not have
+  // it yet, the record is written without it rather than failing the hire.
+  const payload = {
+    ...payloadWithoutDesignation,
+    designation: data.employmentDetails?.designation?.trim() || record.designation?.trim() || null,
+  };
+  const isMissingDesignation = (error: { code?: string } | null) =>
+    error?.code === 'PGRST204' || error?.code === '42703';
+
   if (employeeId) {
-    const { error } = await db.from('employees').update(payload).eq('id', employeeId);
+    let { error } = await db.from('employees').update(payload).eq('id', employeeId);
+    if (isMissingDesignation(error)) {
+      ({ error } = await db.from('employees').update(payloadWithoutDesignation).eq('id', employeeId));
+    }
     assertOk(error, 'Failed to update the employee record');
   } else {
-    const { data: created, error } = await db.from('employees').insert(payload).select('id').single();
+    let { data: created, error } = await db.from('employees').insert(payload).select('id').single();
+    if (isMissingDesignation(error)) {
+      ({ data: created, error } = await db.from('employees').insert(payloadWithoutDesignation).select('id').single());
+    }
     assertOk(error, 'Failed to create the employee record');
     employeeId = (created as { id: string }).id;
   }

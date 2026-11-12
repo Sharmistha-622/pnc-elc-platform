@@ -5,7 +5,15 @@ import { canAccessRoute } from '@/lib/role-constants'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-import { buildTeamTree, personSubtitle, reportingLine, treeStats, type TeamPerson, type TeamRecord } from './teamTree'
+import {
+  buildTeamTree,
+  departmentIdByName,
+  personSubtitle,
+  reportingLine,
+  treeStats,
+  type TeamPerson,
+  type TeamRecord,
+} from './teamTree'
 import type { TeamChartResult } from './teamChartTypes'
 
 // ============================================================================
@@ -25,6 +33,11 @@ import type { TeamChartResult } from './teamChartTypes'
 // Each is a handful of queries in parallel (people, departments, employment
 // types), never one per team. Only general data leaves the server: name,
 // designation, team, work email when allowed, and photo.
+//
+// Until migration 202611111500_team_tree is applied to a database, the
+// columns it adds (`department_id`, `designation`, `departments.parent_id`)
+// do not exist there. The chart then falls back to flat teams, placing people
+// by their department name, and says so, rather than failing.
 // ============================================================================
 
 interface PersonRow {
@@ -39,11 +52,75 @@ interface PersonRow {
 }
 
 const PERSON_COLUMNS = 'id, name, email, status, manager_id, department_id, designation, employee_type_id'
+const LEGACY_PERSON_COLUMNS = 'id, name, email, status, manager_id, team, employee_type_id'
 const LOAD_FAILED = 'The team chart could not be loaded. Try again in a moment.'
+const PENDING_MIGRATION =
+  'Sub-teams and designations will appear once the database update for team charts is applied. Until then, everyone is shown in their department.'
 const DEFAULT_ORG_NAME = 'NavGurukul'
 
-const toTeams = (rows: { id: string; name: string; parent_id: string | null }[]): TeamRecord[] =>
-  rows.map((r) => ({ id: r.id, name: r.name, parentId: r.parent_id }))
+// Postgres "undefined column", and PostgREST's "column not in the schema cache".
+const MISSING_COLUMN = new Set(['42703', 'PGRST204'])
+
+type Db = Awaited<ReturnType<typeof createServerSupabaseClient>>
+type QueryError = { code?: string } | null
+
+interface ChartRows {
+  people: PersonRow[]
+  teams: TeamRecord[]
+  /** Set when the database predates the team-tree migration. */
+  notice: string | null
+}
+
+/**
+ * People and teams for a chart, from `directory` (every staff session) or
+ * `employees` (org-wide roles, active people only). Null on a failure other
+ * than the team-tree columns being absent.
+ */
+const loadChartRows = async (
+  supabase: Db,
+  source: 'directory' | 'employees',
+): Promise<{ rows: ChartRows | null; error: QueryError }> => {
+  const people = (columns: string) => {
+    const query = supabase.from(source).select(columns)
+    return source === 'employees' ? query.eq('status', 'active') : query
+  }
+
+  const [current, departments] = await Promise.all([
+    people(PERSON_COLUMNS),
+    supabase.from('departments').select('id, name, parent_id'),
+  ])
+  const isPendingMigration = MISSING_COLUMN.has(current.error?.code ?? '') || MISSING_COLUMN.has(departments.error?.code ?? '')
+  if (!isPendingMigration) {
+    const error = current.error ?? departments.error
+    if (error) return { rows: null, error }
+    return {
+      rows: {
+        people: (current.data ?? []) as unknown as PersonRow[],
+        teams: (departments.data ?? []).map((r) => ({ id: r.id, name: r.name, parentId: r.parent_id })),
+        notice: null,
+      },
+      error: null,
+    }
+  }
+
+  const [legacy, legacyDepartments] = await Promise.all([
+    people(LEGACY_PERSON_COLUMNS),
+    supabase.from('departments').select('id, name'),
+  ])
+  const error = legacy.error ?? legacyDepartments.error
+  if (error) return { rows: null, error }
+  const teams: TeamRecord[] = (legacyDepartments.data ?? []).map((r) => ({ id: r.id, name: r.name, parentId: null }))
+  const idFor = departmentIdByName(teams)
+  const rows = (legacy.data ?? []) as unknown as (Omit<PersonRow, 'department_id' | 'designation'> & { team: string | null })[]
+  return {
+    rows: {
+      people: rows.map(({ team, ...row }) => ({ ...row, department_id: idFor(team), designation: null })),
+      teams,
+      notice: PENDING_MIGRATION,
+    },
+    error: null,
+  }
+}
 
 const toPerson = (row: PersonRow, typeNames: Map<string, string>, avatars: Map<string, string>): TeamPerson => ({
   id: row.id,
@@ -97,18 +174,17 @@ export const getMyTeamChart = async (): Promise<TeamChartResult> => {
     return { ok: false, error: 'No employee record matches your account, so there is no team to show.' }
   }
 
-  const [people, departments, types] = await Promise.all([
-    supabase.from('directory').select(PERSON_COLUMNS),
-    supabase.from('departments').select('id, name, parent_id'),
+  const [loaded, types] = await Promise.all([
+    loadChartRows(supabase, 'directory'),
     supabase.from('employee_types').select('id, name'),
   ])
-  const failed = people.error ?? departments.error ?? types.error
-  if (failed) {
-    console.error('team chart: load failed', { code: failed.code ?? null })
+  const failed = loaded.error ?? types.error
+  if (failed || !loaded.rows) {
+    console.error('team chart: load failed', { code: failed?.code ?? null })
     return { ok: false, error: LOAD_FAILED }
   }
 
-  const rows = (people.data ?? []) as PersonRow[]
+  const { people: rows, teams, notice } = loaded.rows
   const viewer = rows.find((r) => r.id === employee.id)
   // Walk through everyone, so a report whose manager has left still counts,
   // then show only people who are still here.
@@ -119,7 +195,6 @@ export const getMyTeamChart = async (): Promise<TeamChartResult> => {
 
   const typeNames = new Map((types.data ?? []).map((t: { id: string; name: string }) => [t.id, t.name]))
   const avatars = await avatarsFor([viewer?.email ?? null, ...line.map((r) => r.email)])
-  const teams = toTeams(departments.data ?? [])
   const tree = buildTeamTree(teams, line.map((r) => toPerson(r, typeNames, avatars)))
 
   const viewerRow: PersonRow = viewer ?? {
@@ -146,6 +221,7 @@ export const getMyTeamChart = async (): Promise<TeamChartResult> => {
       stats: treeStats(tree, 1),
       canOpenProfiles: canAccessRoute(gate.caller.role, '/employees/x/profile'),
       storageKey: `team-chart:my-team:${gate.caller.userId}`,
+      notice,
     },
   }
 }
@@ -156,23 +232,22 @@ export const getOrgChart = async (): Promise<TeamChartResult> => {
   if (!gate.ok) return { ok: false, error: gate.error }
 
   const supabase = await createServerSupabaseClient()
-  const [people, departments, types, orgName] = await Promise.all([
-    supabase.from('employees').select(PERSON_COLUMNS).eq('status', 'active'),
-    supabase.from('departments').select('id, name, parent_id'),
+  const [loaded, types, orgName] = await Promise.all([
+    loadChartRows(supabase, 'employees'),
     supabase.from('employee_types').select('id, name'),
     supabase.from('general_settings').select('value').eq('key', 'organization_name').maybeSingle(),
   ])
-  const failed = people.error ?? departments.error ?? types.error
-  if (failed) {
-    console.error('org chart: load failed', { code: failed.code ?? null })
+  const failed = loaded.error ?? types.error
+  if (failed || !loaded.rows) {
+    console.error('org chart: load failed', { code: failed?.code ?? null })
     return { ok: false, error: LOAD_FAILED }
   }
 
-  const rows = (people.data ?? []) as PersonRow[]
+  const { people: rows, teams, notice } = loaded.rows
   const typeNames = new Map((types.data ?? []).map((t: { id: string; name: string }) => [t.id, t.name]))
   const avatars = await avatarsFor(rows.map((r) => r.email))
   const tree = buildTeamTree(
-    toTeams(departments.data ?? []),
+    teams,
     rows.map((r) => toPerson(r, typeNames, avatars)),
   )
   const configuredName = (orgName.data as { value?: unknown } | null)?.value
@@ -185,6 +260,7 @@ export const getOrgChart = async (): Promise<TeamChartResult> => {
       stats: treeStats(tree),
       canOpenProfiles: canAccessRoute(gate.caller.role, '/employees/x/profile'),
       storageKey: `team-chart:org:${gate.caller.userId}`,
+      notice,
     },
   }
 }

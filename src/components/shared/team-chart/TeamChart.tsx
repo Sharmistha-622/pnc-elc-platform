@@ -130,6 +130,11 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
           isFitted={isFitted}
           onFittedChange={setFitted}
         />
+        {chart.notice ? (
+          <p role="status" className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+            {chart.notice}
+          </p>
+        ) : null}
         <div ref={desktopRef} className="hidden min-w-0 md:block">
           <TeamLanes {...viewProps} isFitted={isFitted} />
         </div>

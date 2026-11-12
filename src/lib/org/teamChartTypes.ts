@@ -23,6 +23,8 @@ export interface TeamChartData {
   canOpenProfiles: boolean
   /** Where this viewer's collapsed teams are remembered in the browser. */
   storageKey: string
+  /** Shown above the chart when it is incomplete, e.g. before a migration. */
+  notice: string | null
 }
 
 export type TeamChartResult = { ok: true; chart: TeamChartData } | { ok: false; error: string }

@@ -4,6 +4,7 @@ import { NO_TEAM_HUE, TEAM_HUE_ORDER, panelTint, teamHue } from './teamPalette'
 import {
   ancestorIds,
   buildTeamTree,
+  departmentIdByName,
   filterTree,
   flattenTeams,
   initialsOf,
@@ -290,6 +291,22 @@ describe('validateTeamParent (cycle prevention)', () => {
   it('allows top level, and refuses an unknown parent', () => {
     expect(validateTeamParent(teams, 'platform', null)).toBeNull()
     expect(validateTeamParent(teams, 'platform', 'gone')).toBe('unknown_parent')
+  })
+})
+
+describe('departmentIdByName (before the team-tree migration)', () => {
+  const idFor = departmentIdByName(TEAMS)
+
+  it('matches a department name ignoring case and spaces', () => {
+    expect(idFor('  ceo office ')).toBe('ceo')
+    expect(idFor('PnC')).toBe('pnc')
+  })
+
+  it('matches nothing for blank, None or an unknown name', () => {
+    expect(idFor(null)).toBeNull()
+    expect(idFor('')).toBeNull()
+    expect(idFor('None')).toBeNull()
+    expect(idFor('Operations')).toBeNull()
   })
 })
 
