@@ -30,7 +30,15 @@ import { onboardingDb, assertOk, isUuid, mapRecord, RECORD_SELECT } from './db';
 import { getPortalPrivacySettings } from '@/lib/dpdp/portal';
 import { upsertSalaryStructure } from './salary';
 import { renderLettersForRecord, storeGeneratedLetters } from './letter-generation';
-import { sendInvitationEmail } from './invitation-email';
+import {
+  sendInvitationEmail,
+  sendOnboardingSubmittedCandidateEmail,
+  sendOnboardingSubmittedPncEmail,
+  sendOnboardingDocumentRejectedEmail,
+  sendOnboardingChangesRequestedEmail,
+  sendOnboardingApprovedEmail,
+  sendOnboardingCorrectionRequestedPncEmail,
+} from './invitation-email';
 import { CANDIDATE_BUCKET } from './candidate-storage';
 import { carryDocumentsToEmployee } from './document-handover';
 import { sealIdentityDocument, purgeStagedDocuments } from '@/lib/vault/seal-service';
@@ -465,23 +473,79 @@ async function employeeTypeCodeFor(employeeTypeId?: string | null): Promise<stri
 }
 
 // ---------------------------------------------------------------------------
-// Invitation
+// Invitation & Portal Links
 // ---------------------------------------------------------------------------
+
+/**
+ * Reads the PnC mailbox configured in Settings › Reviews
+ * (`review_cycle_settings.pnc_notification_email`). Returns null if empty.
+ */
+export async function getPncNotificationMailbox(): Promise<string | null> {
+  try {
+    const { data } = await onboardingDb()
+      .from('review_cycle_settings')
+      .select('pnc_notification_email')
+      .eq('id', 'default')
+      .maybeSingle();
+    const raw = (data as { pnc_notification_email?: string | null } | null)?.pnc_notification_email ?? '';
+    const first = raw
+      .split(',')
+      .map((s) => s.trim())
+      .find((s) => /^[^@\s]+@[^@\s]+$/.test(s));
+    return first ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Issues a fresh portal link (`invitation_token` + `invitation_expires_at`
+ * from `invitation_validity_days`), sends the email first with the new link,
+ * and saves the new link only after the send succeeds.
+ */
+export async function issueFreshPortalLinkAndSend(
+  record: OnboardingRecord,
+  sendFn: (freshRecord: OnboardingRecord) => Promise<{ sent: boolean; error?: string }>,
+  extraPatch: Record<string, any> = {}
+): Promise<{ sent: boolean; token: string; expiresAt: string; error?: string }> {
+  const { invitation_validity_days: validityDays } = await getPortalPrivacySettings();
+  const token = generateInvitationToken(record.candidate_name);
+  const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+
+  let result: { sent: boolean; error?: string };
+  try {
+    result = await sendFn({
+      ...record,
+      invitation_token: token,
+      invitation_expires_at: expiresAt,
+    });
+  } catch (err: any) {
+    result = { sent: false, error: err?.message || 'Email dispatch failed.' };
+  }
+
+  if (!result.sent) {
+    return { sent: false, token, expiresAt, error: result.error };
+  }
+
+  await touchRecord(record.id, {
+    ...extraPatch,
+    invitation_token: token,
+    invitation_expires_at: expiresAt,
+  });
+
+  return { sent: true, token, expiresAt };
+}
 
 export async function sendOnboardingInvitation(id: string): Promise<FullOnboardingData | null> {
   const data = await getOnboardingById(id);
   if (!data) return null;
 
-  // Every send issues a new link with a new end date, so a resend also ends
-  // the previous link. The window is the DPDP setting (1 to 30 days).
-  const { invitation_validity_days: validityDays } = await getPortalPrivacySettings();
-  const token = generateInvitationToken(data.record.candidate_name);
-  const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
-
-  // Send first, record second. A record marked `invited` when nothing was sent
-  // is worse than one still marked `draft`: it tells P&C the candidate has the
-  // link when they do not. Until the new link is saved, the old one stands.
-  const result = await sendInvitationEmail({ ...data.record, invitation_token: token });
+  const now = new Date().toISOString();
+  const result = await issueFreshPortalLinkAndSend(
+    data.record,
+    (freshRecord) => sendInvitationEmail(freshRecord),
+    { status: 'invited', invited_at: now }
+  );
 
   if (!result.sent) {
     await logActivity(
@@ -493,9 +557,6 @@ export async function sendOnboardingInvitation(id: string): Promise<FullOnboardi
     );
     throw new Error(result.error || 'The invitation email could not be sent.');
   }
-
-  const now = new Date().toISOString();
-  await touchRecord(id, { status: 'invited', invited_at: now, invitation_token: token, invitation_expires_at: expiresAt });
 
   await logActivity(
     id,
@@ -674,7 +735,25 @@ export async function confirmEmploymentDetails(
     entityId: id,
   };
   if (confirmed) await auditOnboarding.detailsConfirmed(opts);
-  else if (correctionRequested) await auditOnboarding.correctionRequested({ ...opts, notes: correctionNotes });
+  else if (correctionRequested) {
+    await auditOnboarding.correctionRequested({ ...opts, notes: correctionNotes });
+    try {
+      const pncEmail = await getPncNotificationMailbox();
+      if (!pncEmail) {
+        console.info('[onboarding] Skipping correction-requested PnC email: no PnC mailbox configured in Settings › Reviews.');
+        await logActivity(
+          id,
+          'system',
+          'PnC Notification Skipped',
+          'Skipped correction-requested email because no PnC mailbox is configured in Settings › Reviews.'
+        );
+      } else {
+        await sendOnboardingCorrectionRequestedPncEmail(record, correctionNotes ?? '', pncEmail);
+      }
+    } catch (err) {
+      console.warn('[onboarding] Failed to send correction-requested PnC email:', err);
+    }
+  }
 
   return refreshProgress(id);
 }
@@ -837,6 +916,29 @@ export async function submitCandidateOnboarding(id: string): Promise<FullOnboard
     severity: 'notice',
   });
 
+  try {
+    await sendOnboardingSubmittedCandidateEmail(data.record);
+  } catch (err) {
+    console.warn('[onboarding] Failed to send candidate submission confirmation email:', err);
+  }
+
+  try {
+    const pncEmail = await getPncNotificationMailbox();
+    if (!pncEmail) {
+      console.info('[onboarding] Skipping submission PnC email: no PnC mailbox configured in Settings › Reviews.');
+      await logActivity(
+        id,
+        'system',
+        'PnC Notification Skipped',
+        'Skipped submission notification email because no PnC mailbox is configured in Settings › Reviews.'
+      );
+    } else {
+      await sendOnboardingSubmittedPncEmail(data.record, pncEmail);
+    }
+  } catch (err) {
+    console.warn('[onboarding] Failed to send PnC submission notification email:', err);
+  }
+
   return getOnboardingById(id);
 }
 
@@ -919,6 +1021,14 @@ export async function verifyOrRejectDocument(
         `${doc.document_type} is verified but still in core: ${outcome.error}. It will be retried.`,
         { seal_error: outcome.error }
       );
+    }
+  } else if (status === 'rejected') {
+    try {
+      await issueFreshPortalLinkAndSend(data.record, (freshRecord) =>
+        sendOnboardingDocumentRejectedEmail(freshRecord, doc.document_type, rejectionReason ?? '')
+      );
+    } catch (err) {
+      console.warn('[onboarding] Failed to send document rejection email:', err);
     }
   }
 
@@ -1094,6 +1204,22 @@ export async function updateOnboardingStatus(
     note: reviewerNote,
     severity: status === 'approved' || status === 'completed' ? 'notice' : 'info',
   });
+
+  if (status === 'changes_requested') {
+    try {
+      await issueFreshPortalLinkAndSend(data.record, (freshRecord) =>
+        sendOnboardingChangesRequestedEmail(freshRecord, reviewerNote ?? '')
+      );
+    } catch (err) {
+      console.warn('[onboarding] Failed to send changes-requested email:', err);
+    }
+  } else if (status === 'approved') {
+    try {
+      await sendOnboardingApprovedEmail(data.record);
+    } catch (err) {
+      console.warn('[onboarding] Failed to send onboarding approved email:', err);
+    }
+  }
 
   return getOnboardingById(id);
 }
@@ -1367,6 +1493,14 @@ export async function provisionOfficialAccount(id: string): Promise<FullOnboardi
     officialEmail,
     employeeCode,
   });
+
+  if (data.record.status !== 'approved') {
+    try {
+      await sendOnboardingApprovedEmail(data.record);
+    } catch (err) {
+      console.warn('[onboarding] Failed to send onboarding approved email on provisioning:', err);
+    }
+  }
 
   const refreshed = await getOnboardingById(id);
   if (refreshed) await autoScheduleProbationCheckins(refreshed);

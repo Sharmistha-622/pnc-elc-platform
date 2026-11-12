@@ -3077,7 +3077,7 @@ export function EmailsView({
               <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="size-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                  <span>Scheduled batch automation runs on cron every 30 minutes between 09:00 and 19:00 IST.</span>
+                  <span>Scheduled reminder jobs run once each morning.</span>
                 </span>
                 <span className="font-mono text-[11px] font-medium text-foreground bg-background px-2.5 py-0.5 rounded border border-border/60 shrink-0">
                   Timezone: Asia/Kolkata (IST, UTC+5:30)

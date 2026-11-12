@@ -71,6 +71,8 @@ export async function nominatePeers(
         {
           subject,
           body: `<p>Hi ${escapeHtml(peer.name)},</p><p>You've been nominated to provide feedback as part of a confirmation review. Please share your feedback using the link below:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
+          peer_name: peer.name,
+          feedback_link: feedbackLink,
         },
         peer.email
       )

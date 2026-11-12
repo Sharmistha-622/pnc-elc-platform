@@ -73,8 +73,13 @@ export interface Mailer {
 
 export const gmailMailer: Mailer = {
   send: (template, mail, to) =>
-    sendEmail(template, { subject: mail.subject, body: mail.body, recipient_name: to.name }, to.email),
-  invite: (template, mail, ics, to) => sendCalendarInvite({ template, subject: mail.subject, html: mail.body, ics, to }),
+    sendEmail(
+      template,
+      { ...(mail.vars ?? {}), subject: mail.subject, body: mail.body, recipient_name: to.name },
+      to.email
+    ),
+  invite: (template, mail, ics, to) =>
+    sendCalendarInvite({ template, subject: mail.subject, html: mail.body, ics, to, vars: mail.vars }),
 }
 
 export type Ctx = {

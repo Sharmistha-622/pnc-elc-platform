@@ -63,6 +63,8 @@ export async function sendPeerReminders() {
       {
         subject,
         body: `<p>Hi ${escapeHtml(feedback.peer_name ?? '')},</p><p>This is a friendly reminder to share your feedback:</p><p><a href="${feedbackLink}">${feedbackLink}</a></p><p>Thank you!</p>`,
+        peer_name: feedback.peer_name ?? '',
+        feedback_link: feedbackLink,
       },
       feedback.peer_email
     )
