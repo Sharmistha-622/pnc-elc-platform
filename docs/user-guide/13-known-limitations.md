@@ -11,9 +11,6 @@ real work.** Items are grouped by area.
 
 ## General
 
-- **Notifications** in the user menu doesn't open anything yet.
-- **Help panel:** help text exists but there's no button in the header to
-  open it.
 - **Managers** aren't assigned the *Manager* role automatically. Most line
   managers are *Employee* and work from **My Team** and **My Reviews**.
   Buttons on My Team that lead to *Confirmations* send them back to the

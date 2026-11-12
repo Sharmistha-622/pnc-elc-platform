@@ -12,6 +12,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { UserProvider, type User } from "@/contexts/user-context"
 import { DEFAULT_ROLE, type UserRole } from "@/lib/role-constants"
 import { getHasReports } from "@/lib/employees/hasReports"
+import { getWaitingTasks } from "@/lib/dashboard/getDashboardData"
 import { breakGlassCaller } from "@/lib/rbac/breakGlassAccess"
 import { PrivacyContact } from "@/components/shared/privacy/privacy-contact"
 import { NoticeBanner } from "@/components/shared/privacy/notice-banner"
@@ -88,6 +89,7 @@ export default async function DashboardLayout({
     const effectiveRole: UserRole = role || DEFAULT_ROLE
     // Whether My Team leads anywhere. Shared with the dashboard page.
     const hasReports = await getHasReports()
+    const waitingTasks = await getWaitingTasks(effectiveRole, { hasReports })
     // Users & Roles stays in the sidebar for a break-glass account while the
     // Super Admin switch is on. Reads the switch only for those accounts.
     const breakGlass = (await breakGlassCaller()) !== null
@@ -111,7 +113,7 @@ export default async function DashboardLayout({
         <UserProvider user={userData}>
                     <div className="[--header-height:calc(--spacing(14))] h-svh w-full flex flex-col overflow-hidden bg-background">
                         <SidebarProvider className="flex flex-col flex-1 h-full w-full overflow-hidden">
-                            <SiteHeader userRole={effectiveRole} />
+                            <SiteHeader userRole={effectiveRole} tasks={waitingTasks} />
                             <div className="flex flex-1 min-h-0 w-full overflow-hidden">
                                 <AppSidebar userRole={effectiveRole} hasReports={hasReports} breakGlass={breakGlass} />
                                 <SidebarInset className="flex-1 min-w-0 w-full overflow-y-auto bg-background">
