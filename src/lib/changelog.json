@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.20.00",
+    "date": "2026-11-12",
+    "title": "Let employees edit their own contact details",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Let employees edit their own contact details"
+      }
+    ]
+  },
+  {
     "version": "2.19.00",
     "date": "2026-11-12",
     "title": "Wire Notifications menu to dashboard tasks and add Help button",
