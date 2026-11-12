@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.20.01",
+    "date": "2026-11-12",
+    "title": "Drive Appraisals cycle status and footer text from review cycles and Settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Drive Appraisals cycle status and footer text from review cycles and Settings"
+      }
+    ]
+  },
+  {
     "version": "2.20.00",
     "date": "2026-11-12",
     "title": "Let employees edit their own contact details",
