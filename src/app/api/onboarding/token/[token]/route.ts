@@ -151,8 +151,8 @@ export async function POST(
         body.document_type,
         body.signer_name,
         body.signature_data_url,
-        // From the request itself, never from the body.
-        buildSignatureMetadata(req.headers, new Date())
+        // From the request itself, never from the body (method is allow-listed).
+        buildSignatureMetadata(req.headers, new Date(), body.method ?? body.signature_method)
       );
     } else if (action === 'submit_onboarding') {
       result = await submitCandidateOnboarding(id);

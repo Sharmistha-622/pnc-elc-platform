@@ -90,7 +90,14 @@ export async function PATCH(
     } else if (action === 'retry_seal') {
       result = await retrySealDocument(id, body.document_id, actor);
     } else if (action === 'withdraw') {
-      result = await withdrawJoiner(id, body.reason, actor);
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!reason) {
+        return NextResponse.json(
+          { success: false, error: 'A withdrawal reason is required.' },
+          { status: 400 }
+        );
+      }
+      result = await withdrawJoiner(id, reason, actor);
     } else if (action === 'purge_documents') {
       // Deletes a withdrawn joiner's unsealed documents. Deliberately its own
       // action: withdrawing is a workflow step, deleting someone's identity

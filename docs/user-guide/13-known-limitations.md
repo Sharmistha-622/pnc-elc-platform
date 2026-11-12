@@ -40,8 +40,6 @@ real work.** Items are grouped by area.
 - The **Letters & Annexure** tab on the review page may show placeholder text
   instead of the real letter. Use **Issued Letters** to read the real one.
 - On the **Final Review** tab, approval doesn't require the checks to pass.
-- The candidate list's **team filter** is a fixed list, not the department
-  list.
 - The **hardware panel**, and the **manager calendar** used to pick check-in
   slots, show placeholder data. Check-ins don't send invites.
 - The **signature image** on Signatories isn't printed on letters; only the
@@ -87,7 +85,6 @@ real work.** Items are grouped by area.
 
 - The **Email Center** templates don't control the emails actually sent. Real
   emails are built into the platform and sent through Google.
-- **Resend** in the outbox doesn't send anything; it only marks the row.
 - The note about batches "every 30 minutes between 09:00 and 19:00 IST" is
   wrong. Reminder jobs run once each morning.
 
