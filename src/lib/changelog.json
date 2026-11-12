@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.15.02",
+    "date": "2026-11-12",
+    "title": "Remove non-sending Resend action from Email Center outbox",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Remove non-sending Resend action from Email Center outbox"
+      }
+    ]
+  },
+  {
     "version": "2.15.01",
     "date": "2026-11-12",
     "title": "Point IDE changelog rule at rules/version-and-changelog.md",
