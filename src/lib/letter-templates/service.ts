@@ -637,7 +637,7 @@ export async function createCandidateLetter(input: CreateCandidateLetterInput): 
     addendum_type: input.addendum_type || null,
     employee_type_name: input.employee_type_name,
     content: input.content,
-    created_by: 'People & Culture',
+    created_by: input.created_by || 'People & Culture',
     created_at: now,
     updated_at: now,
   };

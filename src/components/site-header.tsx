@@ -17,6 +17,7 @@ import { useSidebar } from "@/components/ui/sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
 import { DevRoleToggle } from "@/components/dev-role-toggle"
 import { BreakGlassRoleSwitch } from "@/components/break-glass-role-switch"
+import { HeaderHelpTrigger } from "@/components/header-help-trigger"
 import { HeaderUserMenu } from "@/components/header-user-menu"
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -55,6 +56,7 @@ const ROUTE_LABELS: Record<string, string> = {
 
 export function SiteHeader({
   userRole,
+  tasks,
   ...props
 }: any) {
   const { toggleSidebar } = useSidebar()
@@ -129,8 +131,11 @@ export function SiteHeader({
         <div className="ml-auto flex items-center gap-2">
           <BreakGlassRoleSwitch />
           <DevRoleToggle userRole={userRole} />
+          <React.Suspense fallback={null}>
+            <HeaderHelpTrigger />
+          </React.Suspense>
           <ModeToggle />
-          <HeaderUserMenu />
+          <HeaderUserMenu tasks={tasks} />
         </div>
       </div>
     </header>

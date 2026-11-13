@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logWriter } from '@/lib/logs/writer'
 import { guard, passes, type Guarded } from '@/lib/rbac/guard'
+import { checkDifferentPeople } from '@/lib/rbac/makerChecker'
 import { getCurrentEmployee } from '@/lib/forms/currentEmployee'
 import { platformConfigRefusal } from '@/lib/settings/access'
 import {
@@ -315,10 +316,22 @@ export async function closeReviewCycle(cycleId: string, input: { outcome: string
   if (input?.outcome !== 'accepted' && input?.outcome !== 'returned') return { ok: false, error: 'Invalid request.' }
   // Nobody closes their own review, whatever their role.
   if (s.rel.isSubject) return { ok: false, error: 'You cannot close your own review.' }
+  if (input.outcome === 'accepted') {
+    const sod = checkDifferentPeople(
+      s.cycle.manager_id,
+      s.employeeId,
+      'The person who recorded the review decision cannot also accept it.'
+    )
+    if (!sod.ok) return { ok: false, error: sod.error }
+  }
 
   const ctx = await ctxFor()
   if (!ctx) return { ok: false, error: NO_SERVICE }
-  const res = await closeCycle(ctx, cycleId, { outcome: input.outcome, note: String(input.note ?? '').slice(0, 2000) })
+  const res = await closeCycle(ctx, cycleId, {
+    outcome: input.outcome,
+    note: String(input.note ?? '').slice(0, 2000),
+    checkerEmployeeId: s.employeeId,
+  })
   if (!res.ok) return { ok: false, error: res.error }
   refresh(cycleId)
   return { ok: true, message: input.outcome === 'accepted' ? 'Review closed.' : 'Sent back to the manager.' }

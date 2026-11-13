@@ -1,5 +1,201 @@
 [
   {
+    "version": "2.21.03",
+    "date": "2026-11-13",
+    "title": "Show the team chart before the team-tree migration is applied",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "My Team and Org Chart load, with departments only, on a database that has not had the team-tree update yet."
+      },
+      {
+        "category": "Fixes",
+        "description": "Completing an onboarding no longer fails on a database without the employee designation column."
+      }
+    ]
+  },
+  {
+    "version": "2.21.02",
+    "date": "2026-11-12",
+    "title": "Add XLSX employee import and list imports in Import History",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Add XLSX employee import and list imports in Import History"
+      }
+    ]
+  },
+  {
+    "version": "2.21.01",
+    "date": "2026-11-12",
+    "title": "Align Confirmations screens with review flow decisions and Settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Align Confirmations screens with review flow decisions and Settings"
+      }
+    ]
+  },
+  {
+    "version": "2.21.00",
+    "date": "2026-11-12",
+    "title": "Drive outbound emails from Email Center templates (#161)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Drive outbound emails from Email Center templates (#161)"
+      }
+    ]
+  },
+  {
+    "version": "2.20.02",
+    "date": "2026-11-12",
+    "title": "Enforce shared maker-checker separation across approvals",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Enforce shared maker-checker separation across approvals"
+      }
+    ]
+  },
+  {
+    "version": "2.20.01",
+    "date": "2026-11-12",
+    "title": "Drive Appraisals cycle status and footer text from review cycles and Settings",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Drive Appraisals cycle status and footer text from review cycles and Settings"
+      }
+    ]
+  },
+  {
+    "version": "2.20.00",
+    "date": "2026-11-12",
+    "title": "Let employees edit their own contact details",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Let employees edit their own contact details"
+      }
+    ]
+  },
+  {
+    "version": "2.19.00",
+    "date": "2026-11-12",
+    "title": "Wire Notifications menu to dashboard tasks and add Help button",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Wire Notifications menu to dashboard tasks and add Help button"
+      }
+    ]
+  },
+  {
+    "version": "2.18.00",
+    "date": "2026-11-12",
+    "title": "Average peer ratings per criterion",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Peer ratings on a review now show each criterion's average with the lowest and highest rating, instead of one chart per peer"
+      }
+    ]
+  },
+  {
+    "version": "2.17.00",
+    "date": "2026-11-12",
+    "title": "Add portal signature upload and EPF Form 11 document type",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Add portal signature upload and EPF Form 11 document type"
+      }
+    ]
+  },
+  {
+    "version": "2.16.00",
+    "date": "2026-11-12",
+    "title": "Add candidate withdraw action and department-backed team filter",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Add candidate withdraw action and department-backed team filter"
+      }
+    ]
+  },
+  {
+    "version": "2.15.02",
+    "date": "2026-11-12",
+    "title": "Remove non-sending Resend action from Email Center outbox",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Remove non-sending Resend action from Email Center outbox"
+      }
+    ]
+  },
+  {
+    "version": "2.15.01",
+    "date": "2026-11-12",
+    "title": "Point IDE changelog rule at rules/version-and-changelog.md",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "IDE agent changelog rule now points to `rules/version-and-changelog.md` instead of instructing manual version edits."
+      }
+    ]
+  },
+  {
+    "version": "2.15.00",
+    "date": "2026-11-12",
+    "title": "Team lanes chart with nested sub-teams and an org chart",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "My Team's chart groups your whole reporting line into team lanes, with nested sub-teams, rolled-up headcounts, search, a team filter, fit to screen and a list view on phones."
+      },
+      {
+        "category": "Features",
+        "description": "Org Chart shows everyone in the organisation by team, for Super Admin and PnC Admin."
+      },
+      {
+        "category": "Improvements",
+        "description": "Employee records carry a designation, filled from onboarding and shown on the team charts."
+      },
+      {
+        "category": "Fixes",
+        "description": "The Employees directory no longer shows Documents links to roles that cannot open documents."
+      }
+    ]
+  },
+  {
+    "version": "2.14.06",
+    "date": "2026-11-11",
+    "title": "Drop missing designation and location columns from reports selects",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Reports headcount and confirmation queries no longer request non-existent `designation` or `locations` columns from `employees`, restoring the by-team and headcount breakdowns."
+      }
+    ]
+  },
+  {
     "version": "2.14.05",
     "date": "2026-11-11",
     "title": "A directory view for colleagues' names; employee records per the matrix",

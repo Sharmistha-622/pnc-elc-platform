@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { guard } from '@/lib/rbac/guard'
 import { isTeamScoped, myReporteeIds } from '@/lib/confirmations/access'
+import { resolveConfirmationGuidelines } from '@/lib/confirmations/guidelines'
+import { loadSettings } from '@/lib/reviews/service'
+import { getPeerFeedbackSettings } from '@/lib/settings/service'
 import { NewConfirmationClient } from './new-confirmation-client'
 import { departmentOf } from '@/lib/employees/department'
 
@@ -74,10 +77,13 @@ export default async function NewConfirmationPage() {
     .select('id, name, team, team_id, employee_type_id')
     .eq('status', 'active')
     .order('name', { ascending: true })
-  const [{ data: teamRows }, { data: typeRows }] = await Promise.all([
+  const [{ data: teamRows }, { data: typeRows }, reviewSettings, peerSettings] = await Promise.all([
     supabase.from('teams').select('id, name'),
     supabase.from('employee_types').select('id, name'),
+    loadSettings(supabase),
+    getPeerFeedbackSettings(),
   ])
+  const guidelines = resolveConfirmationGuidelines({ reviewSettings, peerSettings })
   const teamName = new Map(((teamRows ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]))
   const typeName = new Map(((typeRows ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]))
 
@@ -108,6 +114,7 @@ export default async function NewConfirmationPage() {
       <NewConfirmationClient
         employees={eligibleEmployees}
         directoryEmployees={directoryEmployees}
+        guidelines={guidelines}
       />
     </div>
   )

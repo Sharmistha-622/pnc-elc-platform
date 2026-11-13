@@ -299,6 +299,8 @@ export interface FullOnboardingData {
   salaryStructure?: OnboardingSalaryStructure | null;
 }
 
+export type SignatureMethod = 'draw' | 'upload';
+
 /**
  * What is recorded with a signature. Built on the server from the request
  * that carried it (`buildSignatureMetadata`), never taken from the browser.
@@ -307,5 +309,5 @@ export interface SignatureMetadata {
   ip_address: string | null;
   user_agent: string | null;
   timestamp: string;
-  method: 'canvas_digital_draw';
+  method: SignatureMethod;
 }

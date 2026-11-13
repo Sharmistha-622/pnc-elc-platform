@@ -55,3 +55,21 @@ export function formatAnswer(
       return asString(value) || '—'
   }
 }
+
+const RATING_LINE = /^(.+):\s*([0-5](?:\.\d+)?)\s*\/\s*5$/
+
+/**
+ * Reads a rating grid back out of the text `formatAnswer` made of it, one
+ * `Criterion: N / 5` per line. Null when the text is anything else.
+ */
+export function parseRatingGrid(text: string): [string, number][] | null {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (lines.length === 0) return null
+  const entries: [string, number][] = []
+  for (const line of lines) {
+    const match = line.match(RATING_LINE)
+    if (!match) return null
+    entries.push([match[1].trim(), Number(match[2])])
+  }
+  return entries
+}

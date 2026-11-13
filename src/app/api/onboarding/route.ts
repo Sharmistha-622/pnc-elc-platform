@@ -48,7 +48,11 @@ export async function POST(req: NextRequest) {
     if (typeof payload.ctc_amount !== 'number' || !Number.isFinite(payload.ctc_amount) || payload.ctc_amount <= 0) {
       return NextResponse.json({ success: false, error: 'Enter the offered CTC.' }, { status: 400 });
     }
-    const created = await createOnboardingRecord(payload, customLetters);
+    const actor = access.caller.email ?? access.caller.userId;
+    const created = await createOnboardingRecord(
+      { ...payload, created_by: payload.created_by ?? actor },
+      customLetters
+    );
     return NextResponse.json({ success: true, data: created ? redactPortalToken(created) : created });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

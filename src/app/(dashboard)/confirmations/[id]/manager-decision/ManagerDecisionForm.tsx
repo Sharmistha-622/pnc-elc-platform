@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { updateManagerDecision } from '@/lib/confirmations/updateManagerDecision'
+import { CONFIRMATION_DECISION_OPTIONS } from '@/lib/confirmations/guidelines'
+import type { ConfirmationDecision } from '@/lib/reviews/types'
 import { generateCalendarLink } from '@/lib/calendar/generateCalendarLink'
 
 export function ManagerDecisionForm({
@@ -13,7 +15,7 @@ export function ManagerDecisionForm({
   employeeName: string
   employeeEmail?: string
 }) {
-  const [decision, setDecision] = useState<'yes' | 'no' | ''>('')
+  const [decision, setDecision] = useState<ConfirmationDecision | ''>('')
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -33,12 +35,12 @@ export function ManagerDecisionForm({
   }
 
   if (success) {
-    if (decision === 'yes') {
+    if (decision === 'confirm') {
       const suggestedDate = new Date()
       suggestedDate.setDate(suggestedDate.getDate() + 3)
       suggestedDate.setHours(10, 0, 0, 0)
 
-           const calendarLink = generateCalendarLink({
+      const calendarLink = generateCalendarLink({
         title: `Confirmation Review Meeting — ${employeeName}`,
         description: `Review meeting for ${employeeName}'s confirmation process.`,
         startDateTime: suggestedDate,
@@ -48,7 +50,7 @@ export function ManagerDecisionForm({
       return (
         <div>
           <p className="text-green-700 dark:text-green-300 font-medium mb-4">Decision recorded successfully.</p>
-            <a
+          <a
             href={calendarLink}
             target="_blank"
             rel="noopener noreferrer"
@@ -66,34 +68,26 @@ export function ManagerDecisionForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Is the employee ready for confirmation?</label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="decision"
-              value="yes"
-              checked={decision === 'yes'}
-              onChange={() => setDecision('yes')}
-            />
-            Yes
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="decision"
-              value="no"
-              checked={decision === 'no'}
-              onChange={() => setDecision('no')}
-            />
-            No
-          </label>
+        <label className="block text-sm font-medium mb-2">Confirmation Decision</label>
+        <div className="flex flex-wrap gap-4">
+          {CONFIRMATION_DECISION_OPTIONS.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="decision"
+                value={opt.value}
+                checked={decision === opt.value}
+                onChange={() => setDecision(opt.value as ConfirmationDecision)}
+              />
+              {opt.label}
+            </label>
+          ))}
         </div>
       </div>
 
-      {decision === 'no' && (
+      {decision === 'extend_probation' && (
         <div>
-          <label className="block text-sm font-medium mb-1">Reschedule Date</label>
+          <label className="block text-sm font-medium mb-1">Extend Probation Until</label>
           <input
             type="date"
             value={rescheduleDate}

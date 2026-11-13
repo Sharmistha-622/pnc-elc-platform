@@ -42,12 +42,26 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import type { AppraisalCohortEntry } from '@/lib/appraisals/getAppraisalCohortView'
+import {
+  buildAppraisalFooterCards,
+  deriveAppraisalCycleStatus,
+  type AppraisalCycleStatusSummary,
+  type AppraisalFooterCard,
+} from '@/lib/appraisals/cycleSummary'
 
 interface AppraisalsClientProps {
   entries: AppraisalCohortEntry[]
+  cycleStatus?: AppraisalCycleStatusSummary
+  footerCards?: AppraisalFooterCard[]
 }
 
-export function AppraisalsClient({ entries }: AppraisalsClientProps) {
+export function AppraisalsClient({
+  entries,
+  cycleStatus,
+  footerCards,
+}: AppraisalsClientProps) {
+  const resolvedStatus = cycleStatus ?? deriveAppraisalCycleStatus()
+  const resolvedFooterCards = footerCards ?? buildAppraisalFooterCards()
   // Managers and Exec View read the cohort; only directory roles open a
   // profile, which carries contact and identity details.
   const user = useUserContext()
@@ -173,12 +187,20 @@ export function AppraisalsClient({ entries }: AppraisalsClientProps) {
             </div>
           </div>
           <div className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5 mt-1">
-            <Badge className="bg-emerald-500 text-white font-bold text-xs border-none">
-              Active Planning
+            <Badge
+              className={`font-bold text-xs border-none ${
+                resolvedStatus.tone === 'paused'
+                  ? 'bg-amber-500 text-white'
+                  : resolvedStatus.tone === 'completed'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-emerald-500 text-white'
+              }`}
+            >
+              {resolvedStatus.badge}
             </Badge>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">
-            Bi-annual cadence schedule
+            {resolvedStatus.subtitle}
           </p>
         </div>
       </div>
@@ -377,29 +399,28 @@ export function AppraisalsClient({ entries }: AppraisalsClientProps) {
 
       {/* 4. Cohort Guidelines Footer Card */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl border border-border bg-card/60 shadow-xs space-y-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-              July Cycle Cadence
-            </h4>
+        {resolvedFooterCards.map((card, idx) => (
+          <div
+            key={card.name}
+            className="p-4 rounded-xl border border-border bg-card/60 shadow-xs space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <Calendar
+                className={`h-4 w-4 ${
+                  idx === 0
+                    ? 'text-indigo-600 dark:text-indigo-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                {card.title}
+              </h4>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {card.description}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Covers employees joining or converted between January 1 and June 30. Review cycles initiate June 15 with manager evaluations concluding July 31.
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl border border-border bg-card/60 shadow-xs space-y-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-              December Cycle Cadence
-            </h4>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Covers employees joining or converted between July 1 and December 31. Review cycles initiate November 15 with final calibration finalized by December 31.
-          </p>
-        </div>
+        ))}
       </div>
     </div>
   )

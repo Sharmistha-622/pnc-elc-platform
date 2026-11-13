@@ -1086,10 +1086,12 @@ export function ReportsView({ data }: ReportsViewProps) {
       {/* ===================================================================== */}
       {/* TAB 4: HEADCOUNT & DEMOGRAPHICS REPORT                                */}
       {/* ===================================================================== */}
-      {activeTab === 'headcount' && (
+      {activeTab === 'headcount' && (() => {
+        const hasLocations = Object.keys(data.headcount.byLocation).length > 0
+        return (
         <div className="space-y-4 animate-in fade-in duration-200">
-          {/* 4 Hero KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Hero KPI Cards */}
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasLocations ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3.5`}>
             <Card className="rounded-lg border border-border/80 bg-card p-4 flex flex-col justify-between gap-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground">Total Active Headcount</span>
@@ -1120,20 +1122,22 @@ export function ReportsView({ data }: ReportsViewProps) {
               </div>
             </Card>
 
-            <Card className="rounded-lg border border-border/80 bg-card p-4 flex flex-col justify-between gap-3 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-muted-foreground">Campus Locations</span>
-                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                  <MapPin className="size-4" />
+            {hasLocations && (
+              <Card className="rounded-lg border border-border/80 bg-card p-4 flex flex-col justify-between gap-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Campus Locations</span>
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                    <MapPin className="size-4" />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-0.5">
-                <div className="text-2xl font-extrabold tracking-tight font-mono text-foreground">
-                  {Object.keys(data.headcount.byLocation).length}
+                <div className="space-y-0.5">
+                  <div className="text-2xl font-extrabold tracking-tight font-mono text-foreground">
+                    {Object.keys(data.headcount.byLocation).length}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Campuses &amp; day centers</p>
                 </div>
-                <p className="text-[11px] text-muted-foreground">Campuses &amp; day centers</p>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             <Card className="rounded-lg border border-border/80 bg-card p-4 flex flex-col justify-between gap-3 shadow-xs">
               <div className="flex items-center justify-between">
@@ -1302,10 +1306,10 @@ export function ReportsView({ data }: ReportsViewProps) {
                 <thead className="bg-muted/40 text-muted-foreground uppercase font-semibold border-b border-border/70">
                   <tr>
                     <th className="px-4 py-3">Employee Name</th>
-                    <th className="px-4 py-3">Team &amp; Designation</th>
+                    <th className="px-4 py-3">Team</th>
                     <th className="px-4 py-3">Engagement Model</th>
                     <th className="px-4 py-3">Background</th>
-                    <th className="px-4 py-3">Campus Location</th>
+                    {hasLocations && <th className="px-4 py-3">Campus Location</th>}
                     <th className="px-4 py-3">Joining Date</th>
                     <th className="px-4 py-3 text-right">Roster Profile</th>
                   </tr>
@@ -1313,7 +1317,7 @@ export function ReportsView({ data }: ReportsViewProps) {
                 <tbody className="divide-y divide-border/60">
                   {paginatedHeadcount.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                      <td colSpan={hasLocations ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground text-xs">
                         No employees matching filter criteria.
                       </td>
                     </tr>
@@ -1333,7 +1337,7 @@ export function ReportsView({ data }: ReportsViewProps) {
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{emp.background}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{emp.location_name}</td>
+                        {hasLocations && <td className="px-4 py-3 text-muted-foreground">{emp.location_name}</td>}
                         <td className="px-4 py-3 text-muted-foreground font-mono">
                           {emp.joining_date ? new Date(emp.joining_date).toLocaleDateString() : '—'}
                         </td>
@@ -1363,7 +1367,8 @@ export function ReportsView({ data }: ReportsViewProps) {
             />
           </Card>
         </div>
-      )}
+        )
+      })()}
 
       {/* ===================================================================== */}
       {/* TAB 5: EMAIL DELIVERY REPORT                                          */}

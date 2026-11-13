@@ -11,27 +11,16 @@ real work.** Items are grouped by area.
 
 ## General
 
-- **Notifications** in the user menu doesn't open anything yet.
-- **Help panel:** help text exists but there's no button in the header to
-  open it.
 - **Managers** aren't assigned the *Manager* role automatically. Most line
   managers are *Employee* and work from **My Team** and **My Reviews**.
   Buttons on My Team that lead to *Confirmations* send them back to the
   Dashboard.
-- **Employees can't edit their own details** (phone, address, emergency
-  contact). PnC edits them on the employee's profile.
 - Some links lead to screens a role can't open (e.g. *Create Candidate* for
   PnC Ops, *Audit Logs* for Fin Admin, *Inspect* in Reports for Exec View).
   Clicking them sends you back to the Dashboard.
 
 ## Onboarding
 
-- **Only one onboarding email is sent: the invitation.** Nothing is emailed
-  when a candidate submits, when a document is rejected, when changes are
-  requested, or when they're approved or set up. **Contact the candidate
-  yourself.**
-- A candidate's **Request Correction** on the terms step is only recorded in
-  the audit log; PnC isn't notified.
 - **Create Official Account doesn't create the Google Workspace account or
   send login details.** Do this by hand. The email shown in the confirmation
   dialog may differ from the one actually assigned.
@@ -39,8 +28,6 @@ real work.** Items are grouped by area.
   old Google Apps Script, not from the platform.
 - The **Letters & Annexure** tab on the review page may show placeholder text
   instead of the real letter. Use **Issued Letters** to read the real one.
-- The candidate list's **team filter** is a fixed list, not the department
-  list.
 - The **hardware panel**, and the **manager calendar** used to pick check-in
   slots, show placeholder data. Check-ins don't send invites.
 - The **signature image** on Signatories isn't printed on letters; only the
@@ -60,15 +47,9 @@ real work.** Items are grouped by area.
 - **Meeting slots are picked without reading real calendars.** Check the
   booked time and move it if needed.
 - The daily job runs **once a morning**, so reminders aren't to the minute.
-- The **older Confirmations screens** use different decision options (Yes /
-  No-reschedule) from the new flow (Confirm / Extend / Do not confirm). Some
-  text there (e.g. "15 Days Before Due", "Min. 3 Responses") is fixed and
-  doesn't follow Settings.
 - Accepting **Do not confirm** only closes the review. Nothing changes on the
   employee record, and the next step is up to PnC.
-- The **Appraisals** page is read-only, its *Cycle Status* card always reads
-  "Active Planning", and its footer text about which joiners fall in July
-  doesn't match the actual settings.
+- The **Appraisals** page is read-only.
 - Written feedback from the new review flow is **not yet sealed** into the
   vault after closing.
 
@@ -82,24 +63,14 @@ real work.** Items are grouped by area.
   Reminders** by hand.
 - Managers and employees can't use the screen; PnC records their responses.
 
-## Emails
-
-- The **Email Center** templates don't control the emails actually sent. Real
-  emails are built into the platform and sent through Google.
-- **Resend** in the outbox doesn't send anything; it only marks the row.
-- The note about batches "every 30 minutes between 09:00 and 19:00 IST" is
-  wrong. Reminder jobs run once each morning.
-
 ## Data Management
 
-- **Import Employee Data** accepts **CSV only** (not XLSX), has **no undo**,
-  and isn't listed in *Import History*.
+- **Import Employee Data** has **no undo** (each import accepts CSV or XLSX and
+  is listed in *Import History*).
 - **Import History**, **Record History** and the **Rollback Center** show
   **sample data only**.
 - **System Audit Logs** may show sample rows when the real log is empty.
 - **Bulk Upload Users** isn't available.
-- **Form Builder** *Send this form* doesn't email the person yet. It only
-  appears in their My Forms.
 
 ## Payroll and vault
 
