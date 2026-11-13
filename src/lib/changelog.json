@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.21.05",
+    "date": "2026-11-13",
+    "title": "Remove Data Management sample records and hard-coded person emails",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Remove Data Management sample records and hard-coded person emails"
+      }
+    ]
+  },
+  {
     "version": "2.21.04",
     "date": "2026-11-13",
     "title": "Require all Final Review checks before approving dossier",
