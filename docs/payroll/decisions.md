@@ -20,7 +20,7 @@ inputs still owed.
 
 | # | Decision | Detail | Owner |
 |---|---|---|---|
-| D-01 | Residency | The vault project is created in `ap-south-1` (Mumbai); its tables are created in Phase 0. Core moves from Singapore to Mumbai before any real payroll data is loaded. Until then the vault holds dummy data only. | Nitin |
+| D-01 | Residency | The vault project is created in `ap-south-1` (Mumbai); its tables are created in Phase 0. Core has moved from Singapore to Mumbai (`ap-south-1`). Until real payroll data is loaded, the vault holds dummy data only. | Nitin |
 | D-02 | Core holds rules, never values | Percentages, ceilings, slabs and formulas can live in core. No amount is stored in or displayed from core. `salary_structures` stays frozen until the vault exists, then its data moves to vault `compensation` and the amount columns are dropped. | Nitin |
 | D-03 | Offer letters are rendered in the vault | Core sends template, split variation and CTC once to a vault function, which computes, renders and stores the PDF. Core keeps the document id. The candidate opens it through a signed vault link. | Nitin |
 | D-04 | Payroll audit lives in the vault | The whole payroll trail (who, when, before, after, reason) is in the vault. The ELC audit screen merges it in only for viewers with a vault session and the right resource. | Nitin |

@@ -14,7 +14,7 @@ depends on.
 |---|---|---|
 | Vault tables | The vault project is created in Mumbai; create its tables: apply `0001_vault_schema.sql` and `0002_sealed_records.sql`, then the payroll tables from `design.md` §2.2 (identity, advances, pay items, TDS declarations, fee YTD, run lines and components, payments, output files, payslips, letters, payroll audit) | D-01 |
 | Vault functions | `submit-bank` and `approve-bank` built (vault `0005`); `sync-person` remains, now unblocked | `../rbac.md` #3, settled 2026-11-04: a candidate is not a Supabase user |
-| Core residency | Move core from Singapore to Mumbai before any real data is loaded | D-01 |
+| ~~Core residency~~ | Done: core moved from Singapore to Mumbai (`ap-south-1`) | D-01 |
 | Person and engagement | `person` over `employees`; `engagement` with type, pay basis, dates, location, work state, grade; backfill from `employees` | D-10, D-11, O-01 |
 | Employee ID | Issue `NG-0669`-style IDs from one sequence when a candidate reaches Pre-Joinee, written to `employees.employee_code` (added in #59); retire onboarding's `NG-<year>-` codes | D-34, P-09 |
 | Locations | `ng_locations.state_code` (backfilled from the address) and an `indian_states` master; the `to public` write policies were already closed by the RLS lockdown. Built in `202610291200_location_states.sql` | D-25 |
