@@ -52,6 +52,10 @@ import {
   MILESTONE_DEFINITIONS,
   type MilestoneKey,
 } from './probation-scheduling';
+import {
+  evaluateOnboardingApprovalChecks,
+  formatApprovalRefusal,
+} from './approval-checks';
 
 /**
  * Audit subject for an onboarding record.
@@ -1160,22 +1164,29 @@ export async function updateOnboardingStatus(
   const data = await getOnboardingById(id);
   if (!data) return null;
 
-  if (status === 'approved' && actor) {
-    assertDifferentPeople(
-      data.record.created_by,
-      actor,
-      'The person who issued the offer or letters cannot also approve the onboarding.'
-    );
-    const { data: letters } = await onboardingDb()
-      .from('candidate_letters')
-      .select('created_by')
-      .eq('onboarding_id', id);
-    for (const letter of (letters ?? []) as Array<{ created_by?: string | null }>) {
+  if (status === 'approved') {
+    const readiness = evaluateOnboardingApprovalChecks(data);
+    if (!readiness.canApprove) {
+      throw new Error(formatApprovalRefusal(readiness.failingChecks));
+    }
+
+    if (actor) {
       assertDifferentPeople(
-        letter.created_by,
+        data.record.created_by,
         actor,
         'The person who issued the offer or letters cannot also approve the onboarding.'
       );
+      const { data: letters } = await onboardingDb()
+        .from('candidate_letters')
+        .select('created_by')
+        .eq('onboarding_id', id);
+      for (const letter of (letters ?? []) as Array<{ created_by?: string | null }>) {
+        assertDifferentPeople(
+          letter.created_by,
+          actor,
+          'The person who issued the offer or letters cannot also approve the onboarding.'
+        );
+      }
     }
   }
 

@@ -28,7 +28,6 @@ real work.** Items are grouped by area.
   old Google Apps Script, not from the platform.
 - The **Letters & Annexure** tab on the review page may show placeholder text
   instead of the real letter. Use **Issued Letters** to read the real one.
-- On the **Final Review** tab, approval doesn't require the checks to pass.
 - The **hardware panel**, and the **manager calendar** used to pick check-in
   slots, show placeholder data. Check-ins don't send invites.
 - The **signature image** on Signatories isn't printed on letters; only the

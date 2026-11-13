@@ -205,14 +205,15 @@ describe('maker ≠ checker across workflows', () => {
   it('refuses onboarding final approval when the approver issued the offer or candidate letters', async () => {
     const { updateOnboardingStatus } = await import('@/lib/onboarding/service');
 
+    const oid = '11111111-1111-4111-8111-111111111111';
     let updatedStatus: string | null = null;
-    const emptyChildChain = {
+    const childChain = (rows: Record<string, unknown>[]) => ({
       in: () => ({
-        order: async () => ({ data: [], error: null }),
-        then: (resolve: (val: { data: never[]; error: null }) => void) =>
-          resolve({ data: [], error: null }),
+        order: async () => ({ data: rows, error: null }),
+        then: (resolve: (val: { data: Record<string, unknown>[]; error: null }) => void) =>
+          resolve({ data: rows, error: null }),
       }),
-    };
+    });
 
     mockOnboardingDb.mockReturnValue({
       from: (table: string) => {
@@ -222,7 +223,7 @@ describe('maker ≠ checker across workflows', () => {
               eq: () => ({
                 maybeSingle: async () => ({
                   data: {
-                    id: '11111111-1111-4111-8111-111111111111',
+                    id: oid,
                     candidate_name: 'Asha Rao',
                     personal_email: 'asha@example.org',
                     designation: 'Engineer',
@@ -239,6 +240,27 @@ describe('maker ≠ checker across workflows', () => {
             },
           };
         }
+        if (table === 'onboarding_personal_details') {
+          return { select: () => childChain([{ onboarding_id: oid, full_name: 'Asha Rao', permanent_address: 'Bengaluru' }]) };
+        }
+        if (table === 'onboarding_employment_details') {
+          return { select: () => childChain([{ onboarding_id: oid, candidate_confirmed: true }]) };
+        }
+        if (table === 'onboarding_documents') {
+          return { select: () => childChain([{ onboarding_id: oid, is_required: true, status: 'verified' }]) };
+        }
+        if (table === 'onboarding_policies') {
+          return { select: () => childChain([{ onboarding_id: oid, status: 'completed' }]) };
+        }
+        if (table === 'onboarding_documents_generated') {
+          return {
+            select: () =>
+              childChain([
+                { onboarding_id: oid, document_type: 'offer_letter', status: 'signed' },
+                { onboarding_id: oid, document_type: 'appointment_letter', status: 'signed' },
+              ]),
+          };
+        }
         if (table === 'candidate_letters') {
           return {
             select: () => ({
@@ -251,12 +273,12 @@ describe('maker ≠ checker across workflows', () => {
         }
         if (table === 'onboarding_activity_log') {
           return {
-            select: () => emptyChildChain,
+            select: () => childChain([]),
             insert: async () => ({ error: null }),
           };
         }
         return {
-          select: () => emptyChildChain,
+          select: () => childChain([]),
         };
       },
     });

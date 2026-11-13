@@ -40,6 +40,33 @@ function table(name: string) {
     },
     then: (resolve: (v: unknown) => void) => {
       if (name === 'onboarding_documents') return resolve({ data: state.docs, error: null })
+      if (name === 'onboarding_personal_details') {
+        return resolve({
+          data: [{ onboarding_id: CANDIDATE_ID, full_name: 'Kiran Verma', permanent_address: 'Dharamshala' }],
+          error: null,
+        })
+      }
+      if (name === 'onboarding_employment_details') {
+        return resolve({
+          data: [{ onboarding_id: CANDIDATE_ID, candidate_confirmed: true }],
+          error: null,
+        })
+      }
+      if (name === 'onboarding_policies') {
+        return resolve({
+          data: [{ onboarding_id: CANDIDATE_ID, status: 'completed' }],
+          error: null,
+        })
+      }
+      if (name === 'onboarding_documents_generated') {
+        return resolve({
+          data: [
+            { onboarding_id: CANDIDATE_ID, document_type: 'offer_letter', status: 'signed' },
+            { onboarding_id: CANDIDATE_ID, document_type: 'appointment_letter', status: 'signed' },
+          ],
+          error: null,
+        })
+      }
       return resolve({ data: [], error: null })
     },
   })
@@ -219,6 +246,7 @@ describe('Onboarding lifecycle emails (#151)', () => {
   })
 
   it('Approved / set up: sends one email to the candidate with Day-1 expectations and no login credentials', async () => {
+    state.docs[0].status = 'verified'
     await updateOnboardingStatus(CANDIDATE_ID, 'approved', 'All checks passed.')
 
     expect(state.sentEmails).toHaveLength(1)
@@ -271,6 +299,7 @@ describe('Onboarding lifecycle emails (#151)', () => {
     await expect(
       updateOnboardingStatus(CANDIDATE_ID, 'changes_requested', 'Fix address')
     ).resolves.toBeTruthy()
+    state.docs[0].status = 'verified'
     await expect(updateOnboardingStatus(CANDIDATE_ID, 'approved')).resolves.toBeTruthy()
     await expect(
       confirmEmploymentDetails(CANDIDATE_ID, false, true, 'Typo in title')
