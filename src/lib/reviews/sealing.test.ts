@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 vi.mock('@/lib/audit/events', () => ({ auditEvent: vi.fn(async () => null) }))
 vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(), sendCalendarInvite: vi.fn(), escapeHtml: (s: string) => s }))
-vi.mock('@/lib/vault/seal-service', () => ({ sealFeedbackForConfirmation: vi.fn() }))
+vi.mock('@/lib/vault/seal-service', () => ({ sealFeedbackForConfirmation: vi.fn(), sealReviewCycleRecords: vi.fn() }))
 vi.mock('@/lib/integrations/calendar-availability.server', () => ({ calendarAvailabilityService: {} }))
 
 import { closeCycle, type Ctx } from './service'
