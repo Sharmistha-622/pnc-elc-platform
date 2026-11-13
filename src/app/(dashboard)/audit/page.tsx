@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { PageBanner } from '@/components/shared/page-banner';
 import { AuditTrail } from '@/components/shared/audit-trail';
 import { getAuditTrail, summarizeByModule } from '@/lib/audit/service';
-import { backfillAuditTrail } from '@/lib/audit/seed';
 import { AUDIT_MODULE_LABELS } from '@/lib/audit/types';
 import { TONES } from '@/lib/ui/tone';
 
@@ -23,9 +22,6 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ employee_id?: string; employee_email?: string; employee_name?: string }>;
 }) {
-  // Project pre-existing module activity logs into the trail on first read.
-  await backfillAuditTrail();
-
   const { employee_id, employee_email, employee_name } = await searchParams;
   const scoped = Boolean(employee_id || employee_email);
 
