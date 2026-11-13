@@ -1946,6 +1946,16 @@ export function EmailsView({
                                           Backup Priority #{acc.backup_priority}
                                         </Badge>
                                       )}
+                                      {acc.status === 'needs_reauth' && (
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-[10px] gap-1 px-1.5 py-0 h-4.5"
+                                          title={acc.error_message || 'OAuth refresh token refused or expired'}
+                                        >
+                                          <AlertCircle className="size-2.5" />
+                                          <span>Needs Re-auth</span>
+                                        </Badge>
+                                      )}
                                       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                         <span className="size-1.5 rounded-full bg-emerald-500" />
                                         Quota: {acc.daily_send_limit || 2000}/day
