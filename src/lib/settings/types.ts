@@ -542,7 +542,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-3',
     recipient_name: 'IT Operations Team',
-    recipient_email: 'it-ops@navgurukul.org',
+    recipient_email: 'it-ops@example.org',
     recipient_role: 'IT Administrator',
     category: 'onboarding',
     notification_type: 'Hardware & Account Provisioning Alert',
@@ -555,7 +555,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-4',
     recipient_name: 'Rahul Kumar',
-    recipient_email: 'rahul.kumar@navgurukul.org',
+    recipient_email: 'rahul.kumar@example.org',
     recipient_role: 'Associate Software Engineer',
     category: 'onboarding',
     notification_type: 'Day 1 Welcome & Buddy Introduction',
@@ -567,8 +567,8 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   },
   {
     id: 'log-email-5',
-    recipient_name: 'Nitin Sudarshan',
-    recipient_email: 'nitin@navgurukul.org',
+    recipient_name: 'Arjun Nair',
+    recipient_email: 'arjun.nair@example.org',
     recipient_role: 'People & Culture Lead',
     category: 'confirmation',
     notification_type: 'Peer Feedback Request',
@@ -580,8 +580,8 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   },
   {
     id: 'log-email-6',
-    recipient_name: 'Sharmistha Mazumdar',
-    recipient_email: 'sharmistha@navgurukul.org',
+    recipient_name: 'Meera Krishnan',
+    recipient_email: 'meera.krishnan@example.org',
     recipient_role: 'Reviewer',
     category: 'confirmation',
     notification_type: 'Peer Review Automated Reminder',
@@ -594,7 +594,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-7',
     recipient_name: 'All Employees',
-    recipient_email: 'all-team@navgurukul.org',
+    recipient_email: 'all-team@example.org',
     recipient_role: 'Organization-wide',
     category: 'appraisal',
     notification_type: 'Appraisal Cycle Launch Announcement',
@@ -607,7 +607,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-8',
     recipient_name: 'Priya Singh',
-    recipient_email: 'priya.singh@navgurukul.org',
+    recipient_email: 'priya.singh@example.org',
     recipient_role: 'Senior Program Associate',
     category: 'appraisal',
     notification_type: 'Self-Review Deadline Alert',
@@ -620,7 +620,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-9',
     recipient_name: 'Vikram Patel',
-    recipient_email: 'vikram.patel@navgurukul.org',
+    recipient_email: 'vikram.patel@example.org',
     recipient_role: 'Operations Associate',
     category: 'offboarding',
     notification_type: 'Resignation Formal Acknowledgment',
@@ -633,7 +633,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-10',
     recipient_name: 'Finance & Admin Desk',
-    recipient_email: 'finance-clearance@navgurukul.org',
+    recipient_email: 'finance-clearance@example.org',
     recipient_role: 'Department Clearance Officer',
     category: 'offboarding',
     notification_type: 'No-Dues Department Clearance Reminder',
@@ -646,7 +646,7 @@ export const DEFAULT_EMAIL_DELIVERY_LOGS: EmailDeliveryLog[] = [
   {
     id: 'log-email-11',
     recipient_name: 'Rohan Mehta',
-    recipient_email: 'rohan.invalid-mailbox@navgurukul.org',
+    recipient_email: 'rohan.invalid-mailbox@example.org',
     recipient_role: 'Consultant',
     category: 'confirmation',
     notification_type: 'Peer Review Request',
@@ -1795,7 +1795,7 @@ export const DEFAULT_GOOGLE_ACCOUNTS: GoogleWorkspaceAccount[] = [
   {
     id: 'acc-a',
     name: 'Account A (Primary)',
-    email: 'sharmisthamazumdar24@navgurukul.org',
+    email: 'noreply@example.org',
     client_id: 'your-google-client-id.apps.googleusercontent.com',
     client_secret: 'GOCSPX-••••••••••••••••••••••••••••',
     refresh_token_preview: '1//042-fqCrlAZusCgYIARAAGAQSNwF-••••',
@@ -1812,13 +1812,13 @@ export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   id: 'provider-1',
   active_provider: 'gmail',
   from_name: 'NavGurukul People & Culture',
-  from_email: 'sharmisthamazumdar24@navgurukul.org',
-  reply_to_email: 'sharmisthamazumdar24@navgurukul.org',
+  from_email: 'noreply@example.org',
+  reply_to_email: 'noreply@example.org',
 
   google_accounts: DEFAULT_GOOGLE_ACCOUNTS,
 
   domain_name: 'navgurukul.org',
-  gmail_account: 'sharmisthamazumdar24@navgurukul.org',
+  gmail_account: 'noreply@example.org',
   gmail_client_id: 'your-google-client-id.apps.googleusercontent.com',
   gmail_client_secret: 'GOCSPX-••••••••••••••••••••••••••••',
   gmail_scope: 'https://www.googleapis.com/auth/gmail.send',
@@ -1839,7 +1839,7 @@ export const DEFAULT_EMAIL_PROVIDER_CONFIG: EmailProviderConfig = {
   smtp_host: 'smtp.gmail.com',
   smtp_port: 587,
   smtp_secure: true,
-  smtp_username: 'sharmisthamazumdar24@navgurukul.org',
+  smtp_username: 'noreply@example.org',
   smtp_password: '••••••••••••••••',
 
   daily_send_limit: 2000,

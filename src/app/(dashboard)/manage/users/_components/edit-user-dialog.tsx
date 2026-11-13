@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { UserRole, assignableRoles, roleLabel } from "@/lib/role-constants";
 import { canSetDepartment, ROLE_CODES } from "@/lib/rbac/roles";
 import { BREAK_GLASS_GRANTABLE_ROLES } from "@/lib/rbac/breakGlass";
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from "@/lib/rbac/resolveRole";
 import { updateUserAllocations } from "@/lib/rbac/updateUserAllocations";
 import {
   Dialog,
@@ -117,7 +118,7 @@ export function EditUserDialog({
 
   if (!user) return null;
 
-  const isImmutable = user.email?.toLowerCase() === "nitin@navgurukul.org";
+  const isImmutable = user.email ? IMMUTABLE_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase()) : false;
   const initialRole = (user.role as UserRole) || "employee";
 
   const roleChanged = role !== initialRole;

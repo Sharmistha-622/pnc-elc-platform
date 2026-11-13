@@ -7,13 +7,7 @@ import {
   FileSpreadsheet,
   Search,
   RefreshCw,
-  Database,
-  SlidersHorizontal,
-  Clock,
-  User,
-  ShieldAlert,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -23,84 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageBanner } from "@/components/shared/page-banner";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 
-const SAMPLE_LOGS = [
-  {
-    id: "log-onb-1",
-    table_name: "onboarding_records",
-    record_id: "11111111-1111-1111-1111-111111111111",
-    action: "update",
-    changed_data: { status: "under_review", candidate_name: "Aarav Sharma", progress_percentage: 83 },
-    changed_by: "aarav.sharma@example.com (Candidate)",
-    created_at: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-  },
-  {
-    id: "log-onb-2",
-    table_name: "onboarding_documents",
-    record_id: "doc-aadhaar-001",
-    action: "update",
-    changed_data: { document_name: "Aadhaar Card", verification_status: "rejected", reason: "Document is blurry, name mismatch" },
-    changed_by: "sharmistha@navgurukul.org (P&C)",
-    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    id: "log-onb-3",
-    table_name: "onboarding_records",
-    record_id: "33333333-3333-3333-3333-333333333333",
-    action: "insert",
-    changed_data: { candidate_name: "Rahul Kumar", official_email: "rahul.kumar@navgurukul.org", employee_id: "NG-2026-0182", status: "completed" },
-    changed_by: "nitin@navgurukul.org (P&C)",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: "log-1",
-    table_name: "employees",
-    record_id: "emp-101",
-    action: "update",
-    changed_data: { status: "confirmed", old_status: "probation" },
-    changed_by: "sharmistha@navgurukul.org",
-    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-  },
-  {
-    id: "log-2",
-    table_name: "appraisals",
-    record_id: "appr-204",
-    action: "insert",
-    changed_data: { cycle: "July 2026", employee_id: "emp-101", status: "submitted" },
-    changed_by: "rohit@navgurukul.org",
-    created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-  },
-  {
-    id: "log-3",
-    table_name: "employees",
-    record_id: "emp-108",
-    action: "update",
-    changed_data: { team: "Engineering", old_team: "Operations" },
-    changed_by: "nitin@navgurukul.org",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: "log-4",
-    table_name: "peer_feedback",
-    record_id: "fb-302",
-    action: "insert",
-    changed_data: { peer_id: "emp-105", target_id: "emp-101", score: 4.5 },
-    changed_by: "priya@navgurukul.org",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-  {
-    id: "log-5",
-    table_name: "roles_history",
-    record_id: "rh-405",
-    action: "insert",
-    changed_data: { role: "Manager", effective_date: "2026-07-01" },
-    changed_by: "nitin@navgurukul.org",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-  },
-];
-
 export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<any[]>(SAMPLE_LOGS);
-  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filters
   const [searchRecord, setSearchRecord] = useState("");
@@ -117,11 +36,13 @@ export default function AuditLogsPage() {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         setLogs(data);
+      } else {
+        setLogs([]);
       }
-    } catch (err) {
-      // Keep sample logs
+    } catch {
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -302,7 +223,7 @@ export default function AuditLogsPage() {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-sm font-medium">
-                  No audit logs matching current filter criteria.
+                  {logs.length === 0 ? "No audit logs recorded yet." : "No audit logs matching current filter criteria."}
                 </TableCell>
               </TableRow>
             )}

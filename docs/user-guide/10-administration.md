@@ -189,11 +189,10 @@ Double-check the preview.
 
 ### Audits and Rollbacks
 
-**Onboarding Audit Logs** and **System Audit Logs** show recorded activity.
+**Onboarding Audit Logs** and **System Audit Logs** show recorded activity (or an empty state when no logs are recorded).
 
 > **Import History**, **Record History** and the **Rollback Center**
-> currently show **sample data only**. They aren't connected to real records,
-> so don't use them.
+> are not available yet and show an empty *"Not available yet"* notice.
 
 ---
 

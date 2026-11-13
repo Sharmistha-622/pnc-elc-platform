@@ -25,9 +25,9 @@ export type UpdateSignatoryInput = Partial<CreateSignatoryInput>
 export const DEFAULT_SIGNATORIES: AuthorizedSignatory[] = [
   {
     id: 'sig-1',
-    name: 'Nitin Sudarshan',
+    name: 'Signatory One',
     designation: 'People & Culture Lead, NavGurukul',
-    email: 'nitin@navgurukul.org',
+    email: 'signatory.one@example.org',
     signature_url: null,
     is_default: true,
     is_active: true,
@@ -37,9 +37,9 @@ export const DEFAULT_SIGNATORIES: AuthorizedSignatory[] = [
   },
   {
     id: 'sig-2',
-    name: 'Sharmistha Mazumdar',
+    name: 'Signatory Two',
     designation: 'People & Culture Lead, NavGurukul',
-    email: 'sharmistha@navgurukul.org',
+    email: 'signatory.two@example.org',
     signature_url: null,
     is_default: false,
     is_active: true,
@@ -49,9 +49,9 @@ export const DEFAULT_SIGNATORIES: AuthorizedSignatory[] = [
   },
   {
     id: 'sig-3',
-    name: 'Anurag Kundu',
+    name: 'Signatory Three',
     designation: 'Executive Director, NavGurukul',
-    email: 'anurag@navgurukul.org',
+    email: 'signatory.three@example.org',
     signature_url: null,
     is_default: false,
     is_active: true,

@@ -9,6 +9,7 @@ import { accessFor } from '@/lib/rbac/roles'
 import { departmentOf } from '@/lib/employees/department'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { getSafeAvatarUrl } from '@/lib/avatar'
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
 import { auditEmployee } from '@/lib/audit/events'
 
 export interface SelfContactDetails {
@@ -114,7 +115,7 @@ export async function getMyProfileData(): Promise<{
             userMap.set(u.email.toLowerCase(), {
               id: u.id,
               avatarUrl: getSafeAvatarUrl(u.user_metadata),
-              role: (u.email.toLowerCase() === 'nitin@navgurukul.org')
+              role: IMMUTABLE_SUPER_ADMIN_EMAILS.includes(u.email.toLowerCase())
                 ? 'super_admin'
                 : (u.app_metadata?.role as string) || 'member',
             })

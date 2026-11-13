@@ -67,9 +67,8 @@ real work.** Items are grouped by area.
 
 - **Import Employee Data** has **no undo** (each import accepts CSV or XLSX and
   is listed in *Import History*).
-- **Import History**, **Record History** and the **Rollback Center** show
-  **sample data only**.
-- **System Audit Logs** may show sample rows when the real log is empty.
+- **Record History** and the **Rollback Center** are not available yet and show
+  a *"Not available yet"* empty state.
 - **Bulk Upload Users** isn't available.
 
 ## Payroll and vault

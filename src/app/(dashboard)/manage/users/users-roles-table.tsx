@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ALL_ROLES, ROLES, type RoleGroup } from "@/lib/rbac/roles";
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from "@/lib/rbac/resolveRole";
 import { RoleBadge } from "@/components/shared/role-badge";
 import { DEFAULT_ROLE, normalizeRole, roleLabel, type UserRole } from "@/lib/role-constants";
 import { Button } from "@/components/ui/button";
@@ -430,7 +431,9 @@ export function UsersRolesTable({
               </TableRow>
             ) : (
               paginatedUsers.map((user) => {
-                const isNitin = user.email?.toLowerCase() === "nitin@navgurukul.org";
+                const isNitin = user.email
+                  ? IMMUTABLE_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
+                  : false;
                 const isImmutable = isNitin;
 
                 return (

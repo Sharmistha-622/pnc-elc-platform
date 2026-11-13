@@ -39,7 +39,7 @@ export default async function DashboardLayout({
 
     // Default base user details
     let profileName = "Admin User"
-    let profileEmail = "admin@navgurukul.org"
+    let profileEmail = "admin@example.org"
     let profileAvatar = ""
     let team: string | null = null
     let employeeType: string | null = null

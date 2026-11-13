@@ -2,6 +2,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { normalizeRole, type UserRole } from '@/lib/role-constants'
 import { accessEndedAt, roleBeforeExit } from '@/lib/rbac/lifecycle'
+import { IMMUTABLE_SUPER_ADMIN_EMAILS } from '@/lib/rbac/resolveRole'
 
 export type UserRow = {
   id: string
@@ -31,7 +32,7 @@ export async function listUsersWithRoles(): Promise<UserRow[]> {
           name: (u.user_metadata?.full_name as string) ?? (u.user_metadata?.name as string) ?? '',
           // Roles stored before RBAC v1 are display names; normalize so the
           // directory never shows a role the rest of the app cannot read.
-          role: (u.email?.toLowerCase() === 'nitin@navgurukul.org')
+          role: (u.email && IMMUTABLE_SUPER_ADMIN_EMAILS.includes(u.email.toLowerCase()))
             ? ('super_admin' as UserRole)
             : normalizeRole(u.app_metadata?.role),
           team: (u.user_metadata?.team as string) ?? null,
