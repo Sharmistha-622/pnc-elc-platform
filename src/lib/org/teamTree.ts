@@ -322,6 +322,23 @@ export const validateTeamParent = (
   return parentDepth + branchHeight > MAX_TEAM_DEPTH ? 'too_deep' : null
 }
 
+/**
+ * Looks a department up by name, ignoring case and surrounding spaces, the
+ * way the team-tree migration's backfill matches `employees.team`. Blank and
+ * "None" match nothing.
+ */
+export const departmentIdByName = (teams: TeamRecord[]): ((name: string | null | undefined) => string | null) => {
+  const byName = new Map<string, string>()
+  for (const team of teams) {
+    const key = team.name.trim().toLocaleLowerCase()
+    if (!byName.has(key)) byName.set(key, team.id)
+  }
+  return (name) => {
+    const key = name?.trim().toLocaleLowerCase()
+    return key && key !== 'none' ? byName.get(key) ?? null : null
+  }
+}
+
 /** Two letters for an avatar: first and last name, e.g. "Asha Rao" → "AR". */
 export const initialsOf = (name: string): string => {
   const parts = name.trim().split(/\s+/).filter(Boolean)
