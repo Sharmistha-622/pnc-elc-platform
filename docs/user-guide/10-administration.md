@@ -110,17 +110,23 @@ Super Admin and PnC Admin only: these hold personal data.
 | **Email Setup Infrastructure** | The sending provider and domain checks (SPF/DKIM/DMARC). Platform team only. |
 | **Daily Sending Quota & Volume** | How much of the Google daily limit (2,000 emails) has been used. |
 
-> ⚠️ **Important:** the templates on this screen **don't yet control the
-> emails that actually go out**. The real emails are built into the platform
-> and are always sent through Google. *Resend* in the outbox marks the row as
-> delivered but **doesn't actually send again**. See
-> [Known limitations](13-known-limitations.md#emails).
+> **Note:** each outbound email reads its active template from **Templates &
+> Cadence** by key, fills allow-listed variables on the server, and falls back
+> to built-in wording only if no active template exists. No template can
+> include salary, CTC, government ID numbers, or bank account details. Because
+> email logs keep no message bodies, failed messages are re-sent from the
+> screen that sent them (for example, *Resend Invitation Email* on the
+> candidate).
 
 ### The emails that are actually sent today
 
 | When | Email |
 |---|---|
 | Candidate created or invited | *"Welcome to NavGurukul — complete your onboarding"*, with the portal link |
+| Candidate requests correction on terms | To PnC mailbox (from Settings › Reviews), linking to the review page |
+| Candidate submits onboarding | Confirmation to candidate; alert to PnC mailbox linking to the review page |
+| Document rejected / changes requested | To candidate, with the reason and a fresh portal link |
+| Onboarding approved / set up | To candidate, with Day-1 expectations (no login credentials) |
 | Review opens | Self-review due (employee); manager review form (manager) |
 | Employee nominates peers | Peer feedback request (each peer) |
 | Every morning | Reminders; *"Needs PnC"* escalation; *"Ready for meeting"* (PnC) |
@@ -130,6 +136,7 @@ Super Admin and PnC Admin only: these hold personal data.
 | Resignation recorded | Resignation acknowledgement |
 | *Send Reminders* on an exit | Clearance reminder |
 | Exit closed | Relieving documents |
+| Form sent in Form Builder | *"New form assigned to you"*, linking to the form in My Forms |
 
 ---
 
@@ -211,7 +218,7 @@ In the builder:
    already filled in keep the version they were answered on.
 4. **Send this form**: choose who fills it in, optionally who it's about,
    and how many days until it expires. It appears in that person's **My
-   Forms** (no email is sent for this yet). Submitted answers are listed
+   Forms** and emails them a link to open it. Submitted answers are listed
    below.
 
 ## Good practice for administrators

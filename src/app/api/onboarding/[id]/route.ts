@@ -14,6 +14,10 @@ import {
   purgeWithdrawnDocuments,
 } from '@/lib/onboarding/service';
 import { ACTION_ROLES, isOnboardingAction } from '@/lib/onboarding/access';
+import {
+  evaluateOnboardingApprovalChecks,
+  formatApprovalRefusal,
+} from '@/lib/onboarding/approval-checks';
 import { redactSalary, redactPortalToken } from '@/lib/onboarding/redact';
 import { guard, maySeeSalary, type Guarded } from '@/lib/rbac/guard';
 import type { FullOnboardingData } from '@/lib/onboarding/types';
@@ -90,14 +94,38 @@ export async function PATCH(
     } else if (action === 'retry_seal') {
       result = await retrySealDocument(id, body.document_id, actor);
     } else if (action === 'withdraw') {
-      result = await withdrawJoiner(id, body.reason, actor);
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!reason) {
+        return NextResponse.json(
+          { success: false, error: 'A withdrawal reason is required.' },
+          { status: 400 }
+        );
+      }
+      result = await withdrawJoiner(id, reason, actor);
     } else if (action === 'purge_documents') {
       // Deletes a withdrawn joiner's unsealed documents. Deliberately its own
       // action: withdrawing is a workflow step, deleting someone's identity
       // documents is a decision.
       result = await purgeWithdrawnDocuments(id, body.reason, actor);
     } else if (action === 'update_status') {
-      result = await updateOnboardingStatus(id, body.status, body.note);
+      if (body.status === 'approved') {
+        const existing = await getOnboardingById(id);
+        if (!existing) {
+          return NextResponse.json({ success: false, error: 'Record not found or update failed' }, { status: 404 });
+        }
+        const readiness = evaluateOnboardingApprovalChecks(existing);
+        if (!readiness.canApprove) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: formatApprovalRefusal(readiness.failingChecks),
+              failingChecks: readiness.failingChecks,
+            },
+            { status: 400 }
+          );
+        }
+      }
+      result = await updateOnboardingStatus(id, body.status, body.note, actor);
     } else if (action === 'provision_account') {
       result = await provisionOfficialAccount(id);
     } else if (action === 'update_orientation_checklist') {

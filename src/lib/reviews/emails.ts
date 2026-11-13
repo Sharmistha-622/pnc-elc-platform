@@ -10,7 +10,7 @@
 import { escapeHtml } from '@/lib/email/sendEmail'
 import type { ParticipantRole, ReviewKind } from './types'
 
-export type Mail = { subject: string; body: string }
+export type Mail = { subject: string; body: string; vars?: Record<string, string> }
 
 const kindWord = (kind: ReviewKind) => (kind === 'confirmation' ? 'confirmation' : 'appraisal')
 
@@ -36,14 +36,24 @@ export function selfInvite(o: {
   maxPeers: number
 }): Mail {
   const word = kindWord(o.kind)
+  const peerRange = o.minPeers === o.maxPeers ? `${o.minPeers}` : `${o.minPeers} to ${o.maxPeers}`
+  const dueClause = due(o.dueOn)
   return {
     subject: `Your ${word} review is due — self-reflection and peer nominations`,
     body: wrap([
       `Hi ${escapeHtml(o.name)},`,
-      `Your ${word} review is due now. Please fill in your self-reflection form, and nominate ${o.minPeers === o.maxPeers ? o.minPeers : `${o.minPeers} to ${o.maxPeers}`} colleagues who know your work to give peer feedback.${due(o.dueOn)}`,
+      `Your ${word} review is due now. Please fill in your self-reflection form, and nominate ${peerRange} colleagues who know your work to give peer feedback.${dueClause}`,
       `Your peers are asked for their feedback as soon as you submit. Your manager is filling in their own review at the same time.`,
       link(o.url, 'Open my review'),
     ]),
+    vars: {
+      recipient_name: o.name,
+      employee_name: o.name,
+      peer_range: peerRange,
+      due_date: o.dueOn ?? '',
+      due_clause: dueClause,
+      review_url: o.url,
+    },
   }
 }
 
@@ -58,24 +68,34 @@ export function reviewerInvite(o: {
 }): Mail {
   const word = kindWord(o.kind)
   const subject = escapeHtml(o.subjectName)
+  const dueClause = due(o.dueOn)
+  const vars = {
+    recipient_name: o.name,
+    employee_name: o.subjectName,
+    due_date: o.dueOn ?? '',
+    due_clause: dueClause,
+    review_url: o.url,
+  }
   return o.role === 'peer'
     ? {
         subject: `${o.subjectName} has nominated you for peer feedback`,
         body: wrap([
           `Hi ${escapeHtml(o.name)},`,
-          `${subject} has nominated you to give peer feedback for their ${word} review.${due(o.dueOn)}`,
+          `${subject} has nominated you to give peer feedback for their ${word} review.${dueClause}`,
           `Your answers go to their manager and PnC without your name. ${subject} does not see them.`,
           link(o.url, 'Give feedback'),
         ]),
+        vars,
       }
     : {
         subject: `${o.subjectName}'s ${word} review: your manager review`,
         body: wrap([
           `Hi ${escapeHtml(o.name)},`,
-          `${subject}'s ${word} review has started. Please fill in your manager review.${due(o.dueOn)}`,
+          `${subject}'s ${word} review has started. Please fill in your manager review.${dueClause}`,
           `You will see their self-reflection and their peers' feedback in My Reviews as it comes in, and PnC will set up a meeting with the two of you once enough is in.`,
           link(o.url, 'Fill in the manager review'),
         ]),
+        vars,
       }
 }
 
@@ -89,6 +109,7 @@ export function reminder(o: {
   dueOn: string | null
 }): Mail {
   const word = kindWord(o.kind)
+  const dueClause = due(o.dueOn)
   const what =
     o.role === 'self'
       ? `your self-reflection for your ${word} review`
@@ -104,9 +125,16 @@ export function reminder(o: {
           : `Reminder: manager review for ${o.subjectName}`,
     body: wrap([
       `Hi ${escapeHtml(o.name)},`,
-      `A reminder that ${what} is still waiting on you.${due(o.dueOn)}`,
+      `A reminder that ${what} is still waiting on you.${dueClause}`,
       link(o.url, 'Open it now'),
     ]),
+    vars: {
+      recipient_name: o.name,
+      employee_name: o.subjectName,
+      due_date: o.dueOn ?? '',
+      due_clause: dueClause,
+      review_url: o.url,
+    },
   }
 }
 
@@ -127,13 +155,29 @@ export function escalation(o: {
       : o.role === 'manager'
         ? `${escapeHtml(o.respondentName)}, ${subject}'s manager, has not filled in the manager review`
         : `${escapeHtml(o.respondentName)} has not given peer feedback for ${subject}`
+  const whoPlain =
+    o.role === 'self'
+      ? `${o.subjectName} has not filled in their own self-reflection`
+      : o.role === 'manager'
+        ? `${o.respondentName}, ${o.subjectName}'s manager, has not filled in the manager review`
+        : `${o.respondentName} has not given peer feedback for ${o.subjectName}`
+  const reminderWord = o.reminders === 1 ? 'reminder' : 'reminders'
   return {
     subject: `Needs PnC: ${o.subjectName}'s ${word} review is stuck`,
     body: wrap([
-      `${who}, after ${o.reminders} ${o.reminders === 1 ? 'reminder' : 'reminders'}.`,
+      `${who}, after ${o.reminders} ${reminderWord}.`,
       `No more automatic reminders will go to them. You can follow up, send a reminder yourself, or adjust the reviewers from the cycle page.`,
       link(o.url, 'Open the review cycle'),
     ]),
+    vars: {
+      employee_name: o.subjectName,
+      respondent_name: o.respondentName,
+      review_kind: word,
+      stuck_summary: whoPlain,
+      reminder_count: String(o.reminders),
+      reminder_word: reminderWord,
+      review_url: o.url,
+    },
   }
 }
 
@@ -148,6 +192,7 @@ export function readyForMeeting(o: {
   url: string
 }): Mail {
   const word = kindWord(o.kind)
+  const managerPossessive = o.managerName ? `${o.managerName}'s` : 'the'
   return {
     subject: `Ready for meeting: ${o.subjectName}'s ${word} review`,
     body: wrap([
@@ -155,6 +200,16 @@ export function readyForMeeting(o: {
       escapeHtml(o.meetingNote),
       link(o.url, 'Open the review cycle'),
     ]),
+    vars: {
+      employee_name: o.subjectName,
+      manager_name: o.managerName ?? '',
+      manager_possessive: managerPossessive,
+      review_kind: word,
+      peers_done: String(o.peersDone),
+      peers_asked: String(o.peersAsked),
+      meeting_note: o.meetingNote,
+      review_url: o.url,
+    },
   }
 }
 
@@ -167,13 +222,24 @@ export function meetingInvite(o: {
   url: string
 }): Mail {
   const word = kindWord(o.kind)
+  const kindTitle = o.kind === 'confirmation' ? 'Confirmation' : 'Appraisal'
+  const managerLabel = o.managerName ? o.managerName : 'their manager'
   return {
-    subject: `${o.kind === 'confirmation' ? 'Confirmation' : 'Appraisal'} review meeting: ${o.subjectName}`,
+    subject: `${kindTitle} review meeting: ${o.subjectName}`,
     body: wrap([
       `A ${word} review meeting for ${escapeHtml(o.subjectName)} with ${o.managerName ? escapeHtml(o.managerName) : 'their manager'} and PnC is set for <strong>${escapeHtml(o.when)}</strong>.`,
       `The calendar invitation is attached. After the meeting the manager records the decision on the platform.`,
       link(o.url, 'Open the review'),
     ]),
+    vars: {
+      employee_name: o.subjectName,
+      manager_name: o.managerName ?? '',
+      manager_label: managerLabel,
+      review_kind: word,
+      review_kind_title: kindTitle,
+      meeting_when: o.when,
+      review_url: o.url,
+    },
   }
 }
 
@@ -187,6 +253,13 @@ export function decisionRecorded(o: { kind: ReviewKind; subjectName: string; man
       `It is waiting for PnC to review and close.`,
       link(o.url, 'Review the decision'),
     ]),
+    vars: {
+      employee_name: o.subjectName,
+      manager_name: o.managerName,
+      review_kind: word,
+      decision: o.decision,
+      review_url: o.url,
+    },
   }
 }
 
@@ -200,5 +273,11 @@ export function decisionReturned(o: { kind: ReviewKind; managerName: string; sub
       `PnC has sent your decision on ${escapeHtml(o.subjectName)}'s ${word} review back to you with a note. Please read it and record the decision again.`,
       link(o.url, 'Open the review'),
     ]),
+    vars: {
+      employee_name: o.subjectName,
+      manager_name: o.managerName,
+      review_kind: word,
+      review_url: o.url,
+    },
   }
 }

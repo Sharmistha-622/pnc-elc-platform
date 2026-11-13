@@ -123,6 +123,16 @@ settings: privacy is P&C's own process. `src/lib/dpdp/access.ts` holds the
 write checks (`privacyEditRefusal`, `retentionModeRefusal`), and the database
 repeats them (`202611071010_dpdp_settings.sql`).
 
+## Team charts
+
+Two screens draw people in their teams. Both show general data only: name,
+designation, team, photo and, where allowed, work email.
+
+| Feature | Roles | Reaches |
+|---|---|---|
+| `myTeam` | every staff role | **My Team** (`/my-team`): the viewer and everyone below them in the reporting line, at any depth, read from `public.directory`. An indirect report's email (and so their photo) is not shown: the directory gives an email only to the person, their manager and their direct reports |
+| `orgChart` | Super Admin, PnC Admin | **Org Chart** (`/org-chart`): everyone active in the organisation, read from `employees`, which RLS already opens to both roles in full |
+
 ## Granting
 
 - **Super Admin grants every sensitive role.** Exec View and Platform Admin

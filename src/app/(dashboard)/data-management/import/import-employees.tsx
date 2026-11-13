@@ -9,8 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageBanner } from "@/components/shared/page-banner";
-import { IMPORT_COLUMNS, IMPORT_TEMPLATE_CSV, type ImportPlan, type RowPlan } from "@/lib/employees/import";
-import { previewEmployeeImport, runEmployeeImport } from "@/lib/employees/importActions";
+import {
+  IMPORT_COLUMNS,
+  IMPORT_TEMPLATE_CSV,
+  MAX_IMPORT_FILE_BYTES,
+  type ImportPlan,
+  type RowPlan,
+} from "@/lib/employees/import";
+import {
+  previewEmployeeImport,
+  runEmployeeImport,
+  type ImportFileInput,
+} from "@/lib/employees/importActions";
 
 const ACTION_LABEL: Record<RowPlan["action"], string> = {
   create: "New",
@@ -28,9 +38,19 @@ const ACTION_CLASS: Record<RowPlan["action"], string> = {
 
 type Filter = "all" | RowPlan["action"] | "warnings";
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
   const [fileName, setFileName] = useState<string | null>(null);
-  const [csvText, setCsvText] = useState<string>("");
+  const [filePayload, setFilePayload] = useState<ImportFileInput | null>(null);
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [busy, setBusy] = useState<"checking" | "importing" | null>(null);
   const [result, setResult] = useState<{ created: number; updated: number; unchanged: number } | null>(null);
@@ -48,10 +68,10 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
     URL.revokeObjectURL(url);
   };
 
-  const check = async (text: string) => {
+  const check = async (payload: ImportFileInput) => {
     setBusy("checking");
     try {
-      const res = await previewEmployeeImport(text);
+      const res = await previewEmployeeImport(payload);
       if (!res.ok) {
         setPlan(null);
         toast.error(res.error);
@@ -70,22 +90,39 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
     const selected = e.target.files?.[0];
     e.target.value = "";
     if (!selected) return;
-    if (!/\.csv$/i.test(selected.name)) {
-      toast.error("Upload a .csv file. In Excel or Google Sheets: File → Download / Save as → CSV.");
+    if (!/\.(csv|xlsx)$/i.test(selected.name)) {
+      toast.error("Upload a .csv or .xlsx file.");
       return;
     }
-    const text = await selected.text();
+    if (selected.size > MAX_IMPORT_FILE_BYTES) {
+      toast.error("The file is too large (maximum 5 MB).");
+      return;
+    }
+
+    const isXlsx = /\.xlsx$/i.test(selected.name);
+    const payload: ImportFileInput = isXlsx
+      ? {
+          fileName: selected.name,
+          xlsxBase64: arrayBufferToBase64(await selected.arrayBuffer()),
+          byteLength: selected.size,
+        }
+      : {
+          fileName: selected.name,
+          csvText: await selected.text(),
+          byteLength: selected.size,
+        };
+
     setResult(null);
     setFileName(selected.name);
-    setCsvText(text);
-    await check(text);
+    setFilePayload(payload);
+    await check(payload);
   };
 
   const runImport = async () => {
-    if (!plan?.canImport) return;
+    if (!plan?.canImport || !filePayload) return;
     setBusy("importing");
     try {
-      const res = await runEmployeeImport(csvText);
+      const res = await runEmployeeImport(filePayload);
       if (!res.ok) {
         if (res.plan) setPlan(res.plan);
         toast.error(res.error);
@@ -95,7 +132,7 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
       toast.success(`${res.created} added, ${res.updated} updated.`);
       if (res.warning) toast.warning(res.warning);
       // Show the directory as it now stands: every row should read "No change".
-      await check(csvText);
+      await check(filePayload);
     } catch {
       toast.error("The import did not finish. Upload the same file again to see what is in.");
     } finally {
@@ -112,7 +149,7 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-200">
       <PageBanner
         title="Import Employee Data"
-        description="Add people to the directory, or update them, from a CSV. Everything is checked before anything is saved."
+        description="Add people to the directory, or update them, from a CSV or XLSX spreadsheet. Everything is checked before anything is saved."
         icon={<FileUp className="h-8 w-8 text-teal-700 dark:text-teal-300" />}
         actions={
           <div className="flex items-center gap-2">
@@ -161,15 +198,22 @@ export function ImportEmployees({ mayImport }: { mayImport: boolean }) {
             </p>
 
             <div className="border border-dashed rounded-lg p-6 text-center border-border hover:border-indigo-400 transition-colors">
-              <input type="file" id="employee-file-input" accept=".csv,text/csv" onChange={onFile} disabled={busy !== null} className="hidden" />
+              <input
+                type="file"
+                id="employee-file-input"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={onFile}
+                disabled={busy !== null}
+                className="hidden"
+              />
               <label htmlFor="employee-file-input" className="cursor-pointer block">
                 {busy === "checking" ? (
                   <Loader2 className="h-8 w-8 mx-auto text-indigo-700 dark:text-indigo-300 mb-2 animate-spin" />
                 ) : (
                   <FileUp className="h-8 w-8 mx-auto text-indigo-700 dark:text-indigo-300 mb-2" />
                 )}
-                <span className="text-sm font-semibold text-foreground">{fileName ?? "Choose a CSV file"}</span>
-                <p className="text-xs text-muted-foreground mt-1">From Excel or Google Sheets: File → Download / Save as → CSV.</p>
+                <span className="text-sm font-semibold text-foreground">{fileName ?? "Choose a CSV or XLSX file"}</span>
+                <p className="text-xs text-muted-foreground mt-1">Accepts .csv or .xlsx workbooks (up to 5 MB).</p>
               </label>
             </div>
           </Card>

@@ -32,6 +32,7 @@ import {
   Radio,
   Loader2,
   IndianRupee,
+  UserX,
 } from 'lucide-react';
 import { AnnexureTable } from '@/components/onboarding/annexure-table';
 import { PageBanner } from '@/components/shared/page-banner';
@@ -48,10 +49,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { displayMaskedNumber } from '@/lib/vault/sealing';
+import { canWithdrawRecord } from '@/lib/onboarding/candidate-list';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FullOnboardingData, OnboardingStatus } from '@/lib/onboarding/types';
+import { evaluateOnboardingApprovalChecks } from '@/lib/onboarding/approval-checks';
 import { toast } from 'sonner';
 
 export default function OnboardingReviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -96,6 +99,10 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
 
   // Provisioning Dialog State
   const [provisionDialogOpen, setProvisionDialogOpen] = useState(false);
+
+  // Withdraw Candidate Dialog State
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState('');
 
   const fetchData = async () => {
     try {
@@ -259,6 +266,8 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
       if (json.success) {
         toast.success(`Onboarding status updated to ${newStatus.replace('_', ' ').toUpperCase()}`);
         fetchData();
+      } else {
+        toast.error(json.error || 'Failed to update status');
       }
     } catch (err) {
       toast.error('Failed to update status');
@@ -293,6 +302,37 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const handleWithdrawCandidate = async () => {
+    if (!data) return;
+    const reason = withdrawReason.trim();
+    if (!reason) {
+      toast.error('Please enter a withdrawal reason');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const res = await fetch(`/api/onboarding/${data.record.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', reason }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`${data.record.candidate_name} marked as withdrawn`);
+        setWithdrawDialogOpen(false);
+        setWithdrawReason('');
+        fetchData();
+      } else {
+        toast.error(json.error || 'Failed to withdraw candidate');
+      }
+    } catch {
+      toast.error('Failed to withdraw candidate');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className="flex flex-1 items-center justify-center p-12 text-muted-foreground text-sm font-medium">
@@ -306,13 +346,21 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
   const offerDoc = generatedDocuments.find((d) => d.document_type === 'offer_letter');
   const apptDoc = generatedDocuments.find((d) => d.document_type === 'appointment_letter');
 
-  const isPersonalComplete = !!personalDetails?.full_name && !!personalDetails?.permanent_address;
-  const isEmploymentConfirmed = !!employmentDetails?.candidate_confirmed;
+  const approvalReadiness = evaluateOnboardingApprovalChecks({
+    personalDetails,
+    employmentDetails,
+    documents,
+    policies,
+    generatedDocuments,
+  });
+
+  const isPersonalComplete = approvalReadiness.checks.find((c) => c.key === 'personal')?.passed ?? false;
+  const isEmploymentConfirmed = approvalReadiness.checks.find((c) => c.key === 'employment')?.passed ?? false;
+  const areDocumentsVerified = approvalReadiness.checks.find((c) => c.key === 'documents')?.passed ?? false;
   const verifiedDocsCount = documents.filter((d) => d.status === 'verified').length;
-  const totalUploadedDocs = documents.filter((d) => ['uploaded', 'verified'].includes(d.status)).length;
-  const arePoliciesComplete = policies.filter((p) => p.status === 'completed').length >= 4;
-  const isOfferSigned = offerDoc?.status === 'signed';
-  const isApptSigned = apptDoc?.status === 'signed';
+  const arePoliciesComplete = approvalReadiness.checks.find((c) => c.key === 'policies')?.passed ?? false;
+  const isOfferSigned = approvalReadiness.checks.find((c) => c.key === 'offer_letter')?.passed ?? false;
+  const isApptSigned = approvalReadiness.checks.find((c) => c.key === 'appointment_letter')?.passed ?? false;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
@@ -389,7 +437,12 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
                 <Button
                   size="sm"
                   onClick={() => handleStatusUpdate('approved', 'P&C verified all documents and approved the onboarding dossier.')}
-                  disabled={actionLoading}
+                  disabled={actionLoading || !approvalReadiness.canApprove}
+                  title={
+                    !approvalReadiness.canApprove
+                      ? `Cannot approve until all checks pass: ${approvalReadiness.failingChecks.join(', ')}`
+                      : undefined
+                  }
                   className="gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-xs"
                 >
                   <CheckCircle2 className="size-3.5" />
@@ -416,6 +469,27 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
                 <span>Official Account Active ({provisioning?.official_email || 'Provisioned'})</span>
               </div>
             )}
+
+            {record.joiner_status === 'withdrawn' ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+                <UserX className="size-3.5" />
+                <span>Withdrawn</span>
+              </div>
+            ) : canWithdrawRecord(record.joiner_status) ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setWithdrawReason('');
+                  setWithdrawDialogOpen(true);
+                }}
+                disabled={actionLoading}
+                className="gap-1.5 text-xs text-rose-700 dark:text-rose-300 border-rose-500/30 hover:bg-rose-500/10 rounded-lg font-semibold"
+              >
+                <UserX className="size-3.5" />
+                <span>Withdraw Candidate</span>
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -1104,7 +1178,7 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
                 <div className="p-4 rounded-xl border border-border/80 bg-muted/10 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-foreground">3. Document Dossier</span>
-                    {verifiedDocsCount >= 3 ? (
+                    {areDocumentsVerified ? (
                       <CheckCircle2 className="size-4 text-emerald-700 dark:text-emerald-300" />
                     ) : (
                       <AlertCircle className="size-4 text-amber-700 dark:text-amber-300" />
@@ -1162,14 +1236,26 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
               </div>
             </CardContent>
             <CardFooter className="pt-4 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-muted-foreground">
-                Current Lifecycle State: <span className="font-bold text-foreground capitalize">{record.status.replace('_', ' ')}</span>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">
+                  Current Lifecycle State: <span className="font-bold text-foreground capitalize">{record.status.replace('_', ' ')}</span>
+                </div>
+                {record.status !== 'completed' && record.status !== 'approved' && !approvalReadiness.canApprove && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                    Cannot approve yet — failing checks: {approvalReadiness.failingChecks.join(', ')}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {record.status !== 'completed' && record.status !== 'approved' && (
                   <Button
                     onClick={() => handleStatusUpdate('approved', 'P&C completed final review and approved onboarding dossier.')}
-                    disabled={actionLoading}
+                    disabled={actionLoading || !approvalReadiness.canApprove}
+                    title={
+                      !approvalReadiness.canApprove
+                        ? `Cannot approve until all checks pass: ${approvalReadiness.failingChecks.join(', ')}`
+                        : undefined
+                    }
                     className="gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs rounded-lg shadow-sm"
                   >
                     <CheckCircle2 className="size-4" />
@@ -1445,6 +1531,64 @@ export default function OnboardingReviewPage({ params }: { params: Promise<{ id:
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg"
             >
               Confirm & Provision Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Candidate Confirmation Dialog */}
+      <Dialog
+        open={withdrawDialogOpen}
+        onOpenChange={(open) => {
+          setWithdrawDialogOpen(open);
+          if (!open) setWithdrawReason('');
+        }}
+      >
+        <DialogContent className="sm:max-w-md rounded-2xl border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-700 dark:text-rose-300">
+              <UserX className="size-4" />
+              Withdraw Candidate
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Withdraw <strong>{record.candidate_name}</strong> from the onboarding pipeline. Their portal link stops working immediately and the hold period for purging unsealed documents starts.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="review_withdraw_reason" className="text-xs font-semibold">
+              Reason for withdrawal <span className="text-rose-700 dark:text-rose-300">*</span>
+            </Label>
+            <Textarea
+              id="review_withdraw_reason"
+              rows={4}
+              placeholder="e.g. Candidate declined the offer or did not join on the agreed date."
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+              className="text-xs rounded-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setWithdrawDialogOpen(false);
+                setWithdrawReason('');
+              }}
+              className="text-xs rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={actionLoading || !withdrawReason.trim()}
+              onClick={handleWithdrawCandidate}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg gap-1.5"
+            >
+              {actionLoading ? <Loader2 className="size-3.5 animate-spin" /> : <UserX className="size-3.5" />}
+              <span>Confirm Withdrawal</span>
             </Button>
           </DialogFooter>
         </DialogContent>

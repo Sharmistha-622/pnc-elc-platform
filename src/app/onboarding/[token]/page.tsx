@@ -44,7 +44,12 @@ import {
   GENERATED_DOCUMENT_LABELS,
   type GeneratedDocumentType,
   type OnboardingGeneratedDocument,
+  type SignatureMethod,
 } from '@/lib/onboarding/types';
+import {
+  MAX_SIGNATURE_DATA_URL_BYTES,
+  validateSignatureImageFile,
+} from '@/lib/onboarding/signature-metadata';
 import { toast } from 'sonner';
 import { PersonalDetailsStep } from './_components/personal-details-step';
 import { NoticeStep } from './_components/notice-step';
@@ -93,10 +98,14 @@ export default function CandidateOnboardingPortalPage({
   const [employmentCorrection, setEmploymentCorrection] = useState('');
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
 
-  // Canvas Signature Pad State
+  // Canvas Signature Pad & Upload State
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const signatureFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [signatureMethod, setSignatureMethod] = useState<SignatureMethod>('draw');
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
+  const [uploadedSignatureUrl, setUploadedSignatureUrl] = useState<string | null>(null);
+  const [uploadedSignatureName, setUploadedSignatureName] = useState<string | null>(null);
   const [signingDoc, setSigningDoc] = useState<{
     type: GeneratedDocumentType;
     name: string;
@@ -194,6 +203,71 @@ export default function CandidateOnboardingPortalPage({
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
+  };
+
+  const clearUploadedSignature = () => {
+    setUploadedSignatureUrl(null);
+    setUploadedSignatureName(null);
+    if (signatureFileInputRef.current) {
+      signatureFileInputRef.current.value = '';
+    }
+  };
+
+  const handleSignatureImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateSignatureImageFile(file);
+    if (!validation.ok) {
+      toast.error(validation.error);
+      e.target.value = '';
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('Could not read signature image.'));
+        element.src = objectUrl;
+      });
+
+      let maxW = 500;
+      let maxH = 160;
+      let dataUrl = '';
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const scale = Math.min(1, maxW / (img.naturalWidth || 1), maxH / (img.naturalHeight || 1));
+        const width = Math.max(1, Math.round((img.naturalWidth || maxW) * scale));
+        const height = Math.max(1, Math.round((img.naturalHeight || maxH) * scale));
+        const offscreen = document.createElement('canvas');
+        offscreen.width = width;
+        offscreen.height = height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Could not initialize image canvas.');
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        dataUrl = offscreen.toDataURL('image/png');
+        if (dataUrl.length <= MAX_SIGNATURE_DATA_URL_BYTES) break;
+        maxW = Math.round(maxW * 0.75);
+        maxH = Math.round(maxH * 0.75);
+      }
+
+      if (!dataUrl || dataUrl.length > MAX_SIGNATURE_DATA_URL_BYTES) {
+        toast.error('Converted PNG signature exceeds 300 KB. Please choose a simpler or smaller image.');
+        e.target.value = '';
+        return;
+      }
+
+      setUploadedSignatureUrl(dataUrl);
+      setUploadedSignatureName(file.name);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not process signature image');
+      e.target.value = '';
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
   };
 
   const handleConfirmEmployment = async (confirmed: boolean, notes?: string) => {
@@ -303,13 +377,21 @@ export default function CandidateOnboardingPortalPage({
       return;
     }
 
-    if (!hasDrawn) {
-      toast.error('Please draw your signature in the signature box');
-      return;
+    let signatureDataUrl: string | null = null;
+    if (signatureMethod === 'upload') {
+      if (!uploadedSignatureUrl) {
+        toast.error('Please upload an image of your signature');
+        return;
+      }
+      signatureDataUrl = uploadedSignatureUrl;
+    } else {
+      if (!hasDrawn) {
+        toast.error('Please draw your signature in the signature box');
+        return;
+      }
+      const canvas = canvasRef.current;
+      signatureDataUrl = canvas ? canvas.toDataURL('image/png') : null;
     }
-
-    const canvas = canvasRef.current;
-    const signatureDataUrl = canvas ? canvas.toDataURL('image/png') : null;
 
     try {
       setSaving(true);
@@ -321,6 +403,7 @@ export default function CandidateOnboardingPortalPage({
           document_type: signingDoc.type,
           signer_name: signerFullName,
           signature_data_url: signatureDataUrl,
+          method: signatureMethod,
         }),
       });
       const json = await res.json();
@@ -330,6 +413,7 @@ export default function CandidateOnboardingPortalPage({
         setSigningDoc(null);
         setSignConsent(false);
         setHasDrawn(false);
+        clearUploadedSignature();
       }
     } catch (err) {
       toast.error('Failed to sign document');
@@ -1105,49 +1189,120 @@ export default function CandidateOnboardingPortalPage({
 
             {/* Interactive Signature Box & Metadata Panel */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Signature Canvas Box */}
+              {/* Signature Canvas or Upload Box */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <PenTool className="size-3.5 text-indigo-700 dark:text-indigo-300" />
-                    <span>Draw Your Signature in the Box Below:</span>
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearCanvas}
-                    className="h-7 text-xs text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 gap-1 rounded-lg"
-                  >
-                    <Eraser className="size-3.5" />
-                    <span>Clear Signature</span>
-                  </Button>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="inline-flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSignatureMethod('draw')}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                        signatureMethod === 'draw'
+                          ? 'bg-background text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <PenTool className="size-3.5" />
+                      <span>Draw</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignatureMethod('upload')}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                        signatureMethod === 'upload'
+                          ? 'bg-background text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Upload className="size-3.5" />
+                      <span>Upload image</span>
+                    </button>
+                  </div>
+
+                  {signatureMethod === 'draw' ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearCanvas}
+                      className="h-7 text-xs text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 gap-1 rounded-lg"
+                    >
+                      <Eraser className="size-3.5" />
+                      <span>Clear Signature</span>
+                    </Button>
+                  ) : uploadedSignatureUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearUploadedSignature}
+                      className="h-7 text-xs text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 gap-1 rounded-lg"
+                    >
+                      <Eraser className="size-3.5" />
+                      <span>Clear Image</span>
+                    </Button>
+                  ) : null}
                 </div>
 
-                <div className="relative border-2 border-dashed border-indigo-400/80 rounded-lg bg-muted/30 p-2 shadow-inner">
-                  <canvas
-                    ref={canvasRef}
-                    width={500}
-                    height={160}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                    className="w-full h-40 bg-transparent cursor-crosshair touch-none"
-                  />
-                  {!hasDrawn && (
-                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-muted-foreground/60 text-xs">
-                      <PenTool className="size-6 mb-1 opacity-40" />
-                      <span>Draw signature using mouse, trackpad, or finger</span>
+                {signatureMethod === 'draw' ? (
+                  <div className="relative border-2 border-dashed border-indigo-400/80 rounded-lg bg-muted/30 p-2 shadow-inner">
+                    <canvas
+                      ref={canvasRef}
+                      width={500}
+                      height={160}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-40 bg-transparent cursor-crosshair touch-none"
+                    />
+                    {!hasDrawn && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-muted-foreground/60 text-xs">
+                        <PenTool className="size-6 mb-1 opacity-40" />
+                        <span>Draw signature using mouse, trackpad, or finger</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 right-3 text-[10px] font-mono text-muted-foreground pointer-events-none">
+                      [Sign Box]
                     </div>
-                  )}
-                  <div className="absolute bottom-2 right-3 text-[10px] font-mono text-muted-foreground pointer-events-none">
-                    [Sign Box]
                   </div>
-                </div>
+                ) : (
+                  <div className="relative border-2 border-dashed border-indigo-400/80 rounded-lg bg-muted/30 p-4 shadow-inner h-44 flex flex-col items-center justify-center gap-2">
+                    <input
+                      ref={signatureFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                      onChange={handleSignatureImageUpload}
+                      className="hidden"
+                      id="signature-image-upload"
+                    />
+                    {uploadedSignatureUrl ? (
+                      <div className="flex flex-col items-center gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={uploadedSignatureUrl}
+                          alt="Uploaded signature preview"
+                          className="max-h-24 object-contain"
+                        />
+                        <span className="text-[11px] text-muted-foreground truncate max-w-xs">
+                          {uploadedSignatureName}
+                        </span>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="signature-image-upload"
+                        className="flex flex-col items-center justify-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <Upload className="size-6 opacity-60" />
+                        <span className="font-semibold text-foreground">Choose signature image (PNG or JPG, up to 1 MB)</span>
+                        <span className="text-[11px]">Converted in your browser to a compact PNG</span>
+                      </label>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Signer Legal Full Name</Label>
@@ -1170,7 +1325,9 @@ export default function CandidateOnboardingPortalPage({
                   <div className="space-y-2 text-[11px] font-mono text-muted-foreground divide-y divide-border/40">
                     <div className="flex justify-between pt-1">
                       <span>Capture Method:</span>
-                      <span className="text-foreground">HTML5 Canvas Direct Stroke</span>
+                      <span className="text-foreground">
+                        {signatureMethod === 'upload' ? 'Uploaded Image (PNG)' : 'HTML5 Canvas Direct Stroke'}
+                      </span>
                     </div>
                     <div className="flex justify-between pt-1">
                       <span>Timestamp (UTC):</span>
@@ -1211,7 +1368,12 @@ export default function CandidateOnboardingPortalPage({
             <Button
               size="sm"
               onClick={handleSignDocument}
-              disabled={saving || !signConsent || !signerFullName.trim() || !hasDrawn}
+              disabled={
+                saving ||
+                !signConsent ||
+                !signerFullName.trim() ||
+                (signatureMethod === 'draw' ? !hasDrawn : !uploadedSignatureUrl)
+              }
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5 rounded-lg"
             >
               <CheckCircle2 className="size-4" />

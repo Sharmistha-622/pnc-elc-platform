@@ -18,19 +18,29 @@ import {
   Calendar,
   Sparkles,
   FileCheck2,
-  FileText,
   History,
-  Briefcase,
   MoreVertical,
   ArrowLeft,
+  UserX,
+  Loader2,
 } from 'lucide-react';
 import { PageBanner } from '@/components/shared/page-banner';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -52,6 +62,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  buildTeamFilterOptions,
+  canWithdrawRecord,
+  type DepartmentFilterItem,
+} from '@/lib/onboarding/candidate-list';
 import { OnboardingRecord, OnboardingStatus } from '@/lib/onboarding/types';
 import { toast } from 'sonner';
 
@@ -129,12 +144,16 @@ function CandidateOnboardingContent() {
   const initialStatusParam = searchParams.get('status') || 'all';
 
   const [records, setRecords] = useState<OnboardingRecord[]>([]);
+  const [departments, setDepartments] = useState<DepartmentFilterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusParam);
   const [teamFilter, setTeamFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [withdrawingRecord, setWithdrawingRecord] = useState<OnboardingRecord | null>(null);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
 
   const fetchRecords = async () => {
     try {
@@ -155,7 +174,17 @@ function CandidateOnboardingContent() {
 
   useEffect(() => {
     fetchRecords();
+    fetch('/api/departments?includeArchived=false')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setDepartments(json.data);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const teamOptions = buildTeamFilterOptions(departments);
 
   useEffect(() => {
     if (searchParams.get('status')) {
@@ -184,6 +213,37 @@ function CandidateOnboardingContent() {
       }
     } catch (err) {
       toast.error('Network error sending invitation');
+    }
+  };
+
+  const handleConfirmWithdraw = async () => {
+    if (!withdrawingRecord) return;
+    const reason = withdrawReason.trim();
+    if (!reason) {
+      toast.error('Please enter a withdrawal reason');
+      return;
+    }
+
+    try {
+      setWithdrawSubmitting(true);
+      const res = await fetch(`/api/onboarding/${withdrawingRecord.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', reason }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`${withdrawingRecord.candidate_name} marked as withdrawn`);
+        setWithdrawingRecord(null);
+        setWithdrawReason('');
+        fetchRecords();
+      } else {
+        toast.error(json.error || 'Failed to withdraw candidate');
+      }
+    } catch {
+      toast.error('Network error withdrawing candidate');
+    } finally {
+      setWithdrawSubmitting(false);
     }
   };
 
@@ -370,11 +430,11 @@ function CandidateOnboardingContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Teams</SelectItem>
-                <SelectItem value="Engineering">Engineering</SelectItem>
-                <SelectItem value="PnC">PnC</SelectItem>
-                <SelectItem value="Design">Design</SelectItem>
-                <SelectItem value="Operations">Operations</SelectItem>
-                <SelectItem value="Academia">Academia</SelectItem>
+                {teamOptions.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -495,12 +555,19 @@ function CandidateOnboardingContent() {
                       </TableCell>
 
                       <TableCell>
-                        <div
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}
-                        >
-                          <Icon className="h-3 w-3 shrink-0" />
-                          <span>{cfg.label}</span>
-                        </div>
+                        {item.joiner_status === 'withdrawn' ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900">
+                            <UserX className="h-3 w-3 shrink-0" />
+                            <span>Withdrawn</span>
+                          </div>
+                        ) : (
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                          >
+                            <Icon className="h-3 w-3 shrink-0" />
+                            <span>{cfg.label}</span>
+                          </div>
+                        )}
                       </TableCell>
 
                       <TableCell className="text-right">
@@ -519,11 +586,23 @@ function CandidateOnboardingContent() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
                               <DropdownMenuItem
+                                disabled={item.joiner_status === 'withdrawn'}
                                 onClick={() => handleSendInvitation(item.id, item.personal_email)}
                                 className="text-xs cursor-pointer gap-2"
                               >
                                 <Send className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span>{item.invited_at ? 'Resend Invitation Email' : 'Send Invitation Email'}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!canWithdrawRecord(item.joiner_status)}
+                                onClick={() => {
+                                  setWithdrawingRecord(item);
+                                  setWithdrawReason('');
+                                }}
+                                className="text-xs cursor-pointer gap-2 text-rose-700 dark:text-rose-300 focus:text-rose-700 dark:focus:text-rose-300"
+                              >
+                                <UserX className="h-3.5 w-3.5" />
+                                <span>{item.joiner_status === 'withdrawn' ? 'Withdrawn' : 'Withdraw Candidate'}</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -551,6 +630,66 @@ function CandidateOnboardingContent() {
           />
         </div>
       </div>
+
+      {/* Withdraw Candidate Confirmation Dialog */}
+      <Dialog
+        open={!!withdrawingRecord}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWithdrawingRecord(null);
+            setWithdrawReason('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md rounded-2xl border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-700 dark:text-rose-300">
+              <UserX className="size-4" />
+              Withdraw Candidate
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Withdraw <strong>{withdrawingRecord?.candidate_name}</strong> from the onboarding pipeline. Their portal link stops working immediately and the hold period for purging unsealed documents starts.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="withdraw_reason" className="text-xs font-semibold">
+              Reason for withdrawal <span className="text-rose-700 dark:text-rose-300">*</span>
+            </Label>
+            <Textarea
+              id="withdraw_reason"
+              rows={4}
+              placeholder="e.g. Candidate declined the offer or did not join on the agreed date."
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+              className="text-xs rounded-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setWithdrawingRecord(null);
+                setWithdrawReason('');
+              }}
+              className="text-xs rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={withdrawSubmitting || !withdrawReason.trim()}
+              onClick={handleConfirmWithdraw}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg gap-1.5"
+            >
+              {withdrawSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <UserX className="size-3.5" />}
+              <span>Confirm Withdrawal</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

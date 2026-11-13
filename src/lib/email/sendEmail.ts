@@ -18,6 +18,7 @@ import {
   getGoogleWorkspaceAccountsInternal,
   getOAuth2ClientForAccount,
 } from './accounts'
+import { resolveEmailTemplate } from './templates'
 
 /**
  * A value safe to place in a mail header.
@@ -94,10 +95,11 @@ export async function sendEmail(
   data: Record<string, string>,
   recipient: string
 ) {
-  const subject = headerValue(data.subject || `Notification: ${template}`)
+  const resolved = await resolveEmailTemplate(template, data)
+  const subject = headerValue(resolved.subject || data.subject || `Notification: ${template}`)
   const to = headerValue(recipient)
   const cc = data.cc ? headerValue(data.cc) : undefined
-  const htmlBody = data.body || `<p>You have a new notification: ${template}</p>`
+  const htmlBody = resolved.body || data.body || `<p>You have a new notification: ${template}</p>`
   const category = getCategoryFromTemplate(template)
   const notificationType = template
     .replace(/_/g, ' ')
@@ -214,8 +216,15 @@ export async function sendCalendarInvite(opts: {
   html: string
   ics: string
   to: { name: string; email: string }[]
+  vars?: Record<string, string>
 }) {
-  const subject = headerValue(opts.subject)
+  const resolved = await resolveEmailTemplate(opts.template, {
+    ...(opts.vars ?? {}),
+    subject: opts.subject,
+    body: opts.html,
+  })
+  const subject = headerValue(resolved.subject || opts.subject)
+  const htmlBody = resolved.body || opts.html
   const to = opts.to.map((r) => headerValue(r.email)).filter(Boolean)
   if (to.length === 0) return { success: false, error: 'No recipients' }
 
@@ -246,7 +255,7 @@ export async function sendCalendarInvite(opts: {
       `--${boundary}`,
       'Content-Type: text/html; charset=utf-8',
       '',
-      opts.html,
+      htmlBody,
       `--${boundary}`,
       'Content-Type: text/calendar; charset=utf-8; method=REQUEST',
       'Content-Transfer-Encoding: 7bit',

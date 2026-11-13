@@ -11,6 +11,7 @@ export function ConfirmationsStatsCards({ confirmations }: ConfirmationsStatsCar
   const approved = confirmations.filter(
     (c) =>
       c.status.toLowerCase() === "approved" ||
+      c.managerDecision?.toLowerCase() === "confirm" ||
       c.managerDecision?.toLowerCase() === "yes"
   ).length;
 

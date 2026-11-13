@@ -15,6 +15,7 @@ export const IDENTITY_DOCUMENT_TYPES = [
   'address_proof',
   'voter_id',
   'driving_licence',
+  'epf_form_11',
 ] as const
 
 export const BANK_DOCUMENT_TYPES = ['bank_proof'] as const

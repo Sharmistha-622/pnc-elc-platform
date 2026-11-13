@@ -29,32 +29,52 @@ export function contactBlock(c: ContactContext): string {
   return `<hr><p><strong>Questions about your data</strong><br>${who}. We answer a grievance within ${c.grievanceDays} days.</p>${board}`
 }
 
-export function acknowledgmentEmail(r: PrivacyRequestRow, c: ContactContext): { subject: string; body: string } {
+export function acknowledgmentEmail(r: PrivacyRequestRow, c: ContactContext): Record<string, string> & { subject: string; body: string } {
   const kind = REQUEST_LABELS[r.request_type].label.toLowerCase()
+  const receivedDate = fmt(r.received_at)
+  const dueDate = fmt(r.due_at)
+  const contact = contactBlock(c)
   return {
     subject: `We have your request ${r.reference}`,
-    body: `<p>We received your request (${esc(kind)}) on ${fmt(r.received_at)}, reference <strong>${esc(r.reference)}</strong>.</p>`
-      + `<p>We will answer by ${fmt(r.due_at)}. Quote the reference if you write to us about it.</p>`
-      + contactBlock(c),
+    body: `<p>We received your request (${esc(kind)}) on ${receivedDate}, reference <strong>${esc(r.reference)}</strong>.</p>`
+      + `<p>We will answer by ${dueDate}. Quote the reference if you write to us about it.</p>`
+      + contact,
+    reference: r.reference,
+    request_type: kind,
+    received_date: receivedDate,
+    due_date: dueDate,
+    contact_block: contact,
   }
 }
 
-export function answerEmail(r: PrivacyRequestRow, c: ContactContext): { subject: string; body: string } {
+export function answerEmail(r: PrivacyRequestRow, c: ContactContext): Record<string, string> & { subject: string; body: string } {
   const answer = esc(r.answer ?? '').replace(/\n/g, '<br>')
   const kept = r.request_type === 'erasure' && r.statute_cited
     ? `<p>Kept under: ${esc(r.statute_cited)}${r.retain_until ? `, until ${fmt(r.retain_until)}` : ''}.</p>`
     : ''
+  const contact = contactBlock(c)
   return {
     subject: `Answer to your request ${r.reference}`,
-    body: `<p>${answer}</p>${kept}` + contactBlock(c),
+    body: `<p>${answer}</p>${kept}` + contact,
+    reference: r.reference,
+    answer_text: answer,
+    retention_note: kept,
+    contact_block: contact,
   }
 }
 
 /** To the escalation contact: reference, type and due date only. */
-export function escalationEmail(r: PrivacyRequestRow, appUrl: string): { subject: string; body: string } {
+export function escalationEmail(r: PrivacyRequestRow, appUrl: string): Record<string, string> & { subject: string; body: string } {
+  const requestType = REQUEST_LABELS[r.request_type].label
+  const dueDate = fmt(r.due_at)
+  const requestUrl = `${appUrl}/manage/privacy/requests/${r.id}`
   return {
     subject: `Privacy request ${r.reference} is close to its due date`,
-    body: `<p>Request ${esc(r.reference)} (${esc(REQUEST_LABELS[r.request_type].label)}) is due on ${fmt(r.due_at)} and is still open.</p>`
+    body: `<p>Request ${esc(r.reference)} (${esc(requestType)}) is due on ${dueDate} and is still open.</p>`
       + `<p><a href="${esc(appUrl)}/manage/privacy/requests/${esc(r.id)}">Open it in the request queue</a>.</p>`,
+    reference: r.reference,
+    request_type: requestType,
+    due_date: dueDate,
+    request_url: requestUrl,
   }
 }

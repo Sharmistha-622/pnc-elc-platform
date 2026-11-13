@@ -6,9 +6,9 @@ const readScreen = (relPath: string) =>
   readFileSync(resolve(process.cwd(), relPath), 'utf8')
 
 describe('Data Management screens (#159)', () => {
-  it('Import History shows an honest empty state ("Not available yet") and no sample rows', () => {
-    const src = readScreen('src/app/(dashboard)/data-management/import-history/page.tsx')
-    expect(src).toContain('Not available yet')
+  it('Import History shows real batches (or an honest empty state) and no sample rows', () => {
+    const src = readScreen('src/app/(dashboard)/data-management/import-history/import-history-client.tsx')
+    expect(src).toContain('No employee imports have been recorded yet.')
     expect(src).not.toContain('SAMPLE_HISTORY')
     expect(src).not.toContain('@navgurukul.org')
   })

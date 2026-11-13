@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MIN_PEERS_FOR_ANONYMITY, type CycleDetail } from '@/lib/reviews/queries'
 import { PeerReveal } from './peer-reveal'
+import { PeerRatingSummary } from './peer-rating-summary'
 import { KIND_LABELS, ROLE_LABELS, STAGE_LABELS, decisionLabel, type ReviewStage } from '@/lib/reviews/types'
 import { StageBadge } from './stage-badge'
 import { SmartReviewAnswerView } from '@/components/shared/field-answer-view'
@@ -173,6 +174,7 @@ export function CycleDetailView({
   const { rel } = detail
   const selfP = detail.participants.find((p) => p.role === 'self')
   const peers = detail.participants.filter((p) => p.role === 'peer')
+  const peerCount = detail.reviews?.peerCount ?? 0
   const open = ['self_review', 'in_review', 'ready_for_meeting', 'meeting_scheduled'].includes(
     detail.stage
   )
@@ -582,20 +584,24 @@ export function CycleDetailView({
                     <span>Peer reviews</span>
                   </h3>
                   <span className="text-xs text-muted-foreground">
-                    {detail.reviews.peerCount} peers, by question. Answers are not grouped by person.
+                    {detail.reviews.peerCount} peers, by question. Ratings are averaged; answers are not grouped by person.
                   </span>
                 </div>
                 <div className="space-y-6">
                   {detail.reviews.peers.map((q) => (
                     <div key={q.label} className="space-y-2">
                       <label className="text-xs font-semibold text-muted-foreground tracking-tight">{q.label}</label>
-                      <ul className="space-y-2">
-                        {q.answers.map((value, i) => (
-                          <li key={i} className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                            <SmartReviewAnswerView label={q.label} value={value} />
-                          </li>
-                        ))}
-                      </ul>
+                      {q.kind === 'ratings' ? (
+                        <PeerRatingSummary criteria={q.criteria} peerCount={peerCount} />
+                      ) : (
+                        <ul className="space-y-2">
+                          {q.answers.map((value, i) => (
+                            <li key={i} className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                              <SmartReviewAnswerView label={q.label} value={value} />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   ))}
                 </div>
