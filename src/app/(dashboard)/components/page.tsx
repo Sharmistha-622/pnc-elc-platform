@@ -116,7 +116,7 @@ export default function ComponentsShowcasePage() {
               <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">Heading 3</h3>
               <h4 className="scroll-m-20 text-xl font-semibold tracking-tight">Heading 4</h4>
               <p className="leading-7 [&:not(:first-child)]:mt-6">The king, seeing how much happier his subjects were, realized the error of his ways and repealed the joke tax.</p>
-              <blockquote className="mt-6 border-l-2 pl-6 italic">"After all," he said, "everyone enjoys a good joke, so it's only fair that they should pay for the privilege."</blockquote>
+              <blockquote className="mt-6 border-l-2 pl-6 italic">&ldquo;After all,&rdquo; he said, &ldquo;everyone enjoys a good joke, so it&apos;s only fair that they should pay for the privilege.&rdquo;</blockquote>
             </div>
           </div>
 
@@ -222,7 +222,7 @@ export default function ComponentsShowcasePage() {
               <DialogHeader>
                 <DialogTitle>Edit profile</DialogTitle>
                 <DialogDescription>
-                  Make changes to your profile here. Click save when you're done.
+                  Make changes to your profile here. Click save when you&apos;re done.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -377,7 +377,7 @@ export default function ComponentsShowcasePage() {
             <AccordionItem value="item-2">
               <AccordionTrigger>Is it styled?</AccordionTrigger>
               <AccordionContent>
-                Yes. It comes with default styles that matches the other components' aesthetic.
+                Yes. It comes with default styles that matches the other components&apos; aesthetic.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

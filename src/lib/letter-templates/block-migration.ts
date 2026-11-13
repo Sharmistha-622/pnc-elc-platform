@@ -172,13 +172,13 @@ export function migrateHtmlToBlocks(html: string): LetterTemplateDocument {
   const responsibilities: BulletListItem[] = [];
   const clauses: ClauseItem[] = [];
   let acceptanceContent = '';
-  let employerSig = {
+  const employerSig = {
     header: 'For NavGurukul Foundation for Social Welfare',
     signatoryName: '[Authorized Signatory Name]',
     signatoryTitle: '[Authorized Signatory Title]',
     dateText: 'Date: [Offer Letter Date]',
   };
-  let candidateSig = {
+  const candidateSig = {
     header: 'Accepted & Agreed',
     signatoryName: '[Full Name]',
     signatoryTitle: '[Designation]',

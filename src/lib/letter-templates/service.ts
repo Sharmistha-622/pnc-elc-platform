@@ -15,8 +15,8 @@ import { renderBlocksToHtml } from './block-renderer';
 export { populateTemplatePlaceholders };
 
 // In-Memory fallback store populated with realistic seed data
-let MEMORY_TEMPLATES_STORE: Map<string, LetterTemplate> = new Map();
-let MEMORY_CANDIDATE_LETTERS_STORE: Map<string, CandidateLetter> = new Map();
+const MEMORY_TEMPLATES_STORE: Map<string, LetterTemplate> = new Map();
+const MEMORY_CANDIDATE_LETTERS_STORE: Map<string, CandidateLetter> = new Map();
 
 // Sample Consultant Offer Letter Content (exact match from docx sample)
 const CONSULTANT_OFFER_LETTER_CONTENT = `<h1>Consultant Offer Letter</h1>

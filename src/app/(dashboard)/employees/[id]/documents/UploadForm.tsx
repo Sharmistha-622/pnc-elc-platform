@@ -115,7 +115,7 @@ export function UploadForm({
               Upload Employee Document
             </CardTitle>
             <CardDescription className="text-xs">
-              Upload verification records and compliance documents directly to the employee's Google Drive folder
+              Upload verification records and compliance documents directly to the employee&apos;s Google Drive folder
             </CardDescription>
           </div>
         </div>
