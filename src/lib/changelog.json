@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.21.03",
+    "date": "2026-11-13",
+    "title": "Show the team chart before the team-tree migration is applied",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "My Team and Org Chart load, with departments only, on a database that has not had the team-tree update yet."
+      },
+      {
+        "category": "Fixes",
+        "description": "Completing an onboarding no longer fails on a database without the employee designation column."
+      }
+    ]
+  },
+  {
     "version": "2.21.02",
     "date": "2026-11-12",
     "title": "Add XLSX employee import and list imports in Import History",
