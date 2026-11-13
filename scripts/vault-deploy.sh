@@ -14,10 +14,10 @@
 # but the Supabase CLI deploys from <workdir>/supabase/functions. They are
 # copied, with _shared, into a temporary directory laid out that way.
 #
-# Why four functions are deployed with --no-verify-jwt: core calls
-# submit-documents, seal-document, seal-feedback and submit-bank with the shared
+# Why five functions are deployed with --no-verify-jwt: core calls
+# sync-person, submit-documents, seal-document, seal-feedback and submit-bank with the shared
 # x-core-signature header, not a vault login. Supabase's gateway rejects a
-# call without a valid vault JWT before it reaches the code, so those four
+# call without a valid vault JWT before it reaches the code, so those five
 # check the signature themselves. read-salary, read-feedback and approve-bank
 # keep the gateway check: only a signed-in vault user may call them.
 set -euo pipefail
@@ -36,7 +36,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SUPABASE="npx -y supabase@2.20.12"
 URL="https://${REF}.supabase.co"
 SIGNED_IN_ONLY=(read-salary read-feedback approve-bank)
-CALLED_BY_CORE=(submit-documents seal-document seal-feedback submit-bank)
+CALLED_BY_CORE=(sync-person submit-documents seal-document seal-feedback submit-bank)
 
 run() {
   if [ -n "$DRY_RUN" ]; then printf '  would run: %s\n' "$*"; else "$@"; fi

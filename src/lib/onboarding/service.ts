@@ -879,6 +879,22 @@ export async function signGeneratedDocument(
   const next = advanceOnCandidateAction(data.record.status);
   if (next) await touchRecord(id, { status: next });
 
+  if (docType === 'offer_letter' || docType === 'acceptance_letter') {
+    const { isVaultConfigured, syncPersonInVault } = await import('@/lib/vault/client');
+    if (isVaultConfigured()) {
+      try {
+        await syncPersonInVault({
+          coreId: data.record.employee_id || data.record.id,
+          name: data.record.candidate_name,
+          team: data.employmentDetails?.department || null,
+          managerCoreId: data.employmentDetails?.manager_id || null,
+        });
+      } catch (err) {
+        console.warn('[vault] Failed to sync person on offer acceptance:', err);
+      }
+    }
+  }
+
   const label = GENERATED_DOCUMENT_LABELS[docType];
   await logActivity(id, 'candidate', `${label} Signed`, `${signerName} signed the ${label.toLowerCase()}.`);
 
