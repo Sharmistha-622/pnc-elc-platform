@@ -12,12 +12,13 @@ therefore no path that skips the access log.
 |---|---|
 | `read-salary` | logged read: vault role required, logged before the data leaves |
 | `read-feedback` | logged read of *sealed* feedback only — in-flight feedback is still a core read |
+| `sync-person` | one-way copy of a person (core id, name, team, manager) into `people`, idempotent on `core_id` |
 | `submit-documents` | insert-only submission: writes, never reads back |
 | `seal-document` | receives a verified document from core; idempotent on `core_document_id` |
 | `seal-feedback` | receives feedback when its cycle closes; idempotent on `core_feedback_id` |
 | `submit-bank` | bank details from core, insert-only: lands `pending`, returns the last four digits only |
 | `approve-bank` | lists pending bank details (logged), approves or rejects; the rules are in `decide_bank_details` |
-| `_shared/core.ts`, `_shared/bank.ts` | core's signature check; bank-detail checks and masking (plain TypeScript, tested in `src/lib/vault/bank-input.test.ts`) |
+| `_shared/core.ts`, `_shared/bank.ts`, `_shared/person.ts` | core's signature check; bank-detail and person-sync checks (plain TypeScript, tested in `src/lib/vault/`) |
 | `_shared/vault.ts` | role lookup and `logAccess`, which fails closed — a read that cannot be logged does not happen |
 
 See [`docs/vault-setup.md`](../../../docs/vault-setup.md).
