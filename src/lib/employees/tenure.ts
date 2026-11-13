@@ -62,7 +62,7 @@ export function getTenureInMonths(
   const end = endDateStr ? new Date(endDateStr) : new Date();
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
 
-  let years = end.getFullYear() - start.getFullYear();
+  const years = end.getFullYear() - start.getFullYear();
   let months = end.getMonth() - start.getMonth();
   const days = end.getDate() - start.getDate();
   if (days < 0) months -= 1;

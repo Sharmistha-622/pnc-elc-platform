@@ -262,7 +262,7 @@ export function ReportsView({ data }: ReportsViewProps) {
   // Export current tab to CSV
   const handleExportCSV = () => {
     let csvContent = ''
-    let filename = `pnc-report-${activeTab}.csv`
+    const filename = `pnc-report-${activeTab}.csv`
 
     if (activeTab === 'appraisals') {
       csvContent =

@@ -797,7 +797,7 @@ export default function CreateCandidateOnboardingPage() {
                 <div className="text-center py-6 border border-dashed rounded-xl text-xs text-muted-foreground">
                   <p className="font-medium text-foreground">No template loaded yet</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Select a template above and click <strong>"Use Template"</strong> to load and customize the candidate's offer or agreement letter.
+                    Select a template above and click <strong>&ldquo;Use Template&rdquo;</strong> to load and customize the candidate&apos;s offer or agreement letter.
                   </p>
                 </div>
               )}

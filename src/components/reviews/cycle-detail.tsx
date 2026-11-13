@@ -449,7 +449,7 @@ export function CycleDetailView({
           </div>
           {selfP && rel.isSubject && selfP.status !== 'submitted' && peers.length === 0 && (
             <p className="px-5 py-4 text-xs text-muted-foreground border-t border-border/60">
-              You haven't nominated any peer reviewers yet. Use the nomination tool above.
+              You haven&apos;t nominated any peer reviewers yet. Use the nomination tool above.
             </p>
           )}
         </CardContent>
