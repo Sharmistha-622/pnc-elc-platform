@@ -307,7 +307,7 @@ export default async function MyReviewsPage() {
         <div className="space-y-4 pt-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-border/60">
             <div>
-              <h2 className="text-base font-bold text-foreground">Direct Reports' Reviews</h2>
+              <h2 className="text-base font-bold text-foreground">Direct Reports&apos; Reviews</h2>
               <p className="text-xs text-muted-foreground">
                 Reviews for team members reporting to you. Provide manager feedback and finalize outcomes.
               </p>

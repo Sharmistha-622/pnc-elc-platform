@@ -175,7 +175,7 @@ export function UserAuditDialog({
                     {item.reason && (
                       <div className="p-2 rounded-lg bg-background/80 border border-border/60 text-[11px] text-muted-foreground flex items-start gap-1.5">
                         <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                        <span className="italic">"{item.reason}"</span>
+                        <span className="italic">&ldquo;{item.reason}&rdquo;</span>
                       </div>
                     )}
                   </div>

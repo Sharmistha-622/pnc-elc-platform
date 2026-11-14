@@ -454,7 +454,7 @@ export function NotificationSettingsForm({
                         Reviewer Automated Reminders
                       </Label>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Follow up with nominated peers who haven't completed review.
+                        Follow up with nominated peers who haven&apos;t completed review.
                       </p>
                     </div>
                     <Switch

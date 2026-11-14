@@ -1266,7 +1266,7 @@ export function CaseDetailView({ data: initialData }: CaseDetailViewProps) {
                 </CardTitle>
               </div>
               <CardDescription className="text-xs leading-relaxed">
-                <strong>Important Distinction:</strong> An employee reaching their "Last Working Day" does not
+                <strong>Important Distinction:</strong> An employee reaching their &ldquo;Last Working Day&rdquo; does not
                 automatically mean their exit is closed. Final closure confirms all checklists, assets, NDC, and
                 settlement dues are resolved. Closing the case officially transitions the employee status in the
                 primary Directory to <strong>Exited</strong> and establishes their permanent exit record.

@@ -9,15 +9,16 @@ import nextTs from "eslint-config-next/typescript";
 // unused variables. Those rules are warnings for now so the check can run in
 // CI today; correctness rules (the rules of hooks) stay errors. Turn each
 // warning back into an error once its count reaches zero.
-export default [
+const eslintConfig = [
   ...nextVitals,
   ...nextTs,
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
-      "react/no-unescaped-entities": "warn",
-      "prefer-const": "warn",
+      "react/no-unescaped-entities": "error",
+      "prefer-const": "error",
+      "import/no-anonymous-default-export": "error",
       // React Compiler advisories: real, but pre-existing patterns rather
       // than bugs in what they flag today.
       "react-hooks/set-state-in-effect": "warn",
@@ -51,3 +52,5 @@ export default [
     ],
   },
 ];
+
+export default eslintConfig;
