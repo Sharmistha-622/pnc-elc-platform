@@ -36,8 +36,8 @@ Two exceptions are allowed for a limited time, and both are already designed:
 ## Where it lives
 
 **Region: `ap-south-1` (Mumbai).** Payroll requires India-hosted storage, and
-so does the vault. Core is currently in Singapore and must move to Mumbai before
-real payroll data goes live. Neither project should hold real data in another
+so does the vault. Both core (`txtrrlojxznqchanlecx`) and the vault are hosted
+in Mumbai (`ap-south-1`). Neither project should hold real data in another
 region.
 
 ## The inventory

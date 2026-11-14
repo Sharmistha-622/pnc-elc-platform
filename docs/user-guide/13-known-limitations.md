@@ -6,7 +6,7 @@
 > for what has changed since this guide was written.
 
 What isn't finished yet, or behaves differently from what the screen
-suggests, as of version 2.04.00. **Read this before relying on a screen for
+suggests, as of version 2.21.05. **Read this before relying on a screen for
 real work.** Items are grouped by area.
 
 ## General
@@ -67,8 +67,8 @@ real work.** Items are grouped by area.
 
 - **Import Employee Data** has **no undo** (each import accepts CSV or XLSX and
   is listed in *Import History*).
-- **Record History** and the **Rollback Center** are not available yet and show
-  a *"Not available yet"* empty state.
+- **Record History** and the **Rollback Center** are not connected to live
+  history yet and show an empty state until history tracking is wired.
 - **Bulk Upload Users** isn't available.
 
 ## Payroll and vault
