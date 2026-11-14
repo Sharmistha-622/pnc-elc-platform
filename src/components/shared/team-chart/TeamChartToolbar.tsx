@@ -1,6 +1,6 @@
 'use client'
 
-import { Maximize2, Minimize2, Search } from 'lucide-react'
+import { Maximize2, Minimize2, RotateCcw, Search, ZoomIn, ZoomOut } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,12 @@ interface TeamChartToolbarProps {
   onFilterChange: (teamId: string | null) => void
   isFitted: boolean
   onFittedChange: (isFitted: boolean) => void
+  zoom: number
+  minZoom: number
+  maxZoom: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onResetView: () => void
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -47,6 +53,12 @@ export const TeamChartToolbar = ({
   onFilterChange,
   isFitted,
   onFittedChange,
+  zoom,
+  minZoom,
+  maxZoom,
+  onZoomIn,
+  onZoomOut,
+  onResetView,
 }: TeamChartToolbarProps) => {
   const hasQuery = query.trim() !== ''
   const status = !hasQuery ? '' : matchCount === 0 ? 'No matches' : `${activeMatchIndex + 1} of ${matchCount}`
@@ -108,6 +120,47 @@ export const TeamChartToolbar = ({
               ))}
             </SelectContent>
           </Select>
+
+          <div className="hidden items-center gap-1 rounded-md border border-input bg-background px-1 md:inline-flex">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              disabled={!isFitted && zoom <= minZoom}
+              aria-label="Zoom out"
+              title="Zoom out"
+              onClick={onZoomOut}
+            >
+              <ZoomOut className="size-3.5" aria-hidden="true" />
+            </Button>
+            <span className="min-w-10 text-center font-mono text-xs text-muted-foreground tabular-nums">
+              {isFitted ? 'Fit' : `${Math.round(zoom * 100)}%`}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              disabled={!isFitted && zoom >= maxZoom}
+              aria-label="Zoom in"
+              title="Zoom in"
+              onClick={onZoomIn}
+            >
+              <ZoomIn className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label="Reset view"
+              title="Reset view (100%)"
+              onClick={onResetView}
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
 
           <Button
             type="button"
