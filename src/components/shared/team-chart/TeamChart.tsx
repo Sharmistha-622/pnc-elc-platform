@@ -23,6 +23,10 @@ interface TeamChartProps {
 }
 
 const NO_TEAM_ID = '__no-team__'
+const MIN_ZOOM = 0.4
+const MAX_ZOOM = 1.6
+const ZOOM_STEP = 0.1
+const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 10) / 10))
 
 /** People with no team, drawn as one more lane at the end. */
 const noTeamLane = (people: TeamPerson[]): TeamNode => ({
@@ -46,6 +50,8 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
   const [query, setQuery] = useState('')
   const [filterTeamId, setFilterTeamId] = useState<string | null>(null)
   const [isFitted, setFitted] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
   const [activeIndex, setActiveIndex] = useState(0)
   const desktopRef = useRef<HTMLDivElement>(null)
   const mobileRef = useRef<HTMLDivElement>(null)
@@ -143,7 +149,26 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
             setActiveIndex(0)
           }}
           isFitted={isFitted}
-          onFittedChange={setFitted}
+          onFittedChange={(next) => {
+            setFitted(next)
+            setPan({ x: 0, y: 0 })
+          }}
+          zoom={zoom}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          onZoomIn={() => {
+            setFitted(false)
+            setZoom((z) => clampZoom((isFitted ? 1 : z) + ZOOM_STEP))
+          }}
+          onZoomOut={() => {
+            setFitted(false)
+            setZoom((z) => clampZoom((isFitted ? 1 : z) - ZOOM_STEP))
+          }}
+          onResetView={() => {
+            setFitted(false)
+            setZoom(1)
+            setPan({ x: 0, y: 0 })
+          }}
         />
         {chart.notice ? (
           <p role="status" className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
@@ -151,7 +176,7 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
           </p>
         ) : null}
         <div ref={desktopRef} className="hidden min-w-0 md:block">
-          <TeamLanes {...viewProps} isFitted={isFitted} />
+          <TeamLanes {...viewProps} isFitted={isFitted} zoom={zoom} pan={pan} onPanChange={setPan} />
         </div>
         <div ref={mobileRef} className="md:hidden">
           <TeamAccordion {...viewProps} />

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useFitToWidth } from '@/hooks/useFitToWidth'
 import type { TeamChartLeader, TeamChartRoot } from '@/lib/org/teamChartTypes'
 import { NO_TEAM_HUE } from '@/lib/org/teamPalette'
 import type { TeamNode } from '@/lib/org/teamTree'
+import { cn } from '@/lib/utils'
 
 import { BranchRow } from './BranchRow'
 import { BranchStem } from './BranchStem'
@@ -21,6 +22,9 @@ interface TeamLanesProps {
   topLevelTeamCount: number
   peopleCount: number
   isFitted: boolean
+  zoom: number
+  pan: { x: number; y: number }
+  onPanChange: (pan: { x: number; y: number }) => void
   emptyText: string
 }
 
@@ -28,11 +32,25 @@ interface TeamLanesProps {
  * The desktop chart: the root card, a connector, and each top-level team side
  * by side, every team drawn by `TeamBranch`. A wide chart scrolls sideways
  * inside its own frame, never the page; "Fit to screen" scales it down to the
- * frame's width instead.
+ * frame's width instead. Supports click-and-drag panning and zoom.
  */
-export const TeamLanes = ({ root, leaders = [], lanes, topLevelTeamCount, peopleCount, isFitted, emptyText }: TeamLanesProps) => {
-  const { containerRef, contentRef, scale, width, height } = useFitToWidth<HTMLDivElement, HTMLDivElement>(isFitted)
-  const isScaled = scale < 1
+export const TeamLanes = ({
+  root,
+  leaders = [],
+  lanes,
+  topLevelTeamCount,
+  peopleCount,
+  isFitted,
+  zoom,
+  pan,
+  onPanChange,
+  emptyText,
+}: TeamLanesProps) => {
+  const { containerRef, contentRef, scale: fitScale, width, height } = useFitToWidth<HTMLDivElement, HTMLDivElement>(isFitted)
+  const effectiveScale = isFitted ? fitScale : zoom
+  const isFitScaled = isFitted && fitScale < 1
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
 
   // A chart wider than its frame opens scrolled to the middle, under the root card.
   useEffect(() => {
@@ -42,23 +60,68 @@ export const TeamLanes = ({ root, leaders = [], lanes, topLevelTeamCount, people
     }
   }, [containerRef])
 
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      onPanChange({
+        x: dragStartRef.current.panX + (e.clientX - dragStartRef.current.mouseX),
+        y: dragStartRef.current.panY + (e.clientY - dragStartRef.current.mouseY),
+      })
+    }
+    const handleMouseUp = () => setIsDragging(false)
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, onPanChange])
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, input, select, [role="dialog"], [role="menu"], [data-radix-popper-content-wrapper]')) {
+      return
+    }
+    setIsDragging(true)
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    }
+  }
+
+  const hasTransform = pan.x !== 0 || pan.y !== 0 || effectiveScale !== 1
+
   return (
     <div
       ref={containerRef}
       role="region"
       aria-label="Team chart"
       tabIndex={0}
-      className="w-full overflow-x-auto rounded-xl border border-border bg-muted/30 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      onMouseDown={handleMouseDown}
+      title="Click and drag to pan"
+      className={cn(
+        'w-full overflow-auto rounded-xl border border-border bg-muted/30 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        isDragging ? 'cursor-grabbing select-none' : 'cursor-grab',
+      )}
     >
-      {/* Sized to the scaled box: a transform alone leaves the layout size unchanged. */}
+      {/* Sized to the scaled box when fitted: a transform alone leaves the layout size unchanged. */}
       <div
         className="mx-auto w-max"
-        style={isScaled ? { width: width * scale, height: height * scale } : undefined}
+        style={isFitScaled ? { width: width * fitScale, height: height * fitScale } : undefined}
       >
         <div
           ref={contentRef}
-          className="w-max origin-top-left p-8"
-          style={isScaled ? { transform: `scale(${scale})` } : undefined}
+          className={cn(
+            'w-max p-8',
+            isFitted ? 'origin-top-left' : 'origin-top',
+            !isDragging && 'transition-transform duration-150 ease-out',
+          )}
+          style={hasTransform ? { transform: `translate(${pan.x}px, ${pan.y}px) scale(${effectiveScale})` } : undefined}
         >
           <div className="flex flex-col items-center">
             <RootCard root={root} teamCount={topLevelTeamCount} peopleCount={peopleCount} className="w-96" />
