@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.24.01",
+    "date": "2026-11-14",
+    "title": "Replace cold-start backfill with one-off migration (#182)",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Fixes",
+        "description": "Replaced the cold-start audit trail backfill with a one-off database migration."
+      }
+    ]
+  },
+  {
     "version": "2.24.00",
     "date": "2026-11-14",
     "title": "Use shared TeamChart with leader level on Org Chart tab",
