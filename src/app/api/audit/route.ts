@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auditEventsFor, getAuditTrail, readsFullAuditDetail, summarizeByModule } from '@/lib/audit/service';
-import { backfillAuditTrail } from '@/lib/audit/seed';
 import { guard } from '@/lib/rbac/guard';
 import type { AuditActorType, AuditModule, AuditSeverity } from '@/lib/audit/types';
 
@@ -26,9 +25,6 @@ export async function GET(req: NextRequest) {
   const fullDetail = readsFullAuditDetail(allowed.caller);
 
   try {
-    // Project pre-existing module activity logs into the trail on first read.
-    await backfillAuditTrail();
-
     const sp = req.nextUrl.searchParams;
 
     const events = await getAuditTrail({

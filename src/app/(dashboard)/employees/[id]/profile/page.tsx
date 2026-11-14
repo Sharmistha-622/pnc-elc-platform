@@ -2,7 +2,6 @@ import { getProfileData } from "@/lib/profiles/getProfileData";
 import { ProfileForm } from "./ProfileForm";
 import { PageBanner } from "@/components/shared/page-banner";
 import { AuditTrail } from "@/components/shared/audit-trail";
-import { backfillAuditTrail } from "@/lib/audit/seed";
 import { UserCheck, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -14,9 +13,6 @@ export default async function EmployeeProfilePage({
   const { id } = await params;
   const { profile, relationshipTypes, idProofTypes, employee, employeeName, canViewIdentity } =
     await getProfileData(id);
-
-  // Project pre-existing module activity logs into the trail on first read.
-  await backfillAuditTrail();
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
