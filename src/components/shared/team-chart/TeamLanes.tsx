@@ -3,17 +3,19 @@
 import { useEffect } from 'react'
 
 import { useFitToWidth } from '@/hooks/useFitToWidth'
-import type { TeamChartRoot } from '@/lib/org/teamChartTypes'
+import type { TeamChartLeader, TeamChartRoot } from '@/lib/org/teamChartTypes'
 import { NO_TEAM_HUE } from '@/lib/org/teamPalette'
 import type { TeamNode } from '@/lib/org/teamTree'
 
 import { BranchRow } from './BranchRow'
 import { BranchStem } from './BranchStem'
+import { LeaderCard } from './LeaderCard'
 import { RootCard } from './RootCard'
 import { TeamBranch } from './TeamBranch'
 
 interface TeamLanesProps {
   root: TeamChartRoot
+  leaders?: TeamChartLeader[]
   /** Top-level teams, with a "No team" lane last when anyone has none. */
   lanes: TeamNode[]
   topLevelTeamCount: number
@@ -28,7 +30,7 @@ interface TeamLanesProps {
  * inside its own frame, never the page; "Fit to screen" scales it down to the
  * frame's width instead.
  */
-export const TeamLanes = ({ root, lanes, topLevelTeamCount, peopleCount, isFitted, emptyText }: TeamLanesProps) => {
+export const TeamLanes = ({ root, leaders = [], lanes, topLevelTeamCount, peopleCount, isFitted, emptyText }: TeamLanesProps) => {
   const { containerRef, contentRef, scale, width, height } = useFitToWidth<HTMLDivElement, HTMLDivElement>(isFitted)
   const isScaled = scale < 1
 
@@ -60,6 +62,24 @@ export const TeamLanes = ({ root, lanes, topLevelTeamCount, peopleCount, isFitte
         >
           <div className="flex flex-col items-center">
             <RootCard root={root} teamCount={topLevelTeamCount} peopleCount={peopleCount} className="w-96" />
+            {leaders.length > 0 ? (
+              <>
+                <BranchStem className={NO_TEAM_HUE.stem} />
+                {leaders.length === 1 ? (
+                  <LeaderCard leader={leaders[0]} className="w-96" />
+                ) : (
+                  <BranchRow
+                    items={leaders}
+                    getKey={(leader) => leader.person.id}
+                    renderItem={(leader) => <LeaderCard leader={leader} className="w-80" />}
+                    lineClassName={NO_TEAM_HUE.line}
+                    stemClassName={NO_TEAM_HUE.stem}
+                    gutterClassName="px-4"
+                    ariaLabel="Leadership"
+                  />
+                )}
+              </>
+            ) : null}
             {lanes.length > 0 ? (
               <>
                 <BranchStem className={NO_TEAM_HUE.stem} />
@@ -73,9 +93,9 @@ export const TeamLanes = ({ root, lanes, topLevelTeamCount, peopleCount, isFitte
                   ariaLabel="Teams"
                 />
               </>
-            ) : (
+            ) : leaders.length === 0 ? (
               <p className="mt-8 text-sm text-slate-600 dark:text-slate-400">{emptyText}</p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -86,6 +86,7 @@ vi.mock('@/lib/forms/currentEmployee', () => ({
 vi.mock('@/lib/supabase/admin', () => ({ createAdminSupabaseClient: vi.fn(() => null) }))
 vi.mock('@/lib/supabase/server', () => ({ createServerSupabaseClient: vi.fn(async () => fakeDb(isMigrated)) }))
 
+const { guard } = await import('@/lib/rbac/guard')
 const { getMyTeamChart, getOrgChart } = await import('./getTeamChart')
 
 describe('getMyTeamChart', () => {
@@ -136,10 +137,13 @@ describe('getOrgChart', () => {
     isMigrated = true
   })
 
-  it('shows everyone active, under the organisation', async () => {
+  it('shows everyone active, placing top-level leaders above the teams', async () => {
     const result = await getOrgChart()
     if (!result.ok) throw new Error(result.error)
     expect(result.chart.root).toEqual({ kind: 'org', name: 'Example Org' })
+    expect(result.chart.leaders?.map((l) => ({ name: l.person.name, directReports: l.directReports }))).toEqual([
+      { name: 'Asha Rao', directReports: 2 },
+    ])
     expect(result.chart.stats.people).toBe(4)
   })
 
@@ -149,5 +153,18 @@ describe('getOrgChart', () => {
     if (!result.ok) throw new Error(result.error)
     expect(result.chart.notice).toMatch(/database update/)
     expect(result.chart.stats.people).toBe(4)
+  })
+
+  it('guards on the requested feature when called for /employees', async () => {
+    const result = await getOrgChart('employees')
+    if (!result.ok) throw new Error(result.error)
+    expect(guard).toHaveBeenCalledWith('employees')
+    expect(result.chart.stats.people).toBe(4)
+  })
+
+  it('returns an error when the guard denies access', async () => {
+    vi.mocked(guard).mockResolvedValueOnce({ ok: false, error: 'Forbidden' })
+    const result = await getOrgChart('employees')
+    expect(result).toEqual({ ok: false, error: 'Forbidden' })
   })
 })
