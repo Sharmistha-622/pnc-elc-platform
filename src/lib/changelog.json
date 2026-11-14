@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.24.00",
+    "date": "2026-11-14",
+    "title": "Use shared TeamChart with leader level on Org Chart tab",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Updated `/employees` Org Chart tab to use the shared `TeamChart` layout and placed top-level leaders on a separate level above team lanes."
+      }
+    ]
+  },
+  {
     "version": "2.23.00",
     "date": "2026-11-14",
     "title": "Monthly backup mailbox health check (#205)",
