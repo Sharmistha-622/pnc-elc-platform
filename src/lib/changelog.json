@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.24.02",
+    "date": "2026-11-14",
+    "title": "Update core region residency and user guide ch. 13 (#184)",
+    "type": "patch",
+    "changes": [
+      {
+        "category": "Improvements",
+        "description": "Updated core residency documentation to Mumbai (`ap-south-1`) and refreshed User Guide Chapter 13 to `2.21.05`."
+      }
+    ]
+  },
+  {
     "version": "2.24.01",
     "date": "2026-11-14",
     "title": "Replace cold-start backfill with one-off migration (#182)",
