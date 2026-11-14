@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.23.00",
+    "date": "2026-11-14",
+    "title": "Monthly backup mailbox health check (#205)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Monthly backup mailbox health check (#205)"
+      }
+    ]
+  },
+  {
     "version": "2.22.00",
     "date": "2026-11-14",
     "title": "Build sync-person edge function (#98)",
