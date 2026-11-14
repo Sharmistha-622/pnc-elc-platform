@@ -14,7 +14,7 @@ import {
   type TeamPerson,
   type TeamRecord,
 } from './teamTree'
-import type { TeamChartResult } from './teamChartTypes'
+import type { TeamChartLeader, TeamChartResult } from './teamChartTypes'
 
 // ============================================================================
 // Loading the team chart
@@ -226,9 +226,9 @@ export const getMyTeamChart = async (): Promise<TeamChartResult> => {
   }
 }
 
-/** Everyone in the organisation, placed in their teams. Super Admin and PnC Admin. */
-export const getOrgChart = async (): Promise<TeamChartResult> => {
-  const gate = await guard('orgChart')
+/** Everyone in the organisation, placed in their teams. Accepts `'orgChart'` or `'employees'` feature gate. */
+export const getOrgChart = async (feature: 'orgChart' | 'employees' = 'orgChart'): Promise<TeamChartResult> => {
+  const gate = await guard(feature)
   if (!gate.ok) return { ok: false, error: gate.error }
 
   const supabase = await createServerSupabaseClient()
@@ -246,9 +246,32 @@ export const getOrgChart = async (): Promise<TeamChartResult> => {
   const { people: rows, teams, notice } = loaded.rows
   const typeNames = new Map((types.data ?? []).map((t: { id: string; name: string }) => [t.id, t.name]))
   const avatars = await avatarsFor(rows.map((r) => r.email))
+
+  // Top-level leaders (no manager in the active org, and at least one direct
+  // report) sit on a level between the organisation card and the team lanes.
+  const activeIds = new Set(rows.map((r) => r.id))
+  const directReportCounts = new Map<string, number>()
+  for (const r of rows) {
+    if (r.manager_id && activeIds.has(r.manager_id)) {
+      directReportCounts.set(r.manager_id, (directReportCounts.get(r.manager_id) ?? 0) + 1)
+    }
+  }
+  const teamNameById = new Map(teams.map((t) => [t.id, t.name]))
+  const leaderRows = rows.filter(
+    (r) => (!r.manager_id || !activeIds.has(r.manager_id)) && (directReportCounts.get(r.id) ?? 0) > 0,
+  )
+  const leaderIds = new Set(leaderRows.map((r) => r.id))
+  const leaders: TeamChartLeader[] = leaderRows
+    .map((r) => ({
+      person: toPerson(r, typeNames, avatars),
+      teamName: (r.department_id ? teamNameById.get(r.department_id) : null) ?? null,
+      directReports: directReportCounts.get(r.id) ?? 0,
+    }))
+    .sort((a, b) => a.person.name.localeCompare(b.person.name, undefined, { sensitivity: 'base' }))
+
   const tree = buildTeamTree(
     teams,
-    rows.map((r) => toPerson(r, typeNames, avatars)),
+    rows.filter((r) => !leaderIds.has(r.id)).map((r) => toPerson(r, typeNames, avatars)),
   )
   const configuredName = (orgName.data as { value?: unknown } | null)?.value
 
@@ -256,8 +279,9 @@ export const getOrgChart = async (): Promise<TeamChartResult> => {
     ok: true,
     chart: {
       root: { kind: 'org', name: typeof configuredName === 'string' && configuredName.trim() ? configuredName.trim() : DEFAULT_ORG_NAME },
+      leaders,
       tree,
-      stats: treeStats(tree),
+      stats: treeStats(tree, leaders.length),
       canOpenProfiles: canAccessRoute(gate.caller.role, '/employees/x/profile'),
       storageKey: `team-chart:org:${gate.caller.userId}`,
       notice,

@@ -14,9 +14,18 @@ export type TeamChartRoot =
     }
   | { kind: 'org'; name: string }
 
+/** A top-level leader shown above the teams on an org chart. */
+export interface TeamChartLeader {
+  person: TeamPerson
+  teamName: string | null
+  directReports: number
+}
+
 /** Everything the chart needs, as plain props. */
 export interface TeamChartData {
   root: TeamChartRoot
+  /** Top-level managers placed between an org root and the team lanes. */
+  leaders?: TeamChartLeader[]
   tree: TeamTree
   stats: TeamTreeStats
   /** Whether rows link to `/employees/[id]/profile`. */
