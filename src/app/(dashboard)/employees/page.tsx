@@ -1,4 +1,5 @@
 import { getEmployees } from "@/lib/employees/getEmployees";
+import { getOrgChart } from "@/lib/org/getTeamChart";
 import { PageBanner } from "@/components/shared/page-banner";
 import { Users, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,10 @@ import Link from "next/link";
 import { EmployeesTable } from "./employees-table";
 
 export default async function EmployeesPage() {
-  const employees = await getEmployees();
+  const [employees, orgChart] = await Promise.all([
+    getEmployees(),
+    getOrgChart('employees'),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in duration-300">
@@ -33,7 +37,7 @@ export default async function EmployeesPage() {
       />
 
       {/* Main Table with Search & Pagination */}
-      <EmployeesTable employees={employees} />
+      <EmployeesTable employees={employees} orgChart={orgChart} />
     </div>
   );
 }

@@ -44,7 +44,9 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DataTablePagination } from '@/components/shared/data-table-pagination';
-import { OrgChart } from '@/components/shared/org-chart';
+import { TeamChart } from '@/components/shared/team-chart/TeamChart';
+import { TeamChartError } from '@/components/shared/team-chart/TeamChartError';
+import type { TeamChartResult } from '@/lib/org/teamChartTypes';
 import { useUserContext } from '@/contexts/user-context';
 import { canHandleDocuments } from '@/lib/documents/access';
 import { Employee } from '@/lib/employees/getEmployees';
@@ -58,7 +60,13 @@ import {
 type SortField = 'name' | 'type' | 'team' | 'tenure' | 'joining_date' | 'exit_date' | 'status';
 type SortOrder = 'asc' | 'desc';
 
-export function EmployeesTable({ employees }: { employees: Employee[] }) {
+export function EmployeesTable({
+  employees,
+  orgChart,
+}: {
+  employees: Employee[];
+  orgChart: TeamChartResult;
+}) {
   const user = useUserContext();
   // Fin Admin, Fin Ops and Exec View reach this directory but not ID
   // documents; the documents page refuses them, so the link is not shown.
@@ -763,15 +771,17 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
           </Tabs>
         </TabsContent>
 
-        {/* Tab 2: Org Chart with Department Filter */}
+        {/* Tab 2: Org Chart */}
         <TabsContent value="chart" className="m-0">
-          <OrgChart
-            employees={employees}
-            title="Company Organization Chart"
-            subtitle="Explore organizational hierarchy, reporting managers, and department teams."
-            showDepartmentFilter={true}
-            canOpenDocuments={canOpenDocuments}
-          />
+          {orgChart.ok ? (
+            <TeamChart
+              chart={orgChart.chart}
+              title="Org chart"
+              emptyText="Nobody is on the chart yet."
+            />
+          ) : (
+            <TeamChartError message={orgChart.error} />
+          )}
         </TabsContent>
       </Tabs>
     </div>
