@@ -9,66 +9,66 @@
 # for what a review of these paths has to check.
 
 # The database: schema, policies, and the vault.
-/supabase/                         @Nitinsudarshan @Sharmistha-622
-/scripts/rls-probe.sh              @Nitinsudarshan @Sharmistha-622
-/scripts/dpdp-probe.sh             @Nitinsudarshan @Sharmistha-622
-/src/lib/dpdp/                     @Nitinsudarshan @Sharmistha-622
-/scripts/vault-*.sh               @Nitinsudarshan @Sharmistha-622
+/supabase/                         @Nitinsudarshan @Sharmistha-622 @nitinng
+/scripts/rls-probe.sh              @Nitinsudarshan @Sharmistha-622 @nitinng
+/scripts/dpdp-probe.sh             @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/dpdp/                     @Nitinsudarshan @Sharmistha-622 @nitinng
+/scripts/vault-*.sh               @Nitinsudarshan @Sharmistha-622 @nitinng
 
 # Who a request is, and what their role reaches.
-/src/middleware.ts                 @Nitinsudarshan @Sharmistha-622
-/src/lib/role-constants.ts         @Nitinsudarshan @Sharmistha-622
-/src/lib/rbac/                     @Nitinsudarshan @Sharmistha-622
-/src/lib/auth/                     @Nitinsudarshan @Sharmistha-622
-/src/lib/supabase/                 @Nitinsudarshan @Sharmistha-622
-/src/lib/vault/                    @Nitinsudarshan @Sharmistha-622
-/src/lib/security/                 @Nitinsudarshan @Sharmistha-622
-/src/lib/**/access.ts              @Nitinsudarshan @Sharmistha-622
-/src/lib/onboarding/redact.ts      @Nitinsudarshan @Sharmistha-622
+/src/middleware.ts                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/role-constants.ts         @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/rbac/                     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/auth/                     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/supabase/                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/vault/                    @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/security/                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/**/access.ts              @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/onboarding/redact.ts      @Nitinsudarshan @Sharmistha-622 @nitinng
 
 # Every route handler: each one is reachable directly, not just from a screen.
-/src/app/api/                      @Nitinsudarshan @Sharmistha-622
-/src/app/auth/                     @Nitinsudarshan @Sharmistha-622
+/src/app/api/                      @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/app/auth/                     @Nitinsudarshan @Sharmistha-622 @nitinng
 
 # Every server action: a 'use server' file exports functions the browser can
 # call directly, with any arguments (REVIEW.md §1). Files under a directory
 # owned above are not repeated. src/lib/security/guardrails.test.ts fails when
 # a 'use server' file matches no line here.
-/src/lib/confirmations/createConfirmation.ts     @Nitinsudarshan @Sharmistha-622
-/src/lib/confirmations/getEmployeeContact.ts     @Nitinsudarshan @Sharmistha-622
-/src/lib/confirmations/nominatePeers.ts          @Nitinsudarshan @Sharmistha-622
-/src/lib/confirmations/notifyEmployee.ts         @Nitinsudarshan @Sharmistha-622
-/src/lib/confirmations/submitPeerFeedback.ts     @Nitinsudarshan @Sharmistha-622
-/src/lib/confirmations/updateManagerDecision.ts  @Nitinsudarshan @Sharmistha-622
-/src/lib/documents/uploadDocument.ts             @Nitinsudarshan @Sharmistha-622
-/src/lib/employees/importActions.ts              @Nitinsudarshan @Sharmistha-622
-/src/lib/forms/actions.ts                        @Nitinsudarshan @Sharmistha-622
-/src/lib/forms/branchingActions.ts               @Nitinsudarshan @Sharmistha-622
-/src/lib/forms/requestActions.ts                 @Nitinsudarshan @Sharmistha-622
-/src/lib/forms/respondentActions.ts              @Nitinsudarshan @Sharmistha-622
-/src/lib/offboarding/service.ts                  @Nitinsudarshan @Sharmistha-622
-/src/lib/profile/profileActions.ts               @Nitinsudarshan @Sharmistha-622
-/src/lib/profiles/createOrUpdateProfile.ts       @Nitinsudarshan @Sharmistha-622
-/src/lib/reviews/actions.ts                      @Nitinsudarshan @Sharmistha-622
-/src/lib/settings/breakGlass.ts                  @Nitinsudarshan @Sharmistha-622
-/src/lib/settings/service.ts                     @Nitinsudarshan @Sharmistha-622
-/src/lib/signatories/service.ts                  @Nitinsudarshan @Sharmistha-622
+/src/lib/confirmations/createConfirmation.ts     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/confirmations/getEmployeeContact.ts     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/confirmations/nominatePeers.ts          @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/confirmations/notifyEmployee.ts         @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/confirmations/submitPeerFeedback.ts     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/confirmations/updateManagerDecision.ts  @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/documents/uploadDocument.ts             @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/employees/importActions.ts              @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/forms/actions.ts                        @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/forms/branchingActions.ts               @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/forms/requestActions.ts                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/forms/respondentActions.ts              @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/offboarding/service.ts                  @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/profile/profileActions.ts               @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/profiles/createOrUpdateProfile.ts       @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/reviews/actions.ts                      @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/settings/breakGlass.ts                  @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/settings/service.ts                     @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/signatories/service.ts                  @Nitinsudarshan @Sharmistha-622 @nitinng
 
 # The policy itself, and the checks that hold the code to it.
-/docs/rbac.md                      @Nitinsudarshan @Sharmistha-622
-/docs/vault-*.md                   @Nitinsudarshan @Sharmistha-622
-/rules/security.md                 @Nitinsudarshan @Sharmistha-622
-/rules/data-access.md              @Nitinsudarshan @Sharmistha-622
-/rules/rbac-settings.md            @Nitinsudarshan @Sharmistha-622
-/REVIEW.md                         @Nitinsudarshan @Sharmistha-622
-/eslint.config.mjs                 @Nitinsudarshan @Sharmistha-622
-/.github/                          @Nitinsudarshan @Sharmistha-622
+/docs/rbac.md                      @Nitinsudarshan @Sharmistha-622 @nitinng
+/docs/vault-*.md                   @Nitinsudarshan @Sharmistha-622 @nitinng
+/rules/security.md                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/rules/data-access.md              @Nitinsudarshan @Sharmistha-622 @nitinng
+/rules/rbac-settings.md            @Nitinsudarshan @Sharmistha-622 @nitinng
+/REVIEW.md                         @Nitinsudarshan @Sharmistha-622 @nitinng
+/eslint.config.mjs                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/.github/                          @Nitinsudarshan @Sharmistha-622 @nitinng
 
 # What runs in production, and with what. A dependency or a build setting can
 # read every setting the app holds, the vault's submission secret included.
-/package.json                      @Nitinsudarshan @Sharmistha-622
-/package-lock.json                 @Nitinsudarshan @Sharmistha-622
-/next.config.ts                    @Nitinsudarshan @Sharmistha-622
-/vercel.json                       @Nitinsudarshan @Sharmistha-622
-/src/lib/email/                    @Nitinsudarshan @Sharmistha-622
-/src/lib/integrations/             @Nitinsudarshan @Sharmistha-622
+/package.json                      @Nitinsudarshan @Sharmistha-622 @nitinng
+/package-lock.json                 @Nitinsudarshan @Sharmistha-622 @nitinng
+/next.config.ts                    @Nitinsudarshan @Sharmistha-622 @nitinng
+/vercel.json                       @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/email/                    @Nitinsudarshan @Sharmistha-622 @nitinng
+/src/lib/integrations/             @Nitinsudarshan @Sharmistha-622 @nitinng
