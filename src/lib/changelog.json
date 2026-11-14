@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.22.00",
+    "date": "2026-11-14",
+    "title": "Build sync-person edge function (#98)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Features",
+        "description": "Added the `sync-person` vault Edge Function to copy basic person metadata on offer acceptance."
+      }
+    ]
+  },
+  {
     "version": "2.21.05",
     "date": "2026-11-13",
     "title": "Remove Data Management sample records and hard-coded person emails",
