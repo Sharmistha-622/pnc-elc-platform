@@ -67,12 +67,26 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
     return ids
   }, [search, filterTeamId, chart.tree])
 
+  const leaderMatchIds = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase()
+    if (!q || !chart.leaders?.length) return [] as string[]
+    return chart.leaders
+      .filter(
+        ({ person, teamName }) =>
+          person.name.toLowerCase().includes(q) ||
+          person.subtitle.toLowerCase().includes(q) ||
+          (teamName?.toLowerCase().includes(q) ?? false),
+      )
+      .map(({ person }) => person.id)
+  }, [chart.leaders, deferredQuery])
+
   const matches = useMemo(
     () => [
+      ...leaderMatchIds.map((id) => chartItemId('person', id)),
       ...search.personIds.map((id) => chartItemId('person', id)),
       ...search.teamIds.map((id) => chartItemId('team', id)),
     ],
-    [search],
+    [leaderMatchIds, search],
   )
   const activeMatch = matches.length > 0 ? matches[Math.min(activeIndex, matches.length - 1)] : null
 
@@ -90,16 +104,17 @@ export const TeamChart = ({ chart, title, headingLevel = 'h2', emptyText }: Team
     () => ({
       isCollapsed,
       setTeamOpen,
-      matchedPeople: new Set(search.personIds),
+      matchedPeople: new Set([...leaderMatchIds, ...search.personIds]),
       matchedTeams: new Set(search.teamIds),
       activeMatch,
       canOpenProfiles: chart.canOpenProfiles,
     }),
-    [isCollapsed, setTeamOpen, search, activeMatch, chart.canOpenProfiles],
+    [isCollapsed, setTeamOpen, leaderMatchIds, search, activeMatch, chart.canOpenProfiles],
   )
 
   const viewProps = {
     root: chart.root,
+    leaders: chart.leaders,
     lanes,
     topLevelTeamCount: chart.stats.teams,
     peopleCount: chart.stats.people,
