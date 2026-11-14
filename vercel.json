@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/pre-exit-roles",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/email-backup-ping",
+      "schedule": "0 4 1 * *"
     }
   ]
 }
