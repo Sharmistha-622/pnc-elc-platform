@@ -99,3 +99,22 @@ export async function sealFeedbackInVault(input: {
 }): Promise<SealFeedbackResult> {
   return call<SealFeedbackResult>('seal-feedback', input)
 }
+
+/**
+ * One-way copy of a person into the vault's `people` table, idempotent on
+ * `coreId`. Called when a candidate accepts an offer so pre-joiner documents
+ * and bank details can land in the vault.
+ */
+export async function syncPersonInVault(input: {
+  coreId: string
+  name: string
+  team?: string | null
+  managerCoreId?: string | null
+}): Promise<{ ok: true }> {
+  return call<{ ok: true }>('sync-person', {
+    core_id: input.coreId,
+    name: input.name,
+    team: input.team ?? null,
+    manager_core_id: input.managerCoreId ?? null,
+  })
+}
