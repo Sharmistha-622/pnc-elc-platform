@@ -19,16 +19,14 @@
 begin;
 
 alter table public.form_answers
-  add column if not exists seal_state text not null default 'staged'
-    check (seal_state in ('staged', 'sealing', 'sealed', 'seal_failed')),
+  add column if not exists seal_state seal_state not null default 'staged',
   add column if not exists staged_at timestamptz not null default now(),
   add column if not exists sealed_at timestamptz,
   add column if not exists seal_error text,
   add column if not exists vault_feedback_id uuid;
 
 alter table public.review_decisions
-  add column if not exists seal_state text not null default 'staged'
-    check (seal_state in ('staged', 'sealing', 'sealed', 'seal_failed')),
+  add column if not exists seal_state seal_state not null default 'staged',
   add column if not exists staged_at timestamptz not null default now(),
   add column if not exists sealed_at timestamptz,
   add column if not exists seal_error text,
