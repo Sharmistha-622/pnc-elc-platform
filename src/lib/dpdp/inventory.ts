@@ -179,7 +179,7 @@ const CORE_TABLES: InventoryTable[] = [
     contact: 'email',
   }),
   personal('core', 'form_answers', { principals: ['employee'], basis: '7i', retention: 'feedback_text', processors: CORE }, {
-    meta: `${META}, submission_id, field_id`,
+    meta: `${META}, submission_id, field_id, seal_state, staged_at, sealed_at, seal_error, vault_feedback_id`,
     'staged:performance': 'value',
   }),
   nonPersonal('core', 'form_fields', 'Form definitions.', 'id, form_version_id, section_id, field_type, label, help_text, is_required, order_index, options, show_when, created_at, updated_at'),
@@ -289,7 +289,7 @@ const CORE_TABLES: InventoryTable[] = [
     general: 'cancelled_reason',
   }),
   personal('core', 'review_decisions', { principals: ['employee'], basis: '7i', retention: 'feedback_text', processors: CORE }, {
-    meta: 'cycle_id, decided_by, decided_at, pnc_reviewed_by, pnc_reviewed_at, updated_at',
+    meta: 'cycle_id, decided_by, decided_at, pnc_reviewed_by, pnc_reviewed_at, updated_at, seal_state, staged_at, sealed_at, seal_error, vault_note_id, vault_pnc_note_id',
     performance: 'decision, extend_until, pnc_outcome',
     'staged:performance': 'note, pnc_note',
   }),

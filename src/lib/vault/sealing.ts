@@ -24,7 +24,7 @@
 // ============================================================================
 
 /** What can be sealed. One per staged resource. */
-export type SealableKind = 'identity_document' | 'feedback'
+export type SealableKind = 'identity_document' | 'feedback' | 'form_answer' | 'decision_note'
 
 /** The event that makes a record ready to seal. */
 export type SealTrigger =
@@ -34,6 +34,8 @@ export type SealTrigger =
 export const SEAL_TRIGGER_FOR: Record<SealableKind, SealTrigger> = {
   identity_document: 'document_verified',
   feedback: 'cycle_closed',
+  form_answer: 'cycle_closed',
+  decision_note: 'cycle_closed',
 }
 
 export type SealState =
@@ -56,6 +58,8 @@ export type SealState =
 export const STAGING_BUDGET_DAYS: Record<SealableKind, number> = {
   identity_document: 14,
   feedback: 30,
+  form_answer: 30,
+  decision_note: 30,
 }
 
 export interface StagedRecord {
