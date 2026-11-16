@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.25.00",
+    "date": "2026-11-16",
+    "title": "Seal review form answers and decision notes on cycle close (#101, #173)",
+    "type": "minor",
+    "changes": [
+      {
+        "category": "Security",
+        "description": "Sealed confirmation and appraisal form answers and decision notes into the vault when a review cycle closes."
+      }
+    ]
+  },
+  {
     "version": "2.24.02",
     "date": "2026-11-14",
     "title": "Update core region residency and user guide ch. 13 (#184)",
