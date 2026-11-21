@@ -1,39 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { GoogleWorkspaceAccount } from '@/lib/settings/types'
 
-// An in-memory stand-in for the two tables, recording every write.
+// An in-memory stand-in for the database, recording every write and every
+// table touched.
 const db = vi.hoisted(() => ({
   settings: new Map<string, { value: string; is_active: boolean }>(),
-  credentials: new Map<string, { account_id: string; client_secret: string | null; refresh_token: string | null }>(),
   writes: [] as { table: string; op: string; row: unknown }[],
+  tablesTouched: new Set<string>(),
   admin: true,
 }))
 
 function fakeClient() {
   return {
     from(table: string) {
+      db.tablesTouched.add(table)
       const filters: Record<string, unknown> = {}
-      let inIds: string[] | null = null
       const rows = () => {
         if (table === 'general_settings') {
           const r = db.settings.get(filters.key as string)
           return r ? [{ key: filters.key, ...r }] : []
-        }
-        if (table === 'mail_account_credentials') {
-          return [...db.credentials.values()].filter((r) => !inIds || inIds.includes(r.account_id))
         }
         return []
       }
       const chain = {
         select: () => chain,
         eq: (col: string, v: unknown) => ((filters[col] = v), chain),
-        in: (_col: string, ids: string[]) => ((inIds = ids), chain),
+        in: () => chain,
         maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
         then: (resolve: (v: unknown) => void) => resolve({ data: rows(), error: null }),
         upsert: async (row: Record<string, unknown>) => {
           db.writes.push({ table, op: 'upsert', row })
           if (table === 'general_settings') db.settings.set(row.key as string, { value: row.value as string, is_active: true })
-          if (table === 'mail_account_credentials') db.credentials.set(row.account_id as string, row as never)
           return { error: null }
         },
         update: (row: unknown) => {
@@ -43,7 +40,6 @@ function fakeClient() {
         delete: () => ({
           in: async (_col: string, ids: string[]) => {
             db.writes.push({ table, op: 'delete', row: ids })
-            for (const id of ids) db.credentials.delete(id)
             return { error: null }
           },
         }),
@@ -58,14 +54,28 @@ vi.mock('@/lib/supabase/server', () => ({ createServerSupabaseClient: async () =
 
 import {
   CREDENTIAL_FIELDS,
+  MAIL_ACCOUNTS,
   SECRET_MASK,
+  buildAccount,
   getGoogleWorkspaceAccountsInternal,
   getOAuth2ClientForAccount,
   maskGoogleAccounts,
   resolveCredentials,
   saveGoogleWorkspaceAccountsInternal,
-  toStoredAccount,
+  sendingChain,
+  toStoredStatus,
 } from './accounts'
+
+const [PEOPLE, AUTOMATIONS_PNC, AUTOMATION] = MAIL_ACCOUNTS
+
+// Made-up values. Every token is distinct so a test can tell which was used.
+const ENV = {
+  GOOGLE_CLIENT_ID: 'client-env.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'env-client-secret',
+  GOOGLE_REFRESH_TOKEN_PEOPLE: 'people-token-1111',
+  GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC: 'automations-pnc-token-2222',
+  GOOGLE_REFRESH_TOKEN_AUTOMATION: 'automation-token-3333',
+}
 
 const account = (over: Partial<GoogleWorkspaceAccount> = {}): GoogleWorkspaceAccount => ({
   id: 'acc-1',
@@ -80,28 +90,157 @@ const account = (over: Partial<GoogleWorkspaceAccount> = {}): GoogleWorkspaceAcc
   ...over,
 })
 
-const ENV = {
-  senderEmail: 'sender@example.org',
-  clientId: 'client-env.apps.googleusercontent.com',
-  clientSecret: 'env-client-secret',
-  refreshToken: 'env-refresh-token-0001',
+function stubEnv(env: Record<string, string | undefined>) {
+  for (const key of [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_REFRESH_TOKEN',
+    'GOOGLE_SENDER_EMAIL',
+    ...MAIL_ACCOUNTS.map((d) => d.tokenEnv),
+  ]) {
+    vi.stubEnv(key, env[key] ?? '')
+  }
 }
 
 beforeEach(() => {
   db.settings.clear()
-  db.credentials.clear()
   db.writes.length = 0
+  db.tablesTouched.clear()
   db.admin = true
-  vi.stubEnv('GOOGLE_SENDER_EMAIL', ENV.senderEmail)
-  vi.stubEnv('GOOGLE_CLIENT_ID', ENV.clientId)
-  vi.stubEnv('GOOGLE_CLIENT_SECRET', ENV.clientSecret)
-  vi.stubEnv('GOOGLE_REFRESH_TOKEN', ENV.refreshToken)
+  stubEnv(ENV)
 })
 afterEach(() => vi.unstubAllEnvs())
 
-/** Every value written to general_settings, as text. */
-const settingsWrites = () =>
-  db.writes.filter((w) => w.table === 'general_settings').map((w) => JSON.stringify(w.row))
+/** Every value written anywhere, as text. */
+const allWrites = () => db.writes.map((w) => JSON.stringify(w.row))
+
+describe('MAIL_ACCOUNTS', () => {
+  it('defines the three senders in fallback order, the first primary', () => {
+    expect(MAIL_ACCOUNTS.map((d) => [d.tokenEnv, d.is_active, d.backup_priority])).toEqual([
+      ['GOOGLE_REFRESH_TOKEN_PEOPLE', true, 0],
+      ['GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC', false, 1],
+      ['GOOGLE_REFRESH_TOKEN_AUTOMATION', false, 2],
+    ])
+  })
+})
+
+describe('resolveCredentials (environment only)', () => {
+  it("uses each account's own token and the shared OAuth client", () => {
+    expect(resolveCredentials(PEOPLE, ENV)).toEqual({
+      client_id: ENV.GOOGLE_CLIENT_ID,
+      client_secret: ENV.GOOGLE_CLIENT_SECRET,
+      refresh_token: ENV.GOOGLE_REFRESH_TOKEN_PEOPLE,
+    })
+    expect(resolveCredentials(AUTOMATIONS_PNC, ENV).refresh_token).toBe(ENV.GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC)
+    expect(resolveCredentials(AUTOMATION, ENV).refresh_token).toBe(ENV.GOOGLE_REFRESH_TOKEN_AUTOMATION)
+  })
+
+  it('falls back to GOOGLE_REFRESH_TOKEN for the GOOGLE_SENDER_EMAIL account only', () => {
+    const env = {
+      GOOGLE_CLIENT_ID: ENV.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: ENV.GOOGLE_CLIENT_SECRET,
+      GOOGLE_REFRESH_TOKEN: 'legacy-token-0000',
+      GOOGLE_SENDER_EMAIL: ` ${AUTOMATIONS_PNC.email.toUpperCase()} `,
+    }
+    expect(resolveCredentials(AUTOMATIONS_PNC, env).refresh_token).toBe('legacy-token-0000')
+    expect(resolveCredentials(PEOPLE, env).refresh_token).toBeUndefined()
+    expect(resolveCredentials(AUTOMATION, env).refresh_token).toBeUndefined()
+  })
+
+  it("prefers the account's own token to GOOGLE_REFRESH_TOKEN", () => {
+    const env = { ...ENV, GOOGLE_REFRESH_TOKEN: 'legacy-token-0000', GOOGLE_SENDER_EMAIL: PEOPLE.email }
+    expect(resolveCredentials(PEOPLE, env).refresh_token).toBe(ENV.GOOGLE_REFRESH_TOKEN_PEOPLE)
+  })
+
+  it('treats a blank token as unset', () => {
+    expect(resolveCredentials(PEOPLE, { ...ENV, GOOGLE_REFRESH_TOKEN_PEOPLE: '  ' }).refresh_token).toBeUndefined()
+  })
+})
+
+describe('getGoogleWorkspaceAccountsInternal', () => {
+  it('returns the code-defined accounts with credentials from the environment', async () => {
+    const accounts = await getGoogleWorkspaceAccountsInternal()
+    expect(accounts.map((a) => a.email)).toEqual(MAIL_ACCOUNTS.map((d) => d.email))
+    expect(accounts.map((a) => a.refresh_token)).toEqual([
+      ENV.GOOGLE_REFRESH_TOKEN_PEOPLE,
+      ENV.GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC,
+      ENV.GOOGLE_REFRESH_TOKEN_AUTOMATION,
+    ])
+    expect(accounts.every((a) => a.status === 'connected')).toBe(true)
+  })
+
+  it('never reads the credentials table', async () => {
+    await getGoogleWorkspaceAccountsInternal()
+    expect(db.tablesTouched.has('mail_account_credentials')).toBe(false)
+  })
+
+  it('ignores credentials left in an old settings row', async () => {
+    stubEnv({ GOOGLE_CLIENT_ID: ENV.GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET: ENV.GOOGLE_CLIENT_SECRET })
+    db.settings.set('google_workspace_accounts', {
+      is_active: true,
+      value: JSON.stringify([
+        account({ email: PEOPLE.email, refresh_token: 'left-behind-token', client_secret: 'left-behind' }),
+      ]),
+    })
+    const [people] = await getGoogleWorkspaceAccountsInternal()
+    expect(people.refresh_token).toBeUndefined()
+    expect(people.client_secret).toBe(ENV.GOOGLE_CLIENT_SECRET)
+    expect(people.status).toBe('disconnected')
+  })
+
+  it('applies stored status and usage, matched by email', async () => {
+    db.settings.set('google_workspace_accounts', {
+      is_active: true,
+      value: JSON.stringify([
+        { id: 'old-id', email: AUTOMATION.email.toUpperCase(), status: 'needs_reauth', error_message: 'invalid_grant', daily_sent_count: 7 },
+        { email: 'someone-else@example.org', status: 'needs_reauth' },
+      ]),
+    })
+    const accounts = await getGoogleWorkspaceAccountsInternal()
+    const automation = accounts.find((a) => a.id === AUTOMATION.id)!
+    expect(automation).toMatchObject({ status: 'needs_reauth', error_message: 'invalid_grant', daily_sent_count: 7 })
+    expect(accounts.find((a) => a.id === PEOPLE.id)?.status).toBe('connected')
+    expect(accounts).toHaveLength(MAIL_ACCOUNTS.length)
+  })
+})
+
+describe('sendingChain', () => {
+  const accountsFor = (env: Record<string, string | undefined>) => MAIL_ACCOUNTS.map((d) => buildAccount(d, env, undefined))
+
+  it('tries the primary first, then the backups in order', () => {
+    const { chain, primary, primarySkipped } = sendingChain(accountsFor(ENV))
+    expect(chain.map((a) => a.id)).toEqual(['people', 'automations-pnc', 'automation'])
+    expect(primary?.id).toBe('people')
+    expect(primarySkipped).toBeNull()
+  })
+
+  it('skips an account without a token, and says why the primary was skipped without any value', () => {
+    const { chain, primary, primarySkipped } = sendingChain(
+      accountsFor({ ...ENV, GOOGLE_REFRESH_TOKEN_PEOPLE: undefined, GOOGLE_REFRESH_TOKEN_AUTOMATION: '' }),
+    )
+    expect(chain.map((a) => a.id)).toEqual(['automations-pnc'])
+    expect(primary?.id).toBe('people')
+    expect(primarySkipped).toContain('GOOGLE_REFRESH_TOKEN_PEOPLE')
+    expect(primarySkipped).not.toContain(ENV.GOOGLE_CLIENT_SECRET)
+  })
+
+  it('marks an account without a token as disconnected', () => {
+    const [people] = accountsFor({ ...ENV, GOOGLE_REFRESH_TOKEN_PEOPLE: undefined })
+    expect(people.status).toBe('disconnected')
+  })
+
+  it('is empty when nothing is configured', () => {
+    expect(sendingChain(accountsFor({})).chain).toEqual([])
+  })
+})
+
+describe('getOAuth2ClientForAccount', () => {
+  it('refuses an account without its own credentials instead of borrowing one', () => {
+    expect(() => getOAuth2ClientForAccount(account({ refresh_token: undefined, client_secret: 's' }))).toThrow(
+      /no saved credentials/,
+    )
+  })
+})
 
 describe('maskGoogleAccounts', () => {
   const raw = [
@@ -114,7 +253,7 @@ describe('maskGoogleAccounts', () => {
     expect(a.client_secret).toBe(SECRET_MASK)
     expect(a.refresh_token).toBeUndefined()
     expect(a.refresh_token_preview).toBe(SECRET_MASK)
-    expect(a.email).toBe('sender@example.org')
+    expect(a).toMatchObject({ id: 'acc-1', name: 'Account A', email: 'sender@example.org', is_active: true })
     expect(b.client_secret).toBeUndefined()
     expect(b.refresh_token_preview).toBeUndefined()
   })
@@ -128,133 +267,79 @@ describe('maskGoogleAccounts', () => {
   })
 })
 
-describe('toStoredAccount', () => {
-  it('keeps no credential field', () => {
-    const stored = toStoredAccount(
-      account({ client_secret: 's', refresh_token: 't', refresh_token_preview: 'p' }),
+describe('toStoredStatus', () => {
+  it('keeps status and usage only, no credential field', () => {
+    const stored = toStoredStatus(
+      account({ client_secret: 's', refresh_token: 't', refresh_token_preview: 'p', error_message: 'e' }),
     ) as Record<string, unknown>
     for (const field of CREDENTIAL_FIELDS) expect(stored).not.toHaveProperty(field)
-    expect(stored.email).toBe('sender@example.org')
-  })
-})
-
-describe('resolveCredentials', () => {
-  it("uses the account's own stored token first", () => {
-    const creds = resolveCredentials(account(), { account_id: 'acc-1', client_secret: 'own-secret', refresh_token: 'own-token' }, ENV)
-    expect(creds).toEqual({ client_id: ENV.clientId, client_secret: 'own-secret', refresh_token: 'own-token' })
-  })
-
-  it("lets the environment's sender use the environment's token", () => {
-    expect(resolveCredentials(account(), undefined, ENV).refresh_token).toBe(ENV.refreshToken)
-    expect(resolveCredentials(account({ email: 'SENDER@example.org ' }), undefined, ENV).refresh_token).toBe(ENV.refreshToken)
-  })
-
-  it("never lends the environment's token to another mailbox", () => {
-    const creds = resolveCredentials(account({ email: 'backup@example.org' }), undefined, ENV)
-    expect(creds.refresh_token).toBeUndefined()
-  })
-
-  it("lends the environment's client secret only to accounts on the environment's client", () => {
-    expect(resolveCredentials(account({ client_id: undefined }), undefined, ENV).client_secret).toBe(ENV.clientSecret)
-    expect(resolveCredentials(account({ client_id: 'other-client' }), undefined, ENV).client_secret).toBeUndefined()
-  })
-})
-
-describe('getOAuth2ClientForAccount', () => {
-  it('refuses an account without its own credentials instead of borrowing one', () => {
-    expect(() => getOAuth2ClientForAccount(account({ refresh_token: undefined, client_secret: 's' }))).toThrow(
-      /no saved credentials/,
+    expect(Object.keys(stored).sort()).toEqual(
+      ['daily_send_limit', 'daily_sent_count', 'email', 'error_message', 'status'].sort(),
     )
   })
 })
 
 describe('saveGoogleWorkspaceAccountsInternal', () => {
-  const save = (accounts: GoogleWorkspaceAccount[], canWriteCredentials = true) =>
-    saveGoogleWorkspaceAccountsInternal(accounts, { changedBy: 'admin@example.org', canWriteCredentials })
+  const save = (accounts: GoogleWorkspaceAccount[]) =>
+    saveGoogleWorkspaceAccountsInternal(accounts, { changedBy: 'admin@example.org' })
 
-  it('never writes a credential to general_settings', async () => {
+  it('never writes a credential, to settings or anywhere else', async () => {
     const res = await save([
-      account({ client_secret: 'new-secret-value', refresh_token: 'new-refresh-token', refresh_token_preview: 'x' }),
-      account({ id: 'acc-2', email: 'backup@example.org', is_active: false, backup_priority: 1, refresh_token: 'backup-token-9999' }),
+      account({ email: PEOPLE.email, client_secret: 'new-secret-value', refresh_token: 'new-refresh-token', refresh_token_preview: 'x' }),
+      account({ email: AUTOMATION.email, is_active: false, refresh_token: 'backup-token-9999' }),
     ])
     expect(res.success).toBe(true)
-    const written = settingsWrites()
-    expect(written.length).toBeGreaterThan(0)
-    for (const w of written) {
+    expect(res.credentialsDropped).toBe(true)
+    expect(db.writes.length).toBeGreaterThan(0)
+    for (const w of allWrites()) {
       for (const field of CREDENTIAL_FIELDS) expect(w).not.toContain(field)
       expect(w).not.toContain('new-secret-value')
       expect(w).not.toContain('new-refresh-token')
       expect(w).not.toContain('backup-token-9999')
     }
-  })
-
-  it('stores newly entered credentials in the credentials table, per account', async () => {
-    const res = await save([
-      account({ client_secret: 'new-secret-value', refresh_token: 'new-refresh-token' }),
-      account({ id: 'acc-2', email: 'backup@example.org', is_active: false, backup_priority: 1, refresh_token: 'backup-token-9999' }),
+    expect(db.tablesTouched.has('mail_account_credentials')).toBe(false)
+    // Still sending with the environment's tokens.
+    expect(res.accounts.map((a) => a.refresh_token)).toEqual([
+      ENV.GOOGLE_REFRESH_TOKEN_PEOPLE,
+      ENV.GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC,
+      ENV.GOOGLE_REFRESH_TOKEN_AUTOMATION,
     ])
-    expect(db.credentials.get('acc-1')).toMatchObject({ client_secret: 'new-secret-value', refresh_token: 'new-refresh-token' })
-    expect(db.credentials.get('acc-2')).toMatchObject({ refresh_token: 'backup-token-9999' })
-    expect(res.credentialsReplaced).toEqual(['acc-1', 'acc-2'])
-    // The backup sends with its own token now, not the environment's.
-    expect(res.accounts.find((a) => a.id === 'acc-2')?.refresh_token).toBe('backup-token-9999')
   })
 
-  it('keeps a stored credential the browser sent back masked', async () => {
-    await save([account({ refresh_token: 'first-token-1111', client_secret: 'first-secret' })])
-    db.writes.length = 0
-    await save([account({ refresh_token: '••••1111', client_secret: SECRET_MASK, name: 'Renamed' })])
-    expect(db.credentials.get('acc-1')).toMatchObject({ refresh_token: 'first-token-1111', client_secret: 'first-secret' })
-    expect(db.writes.some((w) => w.table === 'mail_account_credentials')).toBe(false)
+  it('does not flag masked values sent back as credentials', async () => {
+    const res = await save([account({ email: PEOPLE.email, client_secret: SECRET_MASK, refresh_token: '••••1111' })])
+    expect(res.credentialsDropped).toBe(false)
   })
 
-  it("drops credentials from a caller who may not set them, and says so", async () => {
-    const res = await save([account({ refresh_token: 'sneaky-token-0000' })], false)
-    expect(res.success).toBe(true)
-    expect(res.credentialsDropped).toBe(true)
-    expect(db.credentials.size).toBe(0)
-    expect(settingsWrites().join()).not.toContain('sneaky-token-0000')
-  })
-
-  it("deletes a removed account's credentials", async () => {
+  it('saves status and usage for the defined accounts, matched by email', async () => {
     await save([
-      account({ refresh_token: 'a-token-1111' }),
-      account({ id: 'acc-2', email: 'backup@example.org', is_active: false, backup_priority: 1, refresh_token: 'b-token-2222' }),
+      account({ email: AUTOMATIONS_PNC.email.toUpperCase(), status: 'needs_reauth', error_message: 'invalid_grant', daily_sent_count: 3 }),
+      account({ email: 'not-defined@example.org', status: 'needs_reauth' }),
     ])
-    await save([account()])
-    expect(db.credentials.has('acc-2')).toBe(false)
-    expect(db.credentials.has('acc-1')).toBe(true)
+    const row = JSON.parse(db.settings.get('google_workspace_accounts')!.value) as Record<string, unknown>[]
+    expect(row.map((r) => r.email)).toEqual(MAIL_ACCOUNTS.map((d) => d.email))
+    expect(row[1]).toMatchObject({ status: 'needs_reauth', error_message: 'invalid_grant', daily_sent_count: 3 })
+    expect(JSON.stringify(row)).not.toContain('not-defined@example.org')
   })
 
-  it('refuses to take credentials without the service key rather than store them elsewhere', async () => {
-    db.admin = false
-    const res = await save([account({ refresh_token: 'token-without-key' })])
-    expect(res.success).toBe(false)
-    expect(db.writes).toHaveLength(0)
-  })
-})
-
-describe('getGoogleWorkspaceAccountsInternal', () => {
-  it('ignores credentials left in an old settings row', async () => {
-    db.settings.set('google_workspace_accounts', {
-      is_active: true,
-      value: JSON.stringify([
-        account({ id: 'acc-2', email: 'backup@example.org', refresh_token: 'left-behind-token', client_secret: 'left-behind' }),
-      ]),
-    })
-    const [acc] = await getGoogleWorkspaceAccountsInternal()
-    expect(acc.refresh_token).toBeUndefined()
-    expect(acc.status).toBe('disconnected')
+  it("keeps an account's earlier status when the save does not mention it", async () => {
+    await save([account({ email: AUTOMATION.email, status: 'needs_reauth', error_message: 'invalid_grant' })])
+    await save([account({ email: PEOPLE.email, daily_sent_count: 5 })])
+    const accounts = await getGoogleWorkspaceAccountsInternal()
+    expect(accounts.find((a) => a.id === AUTOMATION.id)).toMatchObject({ status: 'needs_reauth', error_message: 'invalid_grant' })
+    expect(accounts.find((a) => a.id === PEOPLE.id)?.daily_sent_count).toBe(5)
   })
 
-  it('reads no credentials without the service key', async () => {
-    db.credentials.set('acc-2', { account_id: 'acc-2', client_secret: 'x', refresh_token: 'stored-token' })
-    db.settings.set('google_workspace_accounts', {
-      is_active: true,
-      value: JSON.stringify([account({ id: 'acc-2', email: 'backup@example.org' })]),
-    })
-    db.admin = false
-    const [acc] = await getGoogleWorkspaceAccountsInternal()
-    expect(acc.refresh_token).toBeUndefined()
+  it('cannot change which account is primary or the fallback order', async () => {
+    await save([
+      account({ email: PEOPLE.email, is_active: false, backup_priority: 2 }),
+      account({ email: AUTOMATION.email, is_active: true, backup_priority: 0 }),
+    ])
+    const accounts = await getGoogleWorkspaceAccountsInternal()
+    expect(accounts.map((a) => [a.id, a.is_active, a.backup_priority])).toEqual([
+      ['people', true, 0],
+      ['automations-pnc', false, 1],
+      ['automation', false, 2],
+    ])
   })
 })

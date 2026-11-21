@@ -1,5 +1,42 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+
+// An in-memory general_settings, recording every write.
+const db = vi.hoisted(() => ({
+  settings: new Map<string, string>(),
+  writes: [] as { table: string; row: unknown }[],
+}))
+
+function fakeClient() {
+  return {
+    from(table: string) {
+      const filters: Record<string, unknown> = {}
+      const chain = {
+        select: () => chain,
+        eq: (col: string, v: unknown) => ((filters[col] = v), chain),
+        maybeSingle: async () => {
+          const value = table === 'general_settings' ? db.settings.get(filters.key as string) : undefined
+          return { data: value ? { value } : null, error: null }
+        },
+        upsert: async (row: Record<string, unknown>) => {
+          db.writes.push({ table, row })
+          if (table === 'general_settings') db.settings.set(row.key as string, row.value as string)
+          return { error: null }
+        },
+        update: (row: unknown) => {
+          db.writes.push({ table, row })
+          return { eq: async () => ({ error: null }) }
+        },
+      }
+      return chain
+    },
+  }
+}
+
+vi.mock('@/lib/supabase/admin', () => ({ createAdminSupabaseClient: () => fakeClient() }))
+vi.mock('@/lib/supabase/server', () => ({ createServerSupabaseClient: async () => fakeClient() }))
+
 import { runBackupMailboxHealthCheck } from './backupHealth'
+import { MAIL_ACCOUNTS } from './accounts'
 import type { GoogleWorkspaceAccount } from '@/lib/settings/types'
 import type { EmailPingResult } from './sendEmail'
 
@@ -117,5 +154,46 @@ describe('runBackupMailboxHealthCheck', () => {
     expect(report).toEqual({ checked: 1, connected: 0, needsReauth: 0, skipped: 1 })
     expect(saveAccounts).not.toHaveBeenCalled()
   })
-})
 
+  describe('with the code-defined accounts', () => {
+    afterEach(() => vi.unstubAllEnvs())
+
+    it('saves a refused backup as needs_reauth by email, skips one without a token, and writes no credential', async () => {
+      db.settings.clear()
+      db.writes.length = 0
+      vi.stubEnv('GOOGLE_CLIENT_ID', 'client-env.apps.googleusercontent.com')
+      vi.stubEnv('GOOGLE_CLIENT_SECRET', 'env-client-secret')
+      vi.stubEnv('GOOGLE_SENDER_EMAIL', '')
+      vi.stubEnv('GOOGLE_REFRESH_TOKEN', '')
+      vi.stubEnv('GOOGLE_REFRESH_TOKEN_PEOPLE', 'people-token-1111')
+      vi.stubEnv('GOOGLE_REFRESH_TOKEN_AUTOMATIONS_PNC', 'automations-pnc-token-2222')
+      vi.stubEnv('GOOGLE_REFRESH_TOKEN_AUTOMATION', '')
+      const [, backup1, backup2] = MAIL_ACCOUNTS
+
+      const { getGoogleWorkspaceAccountsInternal } = await import('./accounts')
+      const pinged: string[] = []
+      const report = await runBackupMailboxHealthCheck({
+        pingAccount: async (accountId): Promise<EmailPingResult> => {
+          pinged.push(accountId)
+          const acc = (await getGoogleWorkspaceAccountsInternal()).find((a) => a.id === accountId)!
+          if (!acc.refresh_token) return { ok: false, status: 'not_configured', message: 'Missing credentials' }
+          return { ok: false, status: 'error', message: 'invalid_grant' }
+        },
+      })
+
+      expect(pinged).toEqual([backup1.id, backup2.id])
+      expect(report).toEqual({ checked: 2, connected: 0, needsReauth: 1, skipped: 1 })
+
+      const row = JSON.parse(db.settings.get('google_workspace_accounts')!) as Record<string, unknown>[]
+      expect(row.find((r) => r.email === backup1.email)).toMatchObject({ status: 'needs_reauth', error_message: 'invalid_grant' })
+      const written = JSON.stringify(db.writes)
+      expect(written).not.toContain('token-1111')
+      expect(written).not.toContain('token-2222')
+      expect(written).not.toContain('env-client-secret')
+      expect(written).not.toContain('refresh_token')
+
+      const after = await getGoogleWorkspaceAccountsInternal()
+      expect(after.find((a) => a.id === backup1.id)?.status).toBe('needs_reauth')
+    })
+  })
+})

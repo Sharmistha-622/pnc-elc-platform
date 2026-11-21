@@ -544,9 +544,9 @@ export async function getGoogleWorkspaceAccounts(): Promise<GoogleWorkspaceAccou
 }
 
 /**
- * Saves the account list. Only a caller who may change the configuration
- * (Super Admin, Platform Admin) gets this far, and only they may set
- * credentials; `canWriteCredentials` says so again where the write happens.
+ * Saves the accounts' status and usage. Only a caller who may change the
+ * configuration (Super Admin, Platform Admin) gets this far. The accounts are
+ * defined in code and their credentials in the environment; neither is saved.
  */
 export async function saveGoogleWorkspaceAccounts(
   accounts: GoogleWorkspaceAccount[],
@@ -560,60 +560,37 @@ async function saveAccounts(
   accounts: GoogleWorkspaceAccount[],
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const changedBy = await callerAddress()
-  const canWriteCredentials = await canEditPlatformConfig()
-  const res = await saveGoogleWorkspaceAccountsInternal(accounts, { changedBy, canWriteCredentials })
+  const showLast4 = await canEditPlatformConfig()
+  // Saves status and usage only. Credentials are set in the environment.
+  const res = await saveGoogleWorkspaceAccountsInternal(accounts, { changedBy })
   if (!res.success) {
     return { success: false, error: res.error }
   }
-  for (const id of res.credentialsReplaced) {
-    const acc = res.accounts.find((a) => a.id === id)
-    // Which account, never the value.
-    await logSettingsChange('mail_account_credentials', id, 'credentials', '', `replaced for ${acc?.email ?? id}`, changedBy)
-  }
   revalidatePath('/manage/emails')
-  return { success: true, data: maskGoogleAccounts(res.accounts, { showLast4: canWriteCredentials }) }
+  return { success: true, data: maskGoogleAccounts(res.accounts, { showLast4 }) }
 }
 
-/** The stored list without credentials: reordering never rewrites them. */
-async function accountsWithoutCredentials(): Promise<GoogleWorkspaceAccount[]> {
-  const accounts = await getGoogleWorkspaceAccountsInternal()
-  return accounts.map((a) => ({ ...a, client_secret: undefined, refresh_token: undefined }))
-}
+const ORDER_SET_IN_CODE =
+  'The sending accounts and their fallback order are set in code (src/lib/email/accounts.ts), not here.'
 
+/** The primary is set in code; this no longer changes it. */
 export async function setActiveGoogleAccount(
   accountId: string,
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
-
-  const accounts = await accountsWithoutCredentials()
-  const target = accounts.find((a) => a.id === accountId)
-  if (!target) {
-    return { success: false, error: `Account with ID ${accountId} not found.` }
-  }
-
-  accounts.forEach((a) => {
-    a.is_active = a.id === accountId
-  })
-
-  return saveAccounts(accounts)
+  void accountId
+  return { success: false, error: ORDER_SET_IN_CODE }
 }
 
+/** The fallback order is set in code; this no longer changes it. */
 export async function reorderGoogleBackups(
   accountIdsInOrder: string[],
 ): Promise<{ success: boolean; data?: GoogleWorkspaceAccount[]; error?: string }> {
   const refused = await platformConfigRefusal()
   if (refused) return refused
-
-  const accounts = await accountsWithoutCredentials()
-  accountIdsInOrder.forEach((id, index) => {
-    const acc = accounts.find((a) => a.id === id)
-    if (acc && !acc.is_active) {
-      acc.backup_priority = index + 1
-    }
-  })
-
-  return saveAccounts(accounts)
+  void accountIdsInOrder
+  return { success: false, error: ORDER_SET_IN_CODE }
 }
 
 

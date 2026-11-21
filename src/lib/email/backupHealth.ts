@@ -34,10 +34,7 @@ export async function runBackupMailboxHealthCheck(
   const saveAccounts =
     deps.saveAccounts ??
     ((accounts: GoogleWorkspaceAccount[]) =>
-      saveGoogleWorkspaceAccountsInternal(accounts, {
-        changedBy: 'system:cron:email-backup-ping',
-        canWriteCredentials: false,
-      }))
+      saveGoogleWorkspaceAccountsInternal(accounts, { changedBy: 'system:cron:email-backup-ping' }))
 
   const accounts = await getAccounts()
   const backups = accounts.filter((acc) => !acc.is_active)

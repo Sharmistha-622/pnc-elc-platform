@@ -17,7 +17,10 @@ import { revalidatePath } from 'next/cache'
 import {
   getGoogleWorkspaceAccountsInternal,
   getOAuth2ClientForAccount,
+  sendingChain,
 } from './accounts'
+import { alertPncOfBackupSend } from './backupAlert'
+import type { GoogleWorkspaceAccount } from '@/lib/settings/types'
 import { resolveEmailTemplate } from './templates'
 
 /**
@@ -86,6 +89,36 @@ function getCategoryFromTemplate(template: string): 'onboarding' | 'confirmation
 }
 
 /**
+ * Sends one message with one account. Throws on failure.
+ */
+async function sendRawWith(acc: GoogleWorkspaceAccount, raw: string): Promise<string> {
+  const oAuth2Client = getOAuth2ClientForAccount(acc)
+  const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
+  const response = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+  return response.data.id || 'msg-sent'
+}
+
+/**
+ * After a backup account sent instead of the primary, tells PnC, at most once
+ * a day, from the account that just worked.
+ */
+async function reportBackupSend(
+  primary: GoogleWorkspaceAccount | undefined,
+  sentBy: GoogleWorkspaceAccount,
+  reason: string | null,
+) {
+  if (!primary || sentBy === primary) return
+  await alertPncOfBackupSend(
+    { primary, sentBy, reason: reason || 'The primary account could not send.' },
+    {
+      send: async (to, subject, html) => {
+        await sendRawWith(sentBy, createEmailBody(headerValue(to), headerValue(subject), html, undefined, sentBy.email))
+      },
+    },
+  )
+}
+
+/**
  * Dispatches an email using the active Google Workspace account, with
  * automatic sequential failover to configured backup accounts (B, C...)
  * if the primary dispatch fails.
@@ -105,31 +138,18 @@ export async function sendEmail(
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 
-  // Retrieve multi-account configuration
-  const accounts = await getGoogleWorkspaceAccountsInternal()
-  const activeAccount = accounts.find((a) => a.is_active) || accounts[0]
-  const backupAccounts = accounts
-    .filter((a) => a.id !== activeAccount.id)
-    .sort((a, b) => (a.backup_priority || 0) - (b.backup_priority || 0))
-
-  const attemptChain = [activeAccount, ...backupAccounts]
-  let lastError: string | null = null
+  // The configured accounts, primary first. Accounts without a token are skipped.
+  const { primary, chain: attemptChain, primarySkipped } = sendingChain(await getGoogleWorkspaceAccountsInternal())
+  let lastError: string | null = attemptChain.length === 0 ? 'No sending account is configured.' : null
+  let primaryFailure: string | null = primarySkipped
 
   for (let i = 0; i < attemptChain.length; i++) {
     const acc = attemptChain[i]
-    const isBackup = i > 0
+    const isBackup = acc !== primary
 
     try {
-      const oAuth2Client = getOAuth2ClientForAccount(acc)
-      const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
       const raw = createEmailBody(to, subject, htmlBody, cc, acc.email)
-
-      const response = await gmail.users.messages.send({
-        userId: 'me',
-        requestBody: { raw },
-      })
-
-      const messageId = response.data.id || 'msg-sent'
+      const messageId = await sendRawWith(acc, raw)
 
       // Automatically record real successful dispatch in database.
       try {
@@ -154,6 +174,8 @@ export async function sendEmail(
         revalidatePath('/manage/emails')
       } catch {}
 
+      if (isBackup) await reportBackupSend(primary, acc, primaryFailure)
+
       return {
         success: true,
         messageId,
@@ -164,6 +186,7 @@ export async function sendEmail(
     } catch (error: any) {
       const errorMsg = error?.message || 'Unknown error'
       lastError = errorMsg
+      if (acc === primary) primaryFailure = errorMsg
       console.warn(`[sendEmail] Attempt via ${acc.name} (${acc.email}) failed: ${errorMsg}`)
 
       // If there are more backup accounts, failover to the next one!
@@ -228,17 +251,13 @@ export async function sendCalendarInvite(opts: {
   const to = opts.to.map((r) => headerValue(r.email)).filter(Boolean)
   if (to.length === 0) return { success: false, error: 'No recipients' }
 
-  // Retrieve multi-account configuration
-  const accounts = await getGoogleWorkspaceAccountsInternal()
-  const activeAccount = accounts.find((a) => a.is_active) || accounts[0]
-  const backupAccounts = accounts
-    .filter((a) => a.id !== activeAccount.id)
-    .sort((a, b) => (a.backup_priority || 0) - (b.backup_priority || 0))
-
-  const attemptChain = [activeAccount, ...backupAccounts]
+  // The configured accounts, primary first. Accounts without a token are skipped.
+  const { primary, chain: attemptChain, primarySkipped } = sendingChain(await getGoogleWorkspaceAccountsInternal())
+  let primaryFailure: string | null = primarySkipped
+  let sentBy: GoogleWorkspaceAccount | null = null
   let result: { success: true; messageId: string } | { success: false; error: string } = {
     success: false,
-    error: 'No accounts configured',
+    error: 'No sending account is configured.',
   }
 
   for (let i = 0; i < attemptChain.length; i++) {
@@ -271,14 +290,13 @@ export async function sendCalendarInvite(opts: {
       .replace(/=+$/, '')
 
     try {
-      const oAuth2Client = getOAuth2ClientForAccount(acc)
-      const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
-      const response = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
-      result = { success: true, messageId: response.data.id || 'msg-sent' }
+      result = { success: true, messageId: await sendRawWith(acc, raw) }
+      sentBy = acc
       break
     } catch (err: any) {
       const errorMsg = err?.message || 'Unknown calendar invite error'
       result = { success: false, error: errorMsg }
+      if (acc === primary) primaryFailure = errorMsg
       console.warn(`[sendCalendarInvite] Attempt via ${acc.name} (${acc.email}) failed: ${errorMsg}`)
 
       if (i < attemptChain.length - 1) {
@@ -307,6 +325,8 @@ export async function sendCalendarInvite(opts: {
   } catch {
     // A failed log never fails the invitation.
   }
+
+  if (sentBy && sentBy !== primary) await reportBackupSend(primary, sentBy, primaryFailure)
 
   return result
 }
